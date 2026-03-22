@@ -123,16 +123,19 @@ async function fetchWithFallback(url) {
 // ─── MAIN DATA FETCH ─────────────────────────────────────────
 async function fetchData() {
     try {
-        // Binance API - используем публичный endpoint без CORS проблем
-        const binanceUrl = "https://api.binance.com/api/3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22DOGEUSDT%22%2C%22BNBUSDT%22%2C%22XRPUSDT%22%5D";
-        
-        const [polyRes, binRes] = await Promise.all([
-            fetchWithFallback(CONFIG.API),
-            fetchWithFallback(binanceUrl)
-        ]);
-
+        // Polymarket API
+        const polyRes = await fetchWithFallback(CONFIG.API);
         const polyData = await polyRes.json();
-        const binData = await binRes.json();
+        
+        // Binance API - может упасть, это не критично
+        let binData = [];
+        try {
+            const binanceUrl = "https://api.binance.com/api/3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22DOGEUSDT%22%2C%22BNBUSDT%22%2C%22XRPUSDT%22%5D";
+            const binRes = await fetchWithFallback(binanceUrl);
+            binData = await binRes.json();
+        } catch(e) {
+            console.warn('Binance API failed, using empty price map:', e.message);
+        }
 
         // Build price map from Binance
         appState.priceMap = {};
