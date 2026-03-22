@@ -6,6 +6,8 @@
 
 const CONFIG = {
     API: "https://gamma-api.polymarket.com/events?active=true&closed=false&order=volume&dir=desc&limit=25",
+    // Alternative API endpoints
+    API_BACKUP: "https://polymarket.com/api/events?active=true&limit=25",
     // Use our own Vercel Proxy for 100% reliability
     PROXY: "/api/proxy?url=",
     REFRESH: 12000,
@@ -55,21 +57,48 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(monitorMarkets, 5000);
 });
 
-// ─── STABLE FETCH: Using local Vercel Proxy ─────────────────
+// ─── STABLE FETCH: Direct API with CORS fallback ────────────────
 async function fetchWithFallback(url) {
+    // Try 1: Direct fetch with CORS
     try {
-        // Try our own Vercel API bridge first
-        const proxyUrl = `${CONFIG.PROXY}${encodeURIComponent(url)}`;
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-        if (res.ok) return res;
-        
-        // Fallback to direct fetch if possible
-        const direct = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (direct.ok) return direct;
+        const direct = await fetch(url, { 
+            signal: AbortSignal.timeout(10000),
+            mode: 'cors'
+        });
+        if (direct.ok) {
+            console.log('✓ Direct fetch successful');
+            return direct;
+        }
     } catch(e) {
-        console.warn('API fetch failed:', e);
+        console.warn('Direct fetch failed:', e.message);
     }
-    throw new Error("Data Bridge Error");
+    
+    // Try 2: Vercel proxy (works on deployed site)
+    try {
+        const proxyUrl = `${CONFIG.PROXY}${encodeURIComponent(url)}`;
+        console.log('Trying proxy:', proxyUrl.substring(0, 50) + '...');
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+        if (res.ok) {
+            console.log('✓ Proxy fetch successful');
+            return res;
+        }
+    } catch(e) {
+        console.warn('Proxy fetch failed:', e.message);
+    }
+    
+    // Try 3: Backup API via proxy
+    try {
+        const backupUrl = `${CONFIG.PROXY}${encodeURIComponent(CONFIG.API_BACKUP)}`;
+        const res = await fetch(backupUrl, { signal: AbortSignal.timeout(10000) });
+        if (res.ok) {
+            console.log('✓ Backup API successful');
+            return res;
+        }
+    } catch(e) {
+        console.warn('Backup API failed:', e.message);
+    }
+    
+    throw new Error("Data Bridge Error - All endpoints failed");
 }
 
 // ─── MAIN DATA FETCH ─────────────────────────────────────────

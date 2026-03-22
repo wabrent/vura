@@ -1,5 +1,18 @@
 // api/proxy.js
+export const config = {
+  runtime: 'edge',
+};
+
 export default async function handler(req, res) {
+  // Handle CORS preflight
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   const { url } = req.query;
 
   if (!url) {
@@ -7,14 +20,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(decodeURIComponent(url));
+    const targetUrl = decodeURIComponent(url);
+    const response = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': 'PolyEdge/1.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API responded with ${response.status}`);
+    }
+    
     const data = await response.json();
 
-    // CORS headers for the browser
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET');
     res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch data' });
+    console.error('Proxy error:', error);
+    res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
   }
 }
