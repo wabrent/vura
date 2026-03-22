@@ -20,10 +20,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Build output
-dist/
-build/
-public/
+# Build output (not for static sites)
+# dist/
+# build/
 
 # Temporary files
 *.tmp
