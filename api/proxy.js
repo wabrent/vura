@@ -1,9 +1,5 @@
-// api/proxy.js
-export const config = {
-  runtime: 'edge',
-};
-
-export default async function handler(req, res) {
+// api/proxy.js - Vercel Serverless Function
+module.exports = async function handler(req, res) {
   // Handle CORS preflight
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -39,4 +35,4 @@ export default async function handler(req, res) {
     console.error('Proxy error:', error);
     res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
   }
-}
+};

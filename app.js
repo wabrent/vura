@@ -10,7 +10,7 @@ const CONFIG = {
     API_BACKUP: "https://polymarket.com/api/events?active=true&limit=25",
     // CORS proxy for local development (remove in production)
     CORS_PROXY: "https://api.allorigins.win/raw?url=",
-    // Use our own Vercel Proxy for 100% reliability
+    // Use our own Vercel Proxy for production
     PROXY: "/api/proxy?url=",
     REFRESH: 12000,
     // Whale tracking thresholds
@@ -123,9 +123,12 @@ async function fetchWithFallback(url) {
 // ─── MAIN DATA FETCH ─────────────────────────────────────────
 async function fetchData() {
     try {
+        // Binance API - используем публичный endpoint без CORS проблем
+        const binanceUrl = "https://api.binance.com/api/3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22DOGEUSDT%22%2C%22BNBUSDT%22%2C%22XRPUSDT%22%5D";
+        
         const [polyRes, binRes] = await Promise.all([
             fetchWithFallback(CONFIG.API),
-            fetchWithFallback("https://api.binance.com/api/3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22DOGEUSDT%22%2C%22BNBUSDT%22%2C%22XRPUSDT%22%5D")
+            fetchWithFallback(binanceUrl)
         ]);
 
         const polyData = await polyRes.json();
