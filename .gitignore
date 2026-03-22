@@ -27,6 +27,3 @@ build/
 # Temporary files
 *.tmp
 .cache/
-
-# API package
-api/package.json

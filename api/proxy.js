@@ -17,6 +17,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const targetUrl = decodeURIComponent(url);
+    console.log('Proxying request to:', targetUrl);
+    
     const response = await fetch(targetUrl, {
       headers: {
         'User-Agent': 'PolyEdge/1.0',
@@ -25,14 +27,16 @@ module.exports = async function handler(req, res) {
     });
     
     if (!response.ok) {
+      console.error('API error:', response.status);
       throw new Error(`API responded with ${response.status}`);
     }
     
     const data = await response.json();
+    console.log('Proxy success, data size:', JSON.stringify(data).length);
 
     res.status(200).json(data);
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Proxy error:', error.message);
     res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
   }
 };
