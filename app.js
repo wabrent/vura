@@ -8,6 +8,8 @@ const CONFIG = {
     API: "https://gamma-api.polymarket.com/events?active=true&closed=false&order=volume&dir=desc&limit=25",
     // Alternative API endpoints
     API_BACKUP: "https://polymarket.com/api/events?active=true&limit=25",
+    // CORS proxy for local development (remove in production)
+    CORS_PROXY: "https://api.allorigins.win/raw?url=",
     // Use our own Vercel Proxy for 100% reliability
     PROXY: "/api/proxy?url=",
     REFRESH: 12000,
@@ -59,7 +61,24 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ─── STABLE FETCH: Direct API with CORS fallback ────────────────
 async function fetchWithFallback(url) {
-    // Try 1: Direct fetch with CORS
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    // Try 1: CORS proxy for local development
+    if (isLocalhost) {
+        try {
+            const corsUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(url)}`;
+            console.log('Local dev: Using CORS proxy');
+            const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
+            if (res.ok) {
+                console.log('✓ CORS proxy fetch successful');
+                return res;
+            }
+        } catch(e) {
+            console.warn('CORS proxy failed:', e.message);
+        }
+    }
+    
+    // Try 2: Direct fetch with CORS
     try {
         const direct = await fetch(url, { 
             signal: AbortSignal.timeout(10000),
@@ -73,7 +92,7 @@ async function fetchWithFallback(url) {
         console.warn('Direct fetch failed:', e.message);
     }
     
-    // Try 2: Vercel proxy (works on deployed site)
+    // Try 3: Vercel proxy (works on deployed site)
     try {
         const proxyUrl = `${CONFIG.PROXY}${encodeURIComponent(url)}`;
         console.log('Trying proxy:', proxyUrl.substring(0, 50) + '...');
@@ -86,7 +105,7 @@ async function fetchWithFallback(url) {
         console.warn('Proxy fetch failed:', e.message);
     }
     
-    // Try 3: Backup API via proxy
+    // Try 4: Backup API via proxy
     try {
         const backupUrl = `${CONFIG.PROXY}${encodeURIComponent(CONFIG.API_BACKUP)}`;
         const res = await fetch(backupUrl, { signal: AbortSignal.timeout(10000) });
