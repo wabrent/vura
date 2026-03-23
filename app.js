@@ -123,29 +123,14 @@ async function fetchWithFallback(url) {
 // ─── MAIN DATA FETCH ─────────────────────────────────────────
 async function fetchData() {
     try {
-        // Polymarket API
+        // Polymarket API only
         const polyRes = await fetchWithFallback(CONFIG.API);
         const polyData = await polyRes.json();
         
-        // Binance API - может упасть, это не критично
-        let binData = [];
-        try {
-            const binanceUrl = "https://api.binance.com/api/3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22DOGEUSDT%22%2C%22BNBUSDT%22%2C%22XRPUSDT%22%5D";
-            const binRes = await fetchWithFallback(binanceUrl);
-            binData = await binRes.json();
-        } catch(e) {
-            console.warn('Binance API failed, using empty price map:', e.message);
-        }
-
-        // Build price map from Binance
+        // Build empty price map (no Binance)
         appState.priceMap = {};
-        if (Array.isArray(binData)) {
-            binData.forEach(t => {
-                appState.priceMap[t.symbol] = { price: parseFloat(t.lastPrice), change24h: parseFloat(t.priceChangePercent) };
-            });
-        }
 
-        // Update header stats from real data
+        // Update header stats
         updateHeaderStats(polyData, appState.priceMap);
 
         // Process markets
@@ -182,25 +167,8 @@ function processEvent(event, priceMap) {
     const rawVol = (event.metrics && event.metrics.volume) || (mainMarket && mainMarket.volume) || 0;
     let finalVol = rawVol > 0 ? rawVol : 0;
 
-    // РЕАЛЬНЫЙ arbitrage matching с Binance
-    let globalPrice = null, diff = 0, matchedTicker = null;
-    const lower = event.title.toLowerCase();
-    const matchedKey = Object.keys(tickerMap).find(k => lower.includes(k));
-    if (matchedKey) {
-        matchedTicker = tickerMap[matchedKey];
-        const ex = priceMap[matchedTicker];
-        if (ex) {
-            globalPrice = ex.price;
-            // Реальный расчёт gap: сравниваем implied probability с ценой актива
-            // Например: если Polymarket даёт 60% для "BTC > $100k", а BTC на Binance стоит $95k
-            const impliedProb = yesPrice;
-            const priceChange = ex.change24h || 0;
-            // Gap = отклонение между implied probability и реальным движением рынка
-            diff = parseFloat(((impliedProb * 100 - 50) - priceChange / 10).toFixed(2));
-        }
-    }
-
     // Category detection
+    const lower = event.title.toLowerCase();
     let category = 'general';
     for (const [cat, words] of Object.entries(CATEGORY_KEYWORDS)) {
         if (words.some(w => lower.includes(w))) { category = cat; break; }
@@ -224,9 +192,9 @@ function processEvent(event, priceMap) {
         spread: parseFloat(spread),
         price: displayPrice,
         yesPrice, noPrice,
-        globalPrice: globalPrice ? `$${globalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
-        diff, hasGlobal: !!globalPrice,
-        endDate, ticker: matchedTicker
+        globalPrice: 'N/A',
+        diff: 0, hasGlobal: false,
+        endDate, ticker: null
     };
 }
 
@@ -290,12 +258,10 @@ function updateHeaderStats(polyData, priceMap) {
     const totalVol = polyData.reduce((sum, e) => sum + ((e.metrics && e.metrics.volume) || 0), 0);
     const volEl = document.getElementById('global-vol');
     const marketsEl = document.getElementById('active-markets');
-    const btcEl = document.getElementById('btc-price');
     const gasEl = document.getElementById('gas-display');
 
     if (volEl) volEl.textContent = '$' + new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(totalVol);
     if (marketsEl) marketsEl.textContent = polyData.length.toLocaleString();
-    if (btcEl && priceMap['BTCUSDT']) btcEl.textContent = '$' + priceMap['BTCUSDT'].price.toLocaleString('en-US', { maximumFractionDigits: 0 });
     if (gasEl) {
         const gwei = (Math.random() * 20 + 15).toFixed(0);
         gasEl.textContent = `● GAS: ${gwei} GWEI`;
@@ -454,10 +420,10 @@ function openMarket(slug) {
 // ─── CSV EXPORT ───────────────────────────────────────────────
 function exportCSV() {
     if (appState.markets.length === 0) return;
-    const headers = ['Question', 'Category', 'Alpha %', 'Volume', 'Price', 'Exchange Gap', 'Slug'];
+    const headers = ['Question', 'Category', 'Alpha %', 'Volume', 'Price', 'Slug'];
     const rows = appState.markets.map(m => [
         `"${m.question.replace(/"/g, '')}"`, m.category, m.alpha,
-        m.volDisplay, m.price + '¢', m.hasGlobal ? m.diff + '%' : 'N/A',
+        m.volDisplay, m.price + '¢',
         `https://polymarket.com/event/${m.slug}`
     ]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
