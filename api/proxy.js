@@ -1,6 +1,4 @@
-// api/proxy.js - Vercel Serverless Function
-module.exports = async function handler(req, res) {
-  // Handle CORS preflight
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -17,26 +15,22 @@ module.exports = async function handler(req, res) {
 
   try {
     const targetUrl = decodeURIComponent(url);
-    console.log('Proxying request to:', targetUrl);
     
     const response = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'PolyEdge/1.0',
+        'User-Agent': 'Mozilla/5.0',
         'Accept': 'application/json'
-      }
+      },
+      signal: AbortSignal.timeout(15000)
     });
     
     if (!response.ok) {
-      console.error('API error:', response.status);
       throw new Error(`API responded with ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('Proxy success, data size:', JSON.stringify(data).length);
-
     res.status(200).json(data);
   } catch (error) {
-    console.error('Proxy error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
+    res.status(500).json({ error: error.message });
   }
-};
+}
