@@ -2,10 +2,10 @@
   "name": "polyedge-quant",
   "version": "4.0.0",
   "description": "PolyEdge Quant Terminal — Real-time Polymarket analytics with Alpha Score, Arbitrage detection, and Whale Flow tracking",
-  "main": "server.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node local-server.js",
+    "dev": "node local-server.js",
     "build": "echo 'No build step required - vanilla JS'",
     "deploy": "vercel --prod"
   },
