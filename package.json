@@ -24,7 +24,7 @@
     "type": "git",
     "url": "https://github.com/waabrent/polyedge.git"
   },
-  "dependencies": {
+  "devDependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1"
   }
