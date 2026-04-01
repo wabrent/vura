@@ -22,10 +22,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/waabrent/polyedge.git"
-  },
-  "devDependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "url": "https://github.com/wabrent/polyedge.git"
   }
 }
