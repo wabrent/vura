@@ -59,26 +59,22 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(monitorMarkets, 5000);
 });
 
-// ─── STABLE FETCH: Direct API with CORS fallback ────────────────
+// ─── STABLE FETCH: Local proxy first, then fallbacks ────────────────
 async function fetchWithFallback(url) {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // Try 1: CORS proxy for local development
-    if (isLocalhost) {
-        try {
-            const corsUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(url)}`;
-            console.log('Local dev: Using CORS proxy');
-            const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
-            if (res.ok) {
-                console.log('✓ CORS proxy fetch successful');
-                return res;
-            }
-        } catch(e) {
-            console.warn('CORS proxy failed:', e.message);
+    // Try 1: Local server proxy (works always)
+    try {
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+        console.log('Trying local proxy...');
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+        if (res.ok) {
+            console.log('✓ Local proxy successful');
+            return res;
         }
+    } catch(e) {
+        console.warn('Local proxy failed:', e.message);
     }
     
-    // Try 2: Direct fetch with CORS
+    // Try 2: Direct fetch
     try {
         const direct = await fetch(url, { 
             signal: AbortSignal.timeout(10000),
@@ -92,29 +88,17 @@ async function fetchWithFallback(url) {
         console.warn('Direct fetch failed:', e.message);
     }
     
-    // Try 3: Vercel proxy (works on deployed site)
+    // Try 3: CORS proxy
     try {
-        const proxyUrl = `${CONFIG.PROXY}${encodeURIComponent(url)}`;
-        console.log('Trying proxy:', proxyUrl.substring(0, 50) + '...');
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+        const corsUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(url)}`;
+        console.log('Trying CORS proxy...');
+        const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
         if (res.ok) {
-            console.log('✓ Proxy fetch successful');
+            console.log('✓ CORS proxy successful');
             return res;
         }
     } catch(e) {
-        console.warn('Proxy fetch failed:', e.message);
-    }
-    
-    // Try 4: Backup API via proxy
-    try {
-        const backupUrl = `${CONFIG.PROXY}${encodeURIComponent(CONFIG.API_BACKUP)}`;
-        const res = await fetch(backupUrl, { signal: AbortSignal.timeout(10000) });
-        if (res.ok) {
-            console.log('✓ Backup API successful');
-            return res;
-        }
-    } catch(e) {
-        console.warn('Backup API failed:', e.message);
+        console.warn('CORS proxy failed:', e.message);
     }
     
     throw new Error("Data Bridge Error - All endpoints failed");

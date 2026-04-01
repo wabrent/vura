@@ -2,10 +2,10 @@
   "name": "polyedge-quant",
   "version": "4.0.0",
   "description": "PolyEdge Quant Terminal — Real-time Polymarket analytics with Alpha Score, Arbitrage detection, and Whale Flow tracking",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
-    "start": "npx live-server --port=3000",
-    "dev": "npx live-server --port=3000 --no-browser",
+    "start": "node server.js",
+    "dev": "node server.js",
     "build": "echo 'No build step required - vanilla JS'",
     "deploy": "vercel --prod"
   },
@@ -23,5 +23,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/waabrent/polyedge.git"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
   }
 }
