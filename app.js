@@ -69,15 +69,28 @@ window.addEventListener('DOMContentLoaded', () => {
 async function fetchWithFallback(url) {
     try {
         const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+        console.log('[FETCH] Trying proxy for:', url.substring(0, 60));
         const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-        if (res.ok) return res;
-    } catch(e) { console.warn('Proxy failed:', e.message); }
+        if (res.ok) {
+            console.log('[FETCH] ✓ Proxy success');
+            return res;
+        }
+        console.log('[FETCH] Proxy response not OK:', res.status);
+    } catch(e) { 
+        console.warn('[FETCH] Proxy error:', e.message); 
+    }
     
     try {
         const corsUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(url)}`;
+        console.log('[FETCH] Trying CORS proxy...');
         const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
-        if (res.ok) return res;
-    } catch(e) { console.warn('CORS proxy failed:', e.message); }
+        if (res.ok) {
+            console.log('[FETCH] ✓ CORS success');
+            return res;
+        }
+    } catch(e) { 
+        console.warn('[FETCH] CORS error:', e.message); 
+    }
     
     throw new Error("Data Bridge Error");
 }
