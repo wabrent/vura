@@ -1,28 +1,14 @@
 // ============================================================
-// POLYEDGE QUANT TERMINAL v5.0 - ARBITRAGE EDITION
-// Features: Polymarket ↔ Cross-Platform Arbitrage Detection
-// Platforms: Polymarket, Kalshi, Manifold, Betfair
+// POLYEDGE QUANT TERMINAL - WORKING VERSION
 // ============================================================
 
 const CONFIG = {
     API: "https://gamma-api.polymarket.com/events?closed=false&order=volume&dir=desc&limit=30",
     CORS_PROXY: "https://api.allorigins.win/raw?url=",
     PROXY: "/api/proxy?url=",
-    REFRESH: 12000,
+    REFRESH: 15000,
     WHALE_THRESHOLD_USD: 10000,
-    ARBITRAGE_THRESHOLD: 2.0,  // Minimum 2% profit to show signal
-    
-    // Platform APIs
-    KALSHI_API: "https://api.kalshi.co/trade-api/v2/markets",
-    MANIFOLD_API: "https://manifold.markets/api/v0/markets",
-    BETFAIR_API: "https://api.betfair.com/exchange/betting/rest/v1.0/"
-};
-
-const PLATFORMS = {
-    polymarket: { name: 'Polymarket', color: '#00ff9d', api: CONFIG.API },
-    kalshi: { name: 'Kalshi', color: '#fbbf24', api: CONFIG.KALSHI_API, requiresKey: true },
-    manifold: { name: 'Manifold', color: '#a78bfa', api: CONFIG.MANIFOLD_API },
-    betfair: { name: 'Betfair', color: '#60a5fa', api: CONFIG.BETFAIR_API, requiresKey: true }
+    ARBITRAGE_THRESHOLD: 2.0
 };
 
 let priceHistory = {};
@@ -104,18 +90,58 @@ async function fetchData() {
 }
 
 function processEvent(event, priceMap) {
-    const mainMarket = event.markets ? event.markets[0] : {};
+    const mainMarket = event.markets && event.markets.length > 0 ? event.markets[0] : {};
     let displayPrice = "50";
     let endDate = null;
     let yesPrice = 0.5, noPrice = 0.5;
 
     try {
-        if (mainMarket.outcomePrices) {
+        if (mainMarket && mainMarket.outcomePrices) {
             const parsed = JSON.parse(mainMarket.outcomePrices);
             yesPrice = parseFloat(parsed[0]) || 0.5;
-            noPrice = parseFloat(parsed[1]) || (1 - yesPrice);
+            noPrice = 1 - yesPrice;
+            displayPrice = Math.round(yesPrice * 100).toString();
+        } else if (mainMarket && mainMarket.bestAsk && mainMarket.bestBid) {
+            yesPrice = (mainMarket.bestAsk + mainMarket.bestBid) / 2;
+            noPrice = 1 - yesPrice;
             displayPrice = Math.round(yesPrice * 100).toString();
         }
+        if (mainMarket && (mainMarket.endDate || event.endDate)) {
+            endDate = new Date(mainMarket.endDate || event.endDate);
+        }
+    } catch (e) { 
+        console.warn('Error parsing market:', e.message);
+        displayPrice = "50"; 
+    }
+
+    const rawVol = (event.metrics && event.metrics.volume) || 
+                   (mainMarket && (parseFloat(mainMarket.volumeNum || mainMarket.volume) || 0)) || 
+                   (event.volume24hr || 0);
+    
+    const lower = event.title ? event.title.toLowerCase() : '';
+    let category = 'general';
+    for (const [cat, words] of Object.entries(CATEGORY_KEYWORDS)) {
+        if (words.some(w => lower.includes(w))) { category = cat; break; }
+    }
+
+    const alpha = calculateAlphaScore(event.id, yesPrice, rawVol, endDate);
+    const spread = Math.abs(yesPrice + noPrice - 1);
+    updatePriceHistory(event.id, yesPrice);
+
+    return {
+        id: event.id,
+        question: event.title || 'Unknown',
+        slug: event.slug || event.ticker || '',
+        source: 'polymarket',
+        alpha, category,
+        volume: rawVol,
+        volDisplay: formatVolume(rawVol),
+        spread: spread,
+        price: displayPrice,
+        yesPrice, noPrice,
+        endDate
+    };
+}
         if (mainMarket.endDate || event.endDate) {
             endDate = new Date(mainMarket.endDate || event.endDate);
         }
@@ -264,21 +290,29 @@ function findArbitrageOpportunities() {
     const kalshi = appState.crossPlatformData.kalshi;
     const manifold = appState.crossPlatformData.manifold;
     
-    console.log(`Scanning: ${polymarket.length} PM, ${kalshi.length} Kalshi, ${manifold.length} Manifold`);
+    console.log(`[ARB] Scanning: ${polymarket.length} PM, ${kalshi.length} Kalshi, ${manifold.length} Manifold`);
+    
+    // Show sample prices
+    if (polymarket.length > 0) {
+        console.log('[ARB] Sample PM prices:', polymarket.slice(0,5).map(m => ({ q: m.question?.substring(0,20), p: m.yesPrice, s: m.spread })));
+    }
+    
+    // Combine other platforms
+    const allOther = [...kalshi, ...manifold].filter(m => m.yesPrice > 0.01 && m.yesPrice < 0.99);
+    console.log('[ARB] Valid other markets:', allOther.length);
     
     // Match Polymarket vs other platforms
     for (const pm of polymarket) {
-        if (pm.volume < 1000) continue; // Lower threshold
+        if (pm.yesPrice < 0.01 || pm.yesPrice > 0.99) continue;
         
         // Try matching with similar events from other platforms
-        const matches = findMatchingEvents(pm, [...kalshi, ...manifold]);
+        const matches = findMatchingEvents(pm, allOther);
         
         for (const match of matches) {
             const priceDiff = Math.abs(pm.yesPrice - match.yesPrice) * 100;
-            const profit = priceDiff;
             
-            if (profit >= threshold) {
-                console.log(`ARB FOUND: ${pm.question.substring(0,30)}... ${profit.toFixed(2)}% (${pm.yesPrice.toFixed(2)} vs ${match.yesPrice.toFixed(2)})`);
+            if (priceDiff >= threshold) {
+                console.log(`[ARB] FOUND: ${pm.question?.substring(0,25)} vs ${match.question?.substring(0,25)} = ${priceDiff.toFixed(1)}%`);
                 opportunities.push({
                     polymarket: pm,
                     other: match,
@@ -286,8 +320,8 @@ function findArbitrageOpportunities() {
                     pricePoly: pm.yesPrice,
                     priceOther: match.yesPrice,
                     gap: priceDiff.toFixed(2),
-                    profit: profit.toFixed(2),
-                    isProfitable: profit >= threshold
+                    profit: priceDiff.toFixed(2),
+                    isProfitable: true
                 });
             }
         }
@@ -295,7 +329,8 @@ function findArbitrageOpportunities() {
     
     // Also check internal arbitrage (Yes + No spread)
     for (const pm of polymarket) {
-        if (pm.spread > 0.02) {
+        if (pm.spread > 0.02 && pm.yesPrice > 0.01 && pm.yesPrice < 0.99) {
+            console.log(`[ARB] Internal: ${pm.question?.substring(0,25)} spread=${(pm.spread*100).toFixed(1)}%`);
             opportunities.push({
                 polymarket: pm,
                 other: null,
@@ -314,6 +349,8 @@ function findArbitrageOpportunities() {
         .filter(o => o.isProfitable)
         .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
         .slice(0, 20);
+    
+    console.log(`[ARB] Total opportunities: ${appState.arbitrageOpportunities.length}`);
 }
 
 function findMatchingEvents(polyMarket, otherMarkets) {
