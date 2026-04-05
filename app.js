@@ -116,7 +116,11 @@ function processEvent(event, priceMap) {
 
     const rawVol = (event.metrics && event.metrics.volume) || 
                    (mainMarket && (parseFloat(mainMarket.volumeNum || mainMarket.volume) || 0)) || 
-                   (event.volume24hr || 0);
+                   (event.volume24hr || 0) ||
+                   (event.series && event.series.volume24hr) || 0;
+
+    // If volume is still 0 but series has volume, use that
+    const finalVolume = rawVol > 0 ? rawVol : ((event.series && event.series.volume) || 0);
     
     const lower = event.title ? event.title.toLowerCase() : '';
     let category = 'general';
@@ -124,7 +128,7 @@ function processEvent(event, priceMap) {
         if (words.some(w => lower.includes(w))) { category = cat; break; }
     }
 
-    const alpha = calculateAlphaScore(event.id, yesPrice, rawVol, endDate);
+    const alpha = calculateAlphaScore(event.id, yesPrice, finalVolume, endDate);
     const spread = Math.abs(yesPrice + noPrice - 1);
     updatePriceHistory(event.id, yesPrice);
 
@@ -134,8 +138,8 @@ function processEvent(event, priceMap) {
         slug: event.slug || event.ticker || '',
         source: 'polymarket',
         alpha, category,
-        volume: rawVol,
-        volDisplay: formatVolume(rawVol),
+        volume: finalVolume,
+        volDisplay: formatVolume(finalVolume),
         spread: spread,
         price: displayPrice,
         yesPrice, noPrice,
