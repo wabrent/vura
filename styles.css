@@ -276,3 +276,32 @@ header {
 /* UTILS */
 .custom-scroll::-webkit-scrollbar { width: 3px; }
 .custom-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ARBITRAGE PANEL */
+.arbitrage-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 10px;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+.arbitrage-panel .box-header {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+#arbitrage-list {
+    font-size: 10px;
+}
+
+.arb-item {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.arb-hot {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-left-color: #ef4444 !important;
+}

@@ -111,9 +111,42 @@
             </div>
         </main>
 
-        <!-- WHALE FLOW SIDEBAR -->
+        <!-- ARBITRAGE & WHALE FLOW SIDEBAR -->
         <aside class="flow-container">
             <h3 class="box-header" style="background:transparent; padding:0 0 15px 0; border:none;">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i data-lucide="git-branch" style="width:14px;"></i>
+                        ARBITRAGE SIGNALS
+                    </div>
+                    <span id="arb-count" style="font-size:9px; color:var(--accent);">0 ACTIVE</span>
+                </div>
+            </h3>
+            
+            <div id="arb-log" style="flex-grow: 1; overflow-y: auto; margin-bottom: 15px;" class="custom-scroll">
+                <div style="color:var(--text-dark); font-size:9px; text-align:center; padding:20px;">
+                    SCANNING CROSS-PLATFORM...
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px; padding: 10px; background:rgba(0,255,157,0.05); border:1px solid var(--border);">
+                <div style="font-size:9px; color:var(--text-dim); margin-bottom:6px; display:flex; justify-content:space-between;">
+                    <span>THRESHOLD</span>
+                    <select id="arb-threshold" onchange="updateArbitrageThreshold(this.value)" 
+                        style="background:black; color:var(--accent); border:1px solid var(--border); 
+                        padding:2px 6px; font-size:9px; font-family:inherit;">
+                        <option value="1">1%</option>
+                        <option value="2" selected>2%</option>
+                        <option value="3">3%</option>
+                        <option value="5">5%</option>
+                    </select>
+                </div>
+                <div style="font-size:8px; color:var(--text-dark);">
+                    Polymarket ↔ Kalshi, Manifold, Betfair
+                </div>
+            </div>
+            
+            <h3 class="box-header" style="background:transparent; padding:0 0 15px 0; border:none; border-top:1px solid var(--border); padding-top:15px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <i data-lucide="bar-chart-3" style="width:14px;"></i>
