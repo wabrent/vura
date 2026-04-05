@@ -85,19 +85,29 @@ async function fetchWithFallback(url) {
 // ─── MAIN DATA FETCH ─────────────────────────────────────────
 async function fetchData() {
     try {
+        console.log('[DATA] Fetching Polymarket...');
         const polyRes = await fetchWithFallback(CONFIG.API);
         const polyData = await polyRes.json();
+        console.log('[DATA] PM raw:', polyData.length, 'events');
         
         appState.priceMap = {};
         updateHeaderStats(polyData, appState.priceMap);
-        appState.allMarkets = polyData.map(event => processEvent(event, appState.priceMap));
-        appState.crossPlatformData.polymarket = appState.allMarkets;
+        
+        // Process and filter valid markets
+        const processed = polyData.map(event => processEvent(event, appState.priceMap))
+            .filter(m => m.yesPrice > 0 && m.yesPrice < 1); // Only valid prices
+        
+        console.log('[DATA] PM processed:', processed.length, 'with valid prices');
+        console.log('[DATA] Sample:', processed.slice(0,2).map(m => ({ q: m.question?.substring(0,25), p: m.yesPrice, v: m.volume })));
+        
+        appState.allMarkets = processed;
+        appState.crossPlatformData.polymarket = processed;
         appState.error = false;
         appState.loading = false;
         
         applyFilters();
     } catch (e) {
-        console.error("Fetch Error:", e);
+        console.error("[DATA] Fetch Error:", e);
         appState.error = true;
         renderMarkets();
     }
@@ -252,15 +262,18 @@ async function fetchManifoldMarkets() {
         const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
         if (res.ok) {
             const data = await res.json();
-            appState.crossPlatformData.manifold = (data || []).map(m => ({
+            const processed = (data || []).map(m => ({
                 id: m.id,
                 question: m.question,
-                yesPrice: m.probability,
-                noPrice: 1 - m.probability,
+                yesPrice: m.probability || 0.5,
+                noPrice: 1 - (m.probability || 0.5),
                 volume: m.volume || 0,
                 source: 'manifold',
                 slug: m.slug
-            }));
+            })).filter(m => m.yesPrice > 0 && m.yesPrice < 1);
+            
+            console.log('[DATA] Manifold processed:', processed.length);
+            appState.crossPlatformData.manifold = processed;
         }
     } catch (e) {
         console.warn('Manifold fetch failed:', e.message);
@@ -274,54 +287,56 @@ function findArbitrageOpportunities() {
     const kalshi = appState.crossPlatformData.kalshi;
     const manifold = appState.crossPlatformData.manifold;
     
-    console.log(`Scanning: ${polymarket.length} PM, ${kalshi.length} Kalshi, ${manifold.length} Manifold`);
+    console.log(`[ARB] Scanning: ${polymarket.length} PM, ${kalshi.length} Kalshi, ${manifold.length} Manifold`);
     
-    // Match Polymarket vs other platforms
+    // Show sample prices
+    if (polymarket.length > 0) {
+        console.log('[ARB] Sample PM:', polymarket.slice(0,3).map(m => ({ q: m.question?.substring(0,20), p: m.yesPrice, v: m.volume })));
+    }
+    if (manifold.length > 0) {
+        console.log('[ARB] Sample Manifold:', manifold.slice(0,3).map(m => ({ q: m.question?.substring(0,20), p: m.yesPrice, v: m.volume })));
+    }
+    
+    // Very simple matching - look for any overlap in keywords
+    const allOther = [...kalshi, ...manifold].filter(m => m.yesPrice > 0 && m.yesPrice < 1);
+    
     for (const pm of polymarket) {
-        // Try matching with similar events from other platforms
-        const matches = findMatchingEvents(pm, [...kalshi, ...manifold]);
+        if (pm.yesPrice <= 0 || pm.yesPrice >= 1) continue;
         
-        for (const match of matches) {
-            const priceDiff = Math.abs(pm.yesPrice - match.yesPrice) * 100;
-            const profit = priceDiff;
+        // Find matches by keyword similarity
+        for (const other of allOther) {
+            if (!pm.question || !other.question) continue;
             
-            if (profit >= threshold) {
-                console.log(`ARB FOUND: ${pm.question.substring(0,30)}... ${profit.toFixed(2)}%`);
-                opportunities.push({
-                    polymarket: pm,
-                    other: match,
-                    platform: match.source,
-                    pricePoly: pm.yesPrice,
-                    priceOther: match.yesPrice,
-                    gap: priceDiff.toFixed(2),
-                    profit: profit.toFixed(2),
-                    isProfitable: profit >= threshold
-                });
+            // Simple keyword match
+            const pmWords = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+            const otherTitle = other.question.toLowerCase();
+            const hasMatch = pmWords.some(w => otherTitle.includes(w));
+            
+            if (hasMatch) {
+                const priceDiff = Math.abs(pm.yesPrice - other.yesPrice) * 100;
+                
+                if (priceDiff >= threshold) {
+                    console.log(`[ARB] FOUND: ${pm.question.substring(0,25)}... vs ${other.question.substring(0,25)}... diff=${priceDiff.toFixed(1)}%`);
+                    opportunities.push({
+                        polymarket: pm,
+                        other: other,
+                        platform: other.source,
+                        pricePoly: pm.yesPrice,
+                        priceOther: other.yesPrice,
+                        gap: priceDiff.toFixed(2),
+                        profit: priceDiff.toFixed(2),
+                        isProfitable: true
+                    });
+                }
             }
         }
     }
     
-    // Also check internal arbitrage (Yes + No spread) - skip for now as prices might be 0
-    // for (const pm of polymarket) {
-    //     if (pm.spread > 0.02 && pm.yesPrice > 0 && pm.yesPrice < 1) {
-    //         opportunities.push({
-    //             polymarket: pm,
-    //             other: null,
-    //             platform: 'INTERNAL',
-    //             pricePoly: pm.yesPrice,
-    //             priceOther: pm.noPrice,
-    //             gap: (pm.spread * 100).toFixed(2),
-    //             profit: (pm.spread * 100).toFixed(2),
-    //             isProfitable: pm.spread * 100 >= threshold,
-    //             isInternal: true
-    //         });
-    //     }
-    // }
-    
     appState.arbitrageOpportunities = opportunities
-        .filter(o => o.isProfitable)
         .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
-        .slice(0, 20);
+        .slice(0, 15);
+    
+    console.log(`[ARB] Total opportunities: ${appState.arbitrageOpportunities.length}`);
 }
 
 function findMatchingEvents(polyMarket, otherMarkets) {
