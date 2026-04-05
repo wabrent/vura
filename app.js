@@ -146,36 +146,6 @@ function processEvent(event, priceMap) {
         endDate
     };
 }
-        if (mainMarket.endDate || event.endDate) {
-            endDate = new Date(mainMarket.endDate || event.endDate);
-        }
-    } catch (e) { displayPrice = "50"; }
-
-    const rawVol = (event.metrics && event.metrics.volume) || (mainMarket && mainMarket.volume) || 0;
-    const lower = event.title.toLowerCase();
-    let category = 'general';
-    for (const [cat, words] of Object.entries(CATEGORY_KEYWORDS)) {
-        if (words.some(w => lower.includes(w))) { category = cat; break; }
-    }
-
-    const alpha = calculateAlphaScore(event.id, yesPrice, rawVol, endDate);
-    const spread = Math.abs(yesPrice + noPrice - 1).toFixed(4);
-    updatePriceHistory(event.id, yesPrice);
-
-    return {
-        id: event.id,
-        question: event.title,
-        slug: event.slug,
-        source: 'polymarket',
-        alpha, category,
-        volume: rawVol,
-        volDisplay: formatVolume(rawVol),
-        spread: parseFloat(spread),
-        price: displayPrice,
-        yesPrice, noPrice,
-        endDate
-    };
-}
 
 function calculateAlphaScore(marketId, currentPrice, volume, endDate) {
     let score = 5.0;
