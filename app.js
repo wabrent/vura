@@ -5,7 +5,7 @@
 // ============================================================
 
 const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?active=true&closed=false&order=volume&dir=desc&limit=25",
+    API: "https://gamma-api.polymarket.com/events?closed=false&order=volume&dir=desc&limit=30",
     CORS_PROXY: "https://api.allorigins.win/raw?url=",
     PROXY: "/api/proxy?url=",
     REFRESH: 12000,
@@ -264,9 +264,11 @@ function findArbitrageOpportunities() {
     const kalshi = appState.crossPlatformData.kalshi;
     const manifold = appState.crossPlatformData.manifold;
     
+    console.log(`Scanning: ${polymarket.length} PM, ${kalshi.length} Kalshi, ${manifold.length} Manifold`);
+    
     // Match Polymarket vs other platforms
     for (const pm of polymarket) {
-        if (pm.volume < 10000) continue; // Skip low volume
+        if (pm.volume < 1000) continue; // Lower threshold
         
         // Try matching with similar events from other platforms
         const matches = findMatchingEvents(pm, [...kalshi, ...manifold]);
@@ -276,6 +278,7 @@ function findArbitrageOpportunities() {
             const profit = priceDiff;
             
             if (profit >= threshold) {
+                console.log(`ARB FOUND: ${pm.question.substring(0,30)}... ${profit.toFixed(2)}% (${pm.yesPrice.toFixed(2)} vs ${match.yesPrice.toFixed(2)})`);
                 opportunities.push({
                     polymarket: pm,
                     other: match,
@@ -316,7 +319,7 @@ function findArbitrageOpportunities() {
 function findMatchingEvents(polyMarket, otherMarkets) {
     const matches = [];
     const polyTitle = polyMarket.question.toLowerCase();
-    const polyWords = polyTitle.split(/\s+/).filter(w => w.length > 3);
+    const polyWords = polyTitle.split(/\s+/).filter(w => w.length > 2);
     
     for (const other of otherMarkets) {
         const otherTitle = other.question.toLowerCase();
@@ -324,8 +327,12 @@ function findMatchingEvents(polyMarket, otherMarkets) {
         // Check for keyword overlap
         const overlap = polyWords.filter(w => otherTitle.includes(w)).length;
         
-        if (overlap >= 2 || (polyWords[0] && otherTitle.includes(polyWords[0]))) {
-            if (other.volume > 5000) {
+        // Also check if key terms match (like team names, crypto names, etc.)
+        const keyTerms = ['trump', 'bitcoin', 'btc', 'election', 'nba', 'nfl', 'will', 'ethereum', 'eth'];
+        const hasKeyTerm = keyTerms.some(term => polyTitle.includes(term) && otherTitle.includes(term));
+        
+        if (overlap >= 1 || hasKeyTerm) {
+            if (other.volume > 100) {  // Lower threshold
                 matches.push(other);
             }
         }
@@ -335,54 +342,11 @@ function findMatchingEvents(polyMarket, otherMarkets) {
 
 // ─── ARBITRAGE UI ─────────────────────────────────────────────
 function setupArbitrageControls() {
-    const container = document.getElementById('market-rows');
-    if (!container) return;
-    
-    // Add arbitrage panel after main content
-    setTimeout(() => {
-        initArbitrageUI();
-    }, 1000);
-}
-
-function initArbitrageUI() {
-    // Create arbitrage section in sidebar or main area
-    const flowContainer = document.querySelector('.flow-container');
-    if (!flowContainer) return;
-    
-    // Add arbitrage panel before whale flow
-    const arbPanel = document.createElement('div');
-    arbPanel.id = 'arbitrage-panel';
-    arbPanel.className = 'arbitrage-panel';
-    arbPanel.innerHTML = `
-        <div class="box-header" style="padding: 10px 0; border-bottom: 1px solid var(--border);">
-            <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <i data-lucide="git-branch" style="width:14px;"></i>
-                    CROSS-PLATFORM ARBITRAGE
-                </div>
-                <select id="arb-threshold" onchange="updateArbitrageThreshold(this.value)" 
-                    style="background:black; color:var(--accent); border:1px solid var(--border); 
-                    padding:3px 8px; font-size:9px; font-family:inherit;">
-                    <option value="1">1%</option>
-                    <option value="2" selected>2%</option>
-                    <option value="3">3%</option>
-                    <option value="5">5%</option>
-                </select>
-            </div>
-        </div>
-        <div id="arbitrage-list" style="flex-grow:1; overflow-y:auto; margin-top:10px;" class="custom-scroll">
-            <div style="color:var(--text-dark); font-size:9px; text-align:center; padding:20px;">
-                SCANNING FOR ARBITRAGE...
-            </div>
-        </div>
-    `;
-    
-    flowContainer.parentNode.insertBefore(arbPanel, flowContainer);
-    lucide.createIcons();
+    // UI already in HTML
 }
 
 function renderArbitragePanel() {
-    const container = document.getElementById('arbitrage-list');
+    const container = document.getElementById('arb-log');
     if (!container) return;
     
     if (appState.arbitrageOpportunities.length === 0) {
@@ -392,6 +356,10 @@ function renderArbitragePanel() {
             </div>`;
         return;
     }
+    
+    // Update count
+    const countEl = document.getElementById('arb-count');
+    if (countEl) countEl.textContent = `${appState.arbitrageOpportunities.length} ACTIVE`;
     
     container.innerHTML = appState.arbitrageOpportunities.map(arb => {
         const isHot = parseFloat(arb.gap) >= 5;
