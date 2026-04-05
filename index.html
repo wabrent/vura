@@ -3,665 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OxygenDelta | Prediction Markets Arbitrage</title>
-    <meta name="description" content="Real-time arbitrage scanner for prediction markets - Polymarket, Kalshi, and more">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>PolyEdge Quant | Advanced Terminal</title>
+    <meta name="description" content="PolyEdge Quant — Professional prediction market analytics terminal. Real-time Alpha signals, Whale Flow monitoring, and Arbitrage detection on Polymarket.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2300ff9d'/%3E%3Cpath d='M20 15 H80 V50 H45 L65 75 L45 100 L25 100 L45 75 L25 50 V15 Z' fill='black'/%3E%3C/svg%3E">
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        :root {
-            --bg-dark: #0a0a0f;
-            --bg-card: #12121a;
-            --bg-hover: #1a1a25;
-            --accent: #00ff88;
-            --accent-dim: #00ff8840;
-            --text: #ffffff;
-            --text-dim: #888899;
-            --green: #00ff88;
-            --red: #ff4466;
-            --yellow: #ffaa00;
-            --blue: #4488ff;
-            --border: #2a2a3a;
-        }
-        
-        body {
-            background: var(--bg-dark);
-            color: var(--text);
-            font-family: 'Inter', -apple-system, sans-serif;
-            min-height: 100vh;
-        }
-        
-        /* HEADER */
-        .header {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 24px;
-            font-weight: 700;
-        }
-        
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--accent), var(--blue));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        
-        .stats-bar {
-            display: flex;
-            gap: 30px;
-        }
-        
-        .stat-item {
-            text-align: center;
-        }
-        
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .stat-value {
-            font-size: 20px;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .stat-value.green { color: var(--green); }
-        .stat-value.yellow { color: var(--yellow); }
-        
-        /* CONTROLS */
-        .controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        .filter-btn {
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            color: var(--text-dim);
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        
-        .filter-btn:hover { border-color: var(--accent); color: var(--text); }
-        .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-        
-        .threshold-select {
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        
-        /* MAIN GRID */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-        
-        /* ARBITRAGE TABLE */
-        .arb-table-container {
-            background: var(--bg-card);
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-        }
-        
-        .table-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .table-title {
-            font-size: 16px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .live-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--green);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .table-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 100px;
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border);
-            transition: background 0.2s;
-            cursor: pointer;
-        }
-        
-        .table-row:hover { background: var(--bg-hover); }
-        
-        .row-market {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        
-        .market-title {
-            font-size: 14px;
-            font-weight: 500;
-            line-height: 1.3;
-        }
-        
-        .market-meta {
-            font-size: 11px;
-            color: var(--text-dim);
-            display: flex;
-            gap: 8px;
-        }
-        
-        .platform-tag {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-        }
-        
-        .tag-pm { background: var(--accent-dim); color: var(--accent); }
-        .tag-kalshi { background: #ffaa0030; color: var(--yellow); }
-        .tag-manifold { background: #4488ff30; color: var(--blue); }
-        
-        .price-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .price-value {
-            font-size: 16px;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .price-change {
-            font-size: 11px;
-        }
-        
-        .price-change.positive { color: var(--green); }
-        .price-change.negative { color: var(--red); }
-        
-        .profit-cell {
-            text-align: center;
-        }
-        
-        .profit-value {
-            font-size: 18px;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .profit-value.high { color: var(--green); }
-        .profit-value.medium { color: var(--yellow); }
-        
-        .action-btn {
-            background: var(--accent);
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        
-        .action-btn:hover { opacity: 0.9; }
-        
-        /* SIDEBAR */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        .card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            padding: 15px;
-        }
-        
-        .card-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .whale-item {
-            padding: 12px;
-            background: var(--bg-hover);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border-left: 3px solid var(--accent);
-        }
-        
-        .whale-item.big { border-left-color: var(--yellow); }
-        
-        .whale-amount {
-            font-size: 14px;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--accent);
-        }
-        
-        .whale-market {
-            font-size: 12px;
-            margin-top: 4px;
-            color: var(--text-dim);
-        }
-        
-        /* LOADING */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-dim);
-        }
-        
-        .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-        
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* NO DATA */
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-dim);
-        }
-        
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .main-grid { grid-template-columns: 1fr; }
-            .stats-bar { display: none; }
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">⚡</div>
-            <span>Oxygen<span style="color:var(--accent)">Delta</span></span>
+    <div class="terminal-node">
+
+        <!-- HEADER -->
+        <header>
+            <div class="brand-unit">
+                <div class="logo-box" style="box-shadow: 0 0 15px rgba(0,255,157,0.3);">
+                    <svg viewBox="0 0 100 100" style="width: 20px; height: 20px;" fill="black">
+                        <path d="M20 15 H80 V50 H45 L65 75 L45 100 L25 100 L45 75 L25 50 V15 Z" />
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1 style="font-weight: 900;">PolyEdge <span style="font-style: italic; font-weight: 400;">Quant</span></h1>
+                    <div class="node-status" style="font-weight: 800; opacity: 0.8; letter-spacing: 2px;">
+                         <span style="color:var(--accent);">● LIVE FEED</span>
+                         <span>● ENV: PROD_01</span>
+                         <span id="gas-display">● GAS: —</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px; flex:1; justify-content:center; max-width:460px; margin:0 auto;">
+                <div style="position:relative; flex:1;">
+                    <i data-lucide="search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); width:13px; color:var(--text-dark);"></i>
+                    <input id="search-input" type="text" placeholder="SEARCH MARKET..." style="width:100%; background:var(--bg-card); border:1px solid var(--border); color:var(--accent); padding:7px 10px 7px 32px; font-family:inherit; font-size:10px; font-weight:700; letter-spacing:1px; outline:none; text-transform:uppercase;">
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button onclick="setFilter('all')" id="filter-all" class="filter-btn filter-active">ALL</button>
+                    <button onclick="setFilter('crypto')" id="filter-crypto" class="filter-btn">CRYPTO</button>
+                    <button onclick="setFilter('politics')" id="filter-politics" class="filter-btn">POLITICS</button>
+                    <button onclick="setFilter('sports')" id="filter-sports" class="filter-btn">SPORTS</button>
+                </div>
+            </div>
+
+            <div class="header-util" style="background: var(--bg-card); border: 1px solid var(--border); padding: 5px 20px; display: flex; gap: 20px;">
+                <div style="text-align: right;">
+                    <div style="font-size: 8px; color: var(--text-dark); text-transform: uppercase; font-weight: 900; letter-spacing: 1px;">Global Vol (24h)</div>
+                    <div id="global-vol" style="color: white; font-weight: bold; font-size: 14px;">—</div>
+                </div>
+                <div style="text-align: right; border-left: 1px solid var(--border); padding-left: 20px;">
+                    <div style="font-size: 8px; color: var(--text-dark); text-transform: uppercase; font-weight: 900; letter-spacing: 1px;">Active Markets</div>
+                    <div id="active-markets" style="color: var(--accent); font-weight: bold; font-size: 14px;">—</div>
+                </div>
+                <div style="text-align: right; border-left: 1px solid var(--border); padding-left: 20px;">
+                    <div style="font-size: 8px; color: var(--text-dark); text-transform: uppercase; font-weight: 900; letter-spacing: 1px;">BTC Price</div>
+                    <div id="btc-price" style="color: #fbbf24; font-weight: bold; font-size: 14px;">—</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN SCANNER -->
+        <main class="scanner-container">
+            <div class="box-header">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i data-lucide="activity" style="width:14px;"></i>
+                    LIVE ALPHA SCANNER
+                    <span id="market-count" style="font-size:9px; color:var(--text-dark); margin-left:5px;"></span>
+                </div>
+                <div style="display:flex; gap:15px; color: var(--text-dark); cursor:pointer; font-size:9px; font-weight:700; text-transform:uppercase;">
+                    <span class="hover-white" onclick="exportCSV()" style="display:flex;align-items:center;gap:4px;"><i data-lucide="download" style="width:10px;"></i> Export CSV</span>
+                </div>
+            </div>
+
+            <div style="overflow-y: auto; flex-grow: 1; border-bottom: 1px solid var(--border);" class="custom-scroll">
+                <div id="api-error" class="hidden" style="padding: 60px; text-align: center; color: #ef4444; font-size: 11px;">
+                    <i data-lucide="alert-circle" style="width:24px; margin: 0 auto 10px; display:block;"></i>
+                    <div style="margin-bottom:10px;">DATA STREAM INTERRUPTED</div>
+                    <div style="font-size:9px; color:var(--text-dark); margin-bottom:20px;">Attempting to reconnect via backup nodes...</div>
+                    <button onclick="fetchData()" style="border:1px solid #ef4444; color:#ef4444; background:transparent; padding:6px 16px; font-family:inherit; font-size:10px; font-weight:700; cursor:pointer; letter-spacing:1px;">RETRY CONNECTION</button>
+                </div>
+                <table class="market-table" id="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 38%;">Market Instance</th>
+                            <th style="text-align: center;">Alpha Score</th>
+                            <th style="text-align: center;">Exchange Gap</th>
+                            <th style="text-align: center;">Volume</th>
+                            <th style="text-align: center;">Price / Spread</th>
+                            <th style="text-align: center;">Ends In</th>
+                            <th style="text-align: right;">Execute</th>
+                        </tr>
+                    </thead>
+                    <tbody id="market-rows">
+                        <tr><td colspan="7" style="padding:100px; text-align:center; color:var(--text-dark); letter-spacing:3px; animation: pulse 1.5s infinite;">SYNCHRONIZING WITH POLYMARKET...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- BOT CONSOLE -->
+            <div style="height: 160px; background: black; border-top: 1px solid var(--border); padding: 12px 15px; display: flex; flex-direction: column;">
+                <div style="font-size: 9px; color: var(--text-dark); margin-bottom: 8px; display: flex; justify-content: space-between;">
+                    <span>[SYS] SIGNAL AUDIT CONSOLE</span>
+                    <span id="bot-status" style="color: var(--accent);">BOT ACTIVE: POLARIS_NODE_01</span>
+                </div>
+                <div id="bot-console" style="flex-grow: 1; overflow-y: auto; font-size: 10px; color: #34d399; line-height: 1.6;" class="custom-scroll">
+                    <div style="color: var(--text-dark);">INIT_SEQUENCE: BOOTING QUANT_BOT_V2.0...</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ARBITRAGE & WHALE FLOW SIDEBAR -->
+        <aside class="flow-container">
+            <h3 class="box-header" style="background:transparent; padding:0 0 15px 0; border:none;">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i data-lucide="git-branch" style="width:14px;"></i>
+                        ARBITRAGE SIGNALS
+                    </div>
+                    <span id="arb-count" style="font-size:9px; color:var(--accent);">0 ACTIVE</span>
+                </div>
+            </h3>
+            
+            <div id="arb-log" style="flex-grow: 1; overflow-y: auto; margin-bottom: 15px;" class="custom-scroll">
+                <div style="color:var(--text-dark); font-size:9px; text-align:center; padding:20px;">
+                    SCANNING CROSS-PLATFORM...
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px; padding: 10px; background:rgba(0,255,157,0.05); border:1px solid var(--border);">
+                <div style="font-size:9px; color:var(--text-dim); margin-bottom:6px; display:flex; justify-content:space-between;">
+                    <span>THRESHOLD</span>
+                    <select id="arb-threshold" onchange="updateArbitrageThreshold(this.value)" 
+                        style="background:black; color:var(--accent); border:1px solid var(--border); 
+                        padding:2px 6px; font-size:9px; font-family:inherit;">
+                        <option value="1">1%</option>
+                        <option value="2" selected>2%</option>
+                        <option value="3">3%</option>
+                        <option value="5">5%</option>
+                    </select>
+                </div>
+                <div style="font-size:8px; color:var(--text-dark);">
+                    Polymarket ↔ Kalshi, Manifold, Betfair
+                </div>
+            </div>
+            
+            <h3 class="box-header" style="background:transparent; padding:0 0 15px 0; border:none; border-top:1px solid var(--border); padding-top:15px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i data-lucide="bar-chart-3" style="width:14px;"></i>
+                        WHALE FLOW
+                    </div>
+                    <span id="whale-count" style="font-size:9px; color:var(--text-dark);">0 SIGNALS</span>
+                </div>
+            </h3>
+            
+            <div id="whale-log" style="flex-grow: 1; overflow-y: auto;" class="custom-scroll scrollbar-hide">
+                <!-- Skeleton placeholders while loading -->
+                <div class="whale-skeleton"></div>
+                <div class="whale-skeleton"></div>
+                <div class="whale-skeleton"></div>
+                <div class="whale-skeleton"></div>
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <div style="background: rgba(6, 78, 59, 0.15); padding: 12px; border-radius: 2px;">
+                    <div style="font-size: 9px; color: var(--text-dim); margin-bottom: 8px; letter-spacing: 1px; display:flex; justify-content:space-between;">
+                        <span>INTERNAL CALIBRATOR</span>
+                        <span id="calibrator-pct" style="color:var(--accent);">0%</span>
+                    </div>
+                    <div style="height: 3px; background: #064e3b; border-radius: 10px; overflow: hidden;">
+                        <div id="calibrator-bar" style="height: 100%; background: var(--accent); width: 0%; transition: width 0.5s ease;"></div>
+                    </div>
+                    <div style="font-size: 8px; color: var(--text-dark); margin-top: 8px; font-style: italic;" id="calibrator-label">Awaiting data stream...</div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- MARKET DETAIL MODAL -->
+    <div id="market-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+        <div style="background:var(--bg-card); border:1px solid var(--border); width:600px; max-width:90vw; padding:30px; position:relative; box-shadow:0 0 40px rgba(0,255,157,0.1);">
+            <button onclick="closeModal()" style="position:absolute; top:15px; right:15px; background:transparent; border:none; color:var(--text-dark); cursor:pointer; font-size:18px; font-family:inherit;">✕</button>
+            <div style="font-size:9px; color:var(--text-dark); text-transform:uppercase; letter-spacing:2px; margin-bottom:8px;">MARKET ANALYSIS</div>
+            <h2 id="modal-title" style="color:white; font-size:14px; margin-bottom:20px; line-height:1.4; font-weight:700;"></h2>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-bottom:20px;">
+                <div style="background:black; padding:12px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:8px; color:var(--text-dark); margin-bottom:4px; text-transform:uppercase;">Alpha Score</div>
+                    <div id="modal-alpha" style="color:var(--accent); font-weight:900; font-size:20px; font-style:italic;"></div>
+                </div>
+                <div style="background:black; padding:12px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:8px; color:var(--text-dark); margin-bottom:4px; text-transform:uppercase;">Total Volume</div>
+                    <div id="modal-vol" style="color:white; font-weight:900; font-size:20px;"></div>
+                </div>
+                <div style="background:black; padding:12px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:8px; color:var(--text-dark); margin-bottom:4px; text-transform:uppercase;">Current Price</div>
+                    <div id="modal-price" style="color:#fbbf24; font-weight:900; font-size:20px;"></div>
+                </div>
+            </div>
+            <div style="margin-bottom:20px; padding:15px; background:black; border:1px solid var(--border);">
+                <div style="font-size:9px; color:var(--text-dark); margin-bottom:8px; text-transform:uppercase;">PROBABILITY GAUGE</div>
+                <div style="height:6px; background:#0a1a1a; border-radius:3px; overflow:hidden; margin-bottom:6px;">
+                    <div id="modal-gauge" style="height:100%; background:linear-gradient(90deg, var(--accent), #fbbf24); border-radius:3px; transition:width 1s ease;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:8px; color:var(--text-dark);">
+                    <span>0% (NO)</span><span>50%</span><span>100% (YES)</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="modal-trade-btn" style="flex:1; background:var(--accent); color:black; border:none; padding:12px; font-family:inherit; font-size:11px; font-weight:900; cursor:pointer; letter-spacing:2px; text-transform:uppercase;">TRADE ON POLYMARKET ↗</button>
+                <button onclick="closeModal()" style="border:1px solid var(--border); color:var(--text-dark); background:transparent; padding:12px 20px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; text-transform:uppercase;">CLOSE</button>
+            </div>
         </div>
-        
-        <div class="stats-bar">
-            <div class="stat-item">
-                <div class="stat-label">Active Markets</div>
-                <div class="stat-value" id="stat-markets">—</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">24h Volume</div>
-                <div class="stat-value green" id="stat-volume">—</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">ARB Signals</div>
-                <div class="stat-value yellow" id="stat-signals">0</div>
-            </div>
-        </div>
-        
-        <div class="controls">
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="crypto">Crypto</button>
-            <button class="filter-btn" data-filter="politics">Politics</button>
-            <button class="filter-btn" data-filter="sports">Sports</button>
-            <select class="threshold-select" id="threshold">
-                <option value="1">≥ 1%</option>
-                <option value="2" selected>≥ 2%</option>
-                <option value="3">≥ 3%</option>
-                <option value="5">≥ 5%</option>
-            </select>
-        </div>
-    </header>
-    
-    <!-- MAIN CONTENT -->
-    <main class="main-grid">
-        <!-- ARBITRAGE TABLE -->
-        <div class="arb-table-container">
-            <div class="table-header">
-                <div class="table-title">
-                    <span class="live-dot"></span>
-                    Cross-Platform Arbitrage Opportunities
-                </div>
-                <div style="font-size:12px; color:var(--text-dim);">
-                    Last updated: <span id="last-update">—</span>
-                </div>
-            </div>
-            
-            <!-- Table -->
-            <div class="table-row header-row" style="background: var(--bg-hover); font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px;">
-                <div>Market</div>
-                <div style="text-align:center;">Polymarket</div>
-                <div style="text-align:center;">Other</div>
-                <div style="text-align:center;">Spread</div>
-                <div style="text-align:center;">Profit</div>
-                <div></div>
-            </div>
-            
-            <div id="arb-list">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading markets...
-                </div>
-            </div>
-        </div>
-        
-        <!-- SIDEBAR -->
-        <div class="sidebar">
-            <!-- Whale Flow -->
-            <div class="card">
-                <div class="card-title">
-                    <span style="color:var(--accent)">●</span> Whale Flow
-                </div>
-                <div id="whale-list">
-                    <div class="no-data">Waiting for data...</div>
-                </div>
-            </div>
-            
-            <!-- Internal Spreads -->
-            <div class="card">
-                <div class="card-title">
-                    <span style="color:var(--yellow)">●</span> Internal Spreads
-                </div>
-                <div id="spread-list">
-                    <div class="no-data">No spreads found</div>
-                </div>
-            </div>
-            
-            <!-- Stats -->
-            <div class="card">
-                <div class="card-title">Scanner Status</div>
-                <div style="font-size:12px; color:var(--text-dim); line-height:1.8;">
-                    <div>PM API: <span id="pm-status" style="color:var(--green)">● Connected</span></div>
-                    <div>Kalshi API: <span id="kalshi-status" style="color:var(--text-dim)">○ Waiting</span></div>
-                    <div>Manifold API: <span id="manifold-status" style="color:var(--text-dim)">○ Waiting</span></div>
-                </div>
-            </div>
-        </div>
-    </main>
+    </div>
 
-    <script>
-        // CONFIG
-        const CONFIG = {
-            API: "https://gamma-api.polymarket.com/events?closed=false&order=volume&dir=desc&limit=50",
-            PROXY: "/api/proxy?url=",
-            CORS_PROXY: "https://api.allorigins.win/raw?url=",
-            REFRESH: 15000
-        };
-
-        let state = {
-            markets: [],
-            arbitrage: [],
-            whales: [],
-            threshold: 2,
-            filter: 'all',
-            loading: true
-        };
-
-        // INIT
-        window.addEventListener('DOMContentLoaded', () => {
-            setupControls();
-            fetchAll();
-            setInterval(fetchAll, CONFIG.REFRESH);
-        });
-
-        function setupControls() {
-            // Filters
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    state.filter = btn.dataset.filter;
-                    renderArbitrage();
-                });
-            });
-
-            // Threshold
-            document.getElementById('threshold').addEventListener('change', (e) => {
-                state.threshold = parseInt(e.target.value);
-                renderArbitrage();
-            });
-        }
-
-        async function fetchAll() {
-            console.log('[DATA] Fetching...');
-            try {
-                const [pm, manifold] = await Promise.all([
-                    fetchMarkets(),
-                    fetchManifold()
-                ]);
-                
-                state.markets = pm;
-                state.manifold = manifold;
-                findArbitrage();
-                
-                document.getElementById('pm-status').innerHTML = '● Connected';
-                document.getElementById('manifold-status').innerHTML = '● Connected';
-            } catch (e) {
-                console.error('[DATA] Error:', e);
-            }
-            
-            updateStats();
-            renderArbitrage();
-            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-        }
-
-        async function fetchMarkets() {
-            try {
-                const url = `${CONFIG.PROXY}${encodeURIComponent(CONFIG.API)}`;
-                const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-                if (!res.ok) throw new Error('API error');
-                const data = await res.json();
-                
-                return data.map(e => {
-                    const m = e.markets?.[0] || {};
-                    let price = 0.5;
-                    try {
-                        if (m.outcomePrices) {
-                            price = parseFloat(JSON.parse(m.outcomePrices)[0]) || 0.5;
-                        }
-                    } catch {}
-                    
-                    const vol = parseFloat(e.metrics?.volume || m.volume || 0);
-                    
-                    return {
-                        id: e.id,
-                        title: e.title || m.question,
-                        slug: e.slug,
-                        price,
-                        volume: vol,
-                        source: 'polymarket'
-                    };
-                }).filter(m => m.price > 0.01 && m.price < 0.99 && m.volume > 1000);
-            } catch (e) {
-                console.warn('PM fetch error:', e);
-                return [];
-            }
-        }
-
-        async function fetchManifold() {
-            try {
-                const url = `${CONFIG.PROXY}${encodeURIComponent(
-                    'https://manifold.markets/api/v0/markets?limit=30'
-                )}`;
-                const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-                if (!res.ok) throw new Error('API error');
-                const data = await res.json();
-                
-                return (data || []).map(m => ({
-                    id: m.id,
-                    title: m.question,
-                    price: m.probability || 0.5,
-                    volume: m.volume || 0,
-                    source: 'manifold'
-                })).filter(m => m.price > 0.01 && m.price < 0.99);
-            } catch (e) {
-                console.warn('Manifold fetch error:', e);
-                return [];
-            }
-        }
-
-        function findArbitrage() {
-            const arb = [];
-            const other = state.manifold;
-            
-            for (const pm of state.markets) {
-                // Find matches
-                for (const oth of other) {
-                    if (!matchMarkets(pm.title, oth.title)) continue;
-                    
-                    const diff = Math.abs(pm.price - oth.price) * 100;
-                    if (diff >= state.threshold) {
-                        arb.push({
-                            pm,
-                            other: oth,
-                            diff: diff.toFixed(1),
-                            platform: oth.source
-                        });
-                    }
-                }
-            }
-            
-            // Sort by profit
-            state.arbitrage = arb.sort((a, b) => parseFloat(b.diff) - parseFloat(a.diff)).slice(0, 20);
-            document.getElementById('stat-signals').textContent = state.arbitrage.length;
-        }
-
-        function matchMarkets(title1, title2) {
-            if (!title1 || !title2) return false;
-            const t1 = title1.toLowerCase();
-            const t2 = title2.toLowerCase();
-            
-            // Check for common keywords
-            const keywords = ['trump', 'bitcoin', 'btc', 'election', 'nba', 'nfl', 'will', 'price', 'higher', 'lower'];
-            return keywords.some(k => t1.includes(k) && t2.includes(k));
-        }
-
-        function updateStats() {
-            const totalVol = state.markets.reduce((s, m) => s + m.volume, 0);
-            document.getElementById('stat-markets').textContent = state.markets.length;
-            document.getElementById('stat-volume').textContent = '$' + (totalVol > 1000000 ? (totalVol/1000000).toFixed(1) + 'M' : (totalVol/1000).toFixed(0) + 'K');
-        }
-
-        function renderArbitrage() {
-            const container = document.getElementById('arb-list');
-            
-            if (state.loading) {
-                container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading markets...</div>';
-                return;
-            }
-            
-            let filtered = state.arbitrage;
-            
-            // Filter by category
-            if (state.filter !== 'all') {
-                filtered = filtered.filter(a => {
-                    const title = a.pm.title.toLowerCase();
-                    const keywords = {
-                        crypto: ['bitcoin', 'btc', 'ethereum', 'eth', 'crypto', 'price'],
-                        politics: ['trump', 'election', 'president', 'biden', 'congress'],
-                        sports: ['nba', 'nfl', 'game', 'win', 'championship']
-                    };
-                    return keywords[state.filter]?.some(k => title.includes(k));
-                });
-            }
-            
-            if (filtered.length === 0) {
-                container.innerHTML = '<div class="no-data">No arbitrage opportunities found</div>';
-                return;
-            }
-            
-            container.innerHTML = filtered.map(a => {
-                const profitClass = parseFloat(a.diff) >= 5 ? 'high' : 'medium';
-                const tagClass = a.platform === 'manifold' ? 'tag-manifold' : 'tag-kalshi';
-                
-                return `
-                <div class="table-row">
-                    <div class="row-market">
-                        <div class="market-title">${a.pm.title.substring(0, 60)}...</div>
-                        <div class="market-meta">
-                            <span class="platform-tag tag-pm">PM</span>
-                            <span class="platform-tag ${tagClass}">${a.platform}</span>
-                        </div>
-                    </div>
-                    <div class="price-cell">
-                        <div class="price-value">${(a.pm.price * 100).toFixed(0)}%</div>
-                    </div>
-                    <div class="price-cell">
-                        <div class="price-value">${(a.other.price * 100).toFixed(0)}%</div>
-                    </div>
-                    <div class="price-cell">
-                        <div class="price-value">${a.diff}%</div>
-                    </div>
-                    <div class="profit-cell">
-                        <div class="profit-value ${profitClass}">+${a.diff}%</div>
-                    </div>
-                    <div>
-                        <button class="action-btn" onclick="window.open('https://polymarket.com/event/${a.pm.slug}', '_blank')">Trade</button>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-    </script>
+    <script src="app.js"></script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>
