@@ -126,8 +126,8 @@ function processEvent(event) {
     try {
         if (mainMarket && mainMarket.outcomePrices) {
             const parsed = typeof mainMarket.outcomePrices === 'string' ? JSON.parse(mainMarket.outcomePrices) : mainMarket.outcomePrices;
-            yesPrice = parseFloat(parsed[0]) || 0.5;
-            noPrice = 1 - yesPrice;
+            yesPrice = parseFloat(parsed[0]) || 0;
+            noPrice = parseFloat(parsed[1]) || 0;
             displayPrice = Math.round(yesPrice * 100).toString();
         } else if (mainMarket && mainMarket.bestAsk && mainMarket.bestBid) {
             yesPrice = (parseFloat(mainMarket.bestAsk) + parseFloat(mainMarket.bestBid)) / 2;
