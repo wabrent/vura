@@ -134,12 +134,13 @@ function renderMarkets() {
         container.innerHTML = '<div class="content-state"><p>No markets in this category.</p></div>';
         return;
     }
-    container.innerHTML = markets.map(m => {
+    container.innerHTML = markets.map((m, i) => {
+        const delay = i * 40;
         const change = m.change24h;
         const changeClass = change > 0 ? 'change-up' : (change < 0 ? 'change-down' : '');
         const changeSign = change > 0 ? '+' : '';
         const price = Math.round(m.yesPrice * 100);
-        return `<div class="market-card">
+        return `<div class="market-card" style="animation-delay:${delay}ms">
             <div class="card-left">
                 <span class="card-category">${m.category.toUpperCase()}</span>
                 <span class="card-title">${m.question}</span>
@@ -219,10 +220,11 @@ function renderArbitrage() {
         container.innerHTML = '<div class="content-state"><p>No arbitrage signals found. Scanning internal spreads and cross-platform...</p></div>';
         return;
     }
-    container.innerHTML = appState.arbitrageOpportunities.map(a => {
+    container.innerHTML = appState.arbitrageOpportunities.map((a, i) => {
+        const delay = i * 50;
         const pmPrice = Math.round(a.priceA * 100);
         const otherPrice = Math.round(a.priceB * 100);
-        return `<div class="arb-card">
+        return `<div class="arb-card" style="animation-delay:${delay}ms">
             <div class="arb-left">
                 <span class="arb-platform">${a.platform}</span>
                 <span class="arb-title">${(a.market.question || '').substring(0, 45)}</span>
