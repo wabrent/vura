@@ -215,30 +215,60 @@ function findArbitrageOpportunities() {
     const threshold = appState.arbitrageThreshold;
     const polymarket = appState.crossPlatformData.polymarket;
     const manifold = appState.crossPlatformData.manifold;
-    const allOther = [...manifold].filter(m => m.yesPrice > 0.01 && m.yesPrice < 0.99);
 
     for (const pm of polymarket) {
-        if (pm.yesPrice < 0.01 || pm.yesPrice > 0.99) continue;
-        const matches = findMatchingEvents(pm, allOther);
-        for (const match of matches) {
-            const priceDiff = Math.abs(pm.yesPrice - match.yesPrice) * 100;
-            if (priceDiff >= threshold) {
-                opportunities.push({ polymarket: pm, other: match, platform: match.source.toUpperCase(), pricePoly: pm.yesPrice, priceOther: match.yesPrice, gap: priceDiff.toFixed(2), profit: priceDiff.toFixed(2), isProfitable: true });
-            }
-        }
-    }
-
-    for (const pm of polymarket) {
-        if (pm.spread > 0.015 && pm.yesPrice > 0.01 && pm.yesPrice < 0.99) {
-            const spreadPct = pm.spread * 100;
+        if (!pm.yesPrice || !pm.noPrice) continue;
+        
+        const spread = Math.abs(pm.yesPrice + pm.noPrice - 1);
+        if (spread > 0.003 && pm.yesPrice > 0.02 && pm.yesPrice < 0.98) {
+            const spreadPct = spread * 100;
             if (spreadPct >= threshold) {
-                opportunities.push({ polymarket: pm, other: null, platform: 'INTERNAL', pricePoly: pm.yesPrice, priceOther: pm.noPrice, gap: spreadPct.toFixed(2), profit: spreadPct.toFixed(2), isProfitable: true, isInternal: true });
+                opportunities.push({ 
+                    polymarket: pm, 
+                    other: null, 
+                    platform: 'INTERNAL', 
+                    pricePoly: pm.yesPrice, 
+                    priceOther: pm.noPrice, 
+                    gap: spreadPct.toFixed(2), 
+                    profit: spreadPct.toFixed(2), 
+                    isProfitable: true, 
+                    isInternal: true 
+                });
+            }
+        }
+
+        if (manifold.length > 0) {
+            const keywords = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            for (const m of manifold.slice(0, 20)) {
+                if (!m.yesPrice || !m.question) continue;
+                const overlap = keywords.filter(k => m.question.toLowerCase().includes(k)).length;
+                if (overlap >= 1 && m.volume > 50) {
+                    const priceDiff = Math.abs(pm.yesPrice - m.yesPrice) * 100;
+                    if (priceDiff >= threshold) {
+                        opportunities.push({ 
+                            polymarket: pm, 
+                            other: m, 
+                            platform: 'MANIFOLD', 
+                            pricePoly: pm.yesPrice, 
+                            priceOther: m.yesPrice, 
+                            gap: priceDiff.toFixed(2), 
+                            profit: priceDiff.toFixed(2), 
+                            isProfitable: true 
+                        });
+                    }
+                }
             }
         }
     }
 
-    appState.arbitrageOpportunities = opportunities.filter(o => o.isProfitable).sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit)).slice(0, 20);
-    console.log('[ARB] Opportunities found:', appState.arbitrageOpportunities.length);
+    appState.arbitrageOpportunities = opportunities
+        .filter(o => o.isProfitable)
+        .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
+        .slice(0, 15);
+    
+    if (appState.arbitrageOpportunities.length > 0) {
+        console.log('[ARB] Found:', appState.arbitrageOpportunities.length);
+    }
 }
 
 function findMatchingEvents(polyMarket, otherMarkets) {
@@ -259,23 +289,23 @@ function renderArbitragePanel() {
     if (countEl) countEl.textContent = `${appState.arbitrageOpportunities.length} ACTIVE`;
 
     if (appState.arbitrageOpportunities.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-dark); font-size:9px; text-align:center; padding:20px;">NO ARBITRAGE SIGNALS FOUND<br><span style="font-size:8px;opacity:0.6;">Scanning internal spreads + Manifold</span></div>`;
+        container.innerHTML = `<div style="color:var(--text-3); font-size:10px; text-align:center; padding:20px;">NO ARBITRAGE SIGNALS<br><span style="font-size:9px;opacity:0.6;">Scanning internal spreads...</span></div>`;
         return;
     }
 
     container.innerHTML = appState.arbitrageOpportunities.map(arb => {
         const isHot = parseFloat(arb.gap) >= 5;
-        const color = isHot ? '#ef4444' : arb.platform === 'INTERNAL' ? '#f0b90b' : '#00CED1';
-        const label = arb.isInternal ? '⚠️ INTERNAL SPREAD' : `📡 ${arb.platform}`;
-        const detail = arb.isInternal ? `Yes: ${(arb.pricePoly*100).toFixed(0)}¢ | No: ${(arb.priceOther*100).toFixed(0)}¢` : `PM: ${(arb.pricePoly*100).toFixed(0)}¢ | ${arb.platform}: ${(arb.priceOther*100).toFixed(0)}¢`;
+        const color = isHot ? '#ffc800' : arb.platform === 'INTERNAL' ? '#f0b90b' : 'var(--accent)';
+        const label = arb.isInternal ? 'SPREAD' : arb.platform;
+        const detail = arb.isInternal ? `Yes: ${(arb.pricePoly*100).toFixed(0)}c | No: ${(arb.priceOther*100).toFixed(0)}c` : `PM: ${(arb.pricePoly*100).toFixed(0)}c | ${arb.platform}: ${(arb.priceOther*100).toFixed(0)}c`;
 
-        return `<div class="arb-item ${isHot ? 'arb-hot' : ''}" style="background:rgba(0,0,0,0.3); border:1px solid var(--border); padding:8px; margin-bottom:6px; border-left:2px solid ${color};">
-            <div style="display:flex; justify-content:space-between; font-size:8px;">
-                <span style="color:${color}; font-weight:bold;">${label}</span>
+        return `<div class="arb-item ${isHot ? 'arb-hot' : ''}">
+            <div style="display:flex; justify-content:space-between; font-size:9px;">
+                <span style="color:${color}; font-weight:600;">${label}</span>
                 <span style="color:${color};">+${arb.profit}%</span>
             </div>
-            <div style="color:white; font-size:9px; margin-top:4px; line-height:1.3;">${(arb.polymarket.question || '').substring(0, 42)}...</div>
-            <div style="font-size:8px; color:var(--text-dark); margin-top:2px;">${detail}</div>
+            <div style="color:var(--text); font-size:10px; margin-top:4px; line-height:1.3;">${(arb.polymarket.question || '').substring(0, 35)}</div>
+            <div style="font-size:9px; color:var(--text-3); margin-top:2px;">${detail}</div>
         </div>`;
     }).join('');
 }
@@ -334,35 +364,35 @@ function renderMarkets() {
     if (appState.error) { if (table) table.classList.add('hidden'); if (errorEl) errorEl.classList.remove('hidden'); return; }
     if (table) table.classList.remove('hidden');
     if (errorEl) errorEl.classList.add('hidden');
-    if (countEl) countEl.textContent = `${appState.markets.length} MARKETS | ${appState.arbitrageOpportunities.length} ARB SIGNALS`;
-    if (appState.markets.length === 0) { container.innerHTML = `<tr><td colspan="7" style="padding:80px; text-align:center; color:var(--text-dark);">NO MARKETS MATCH FILTER</td></tr>`; return; }
+    if (countEl) countEl.textContent = `${appState.markets.length} MRKTS | ${appState.arbitrageOpportunities.length} ARB`;
+    if (appState.markets.length === 0) { container.innerHTML = `<tr><td colspan="7" style="padding:60px; text-align:center; color:var(--text-3);">NO MARKETS MATCH FILTER</td></tr>`; return; }
 
-    const catColor = { crypto: '#f0b90b', politics: '#a78bfa', sports: '#60a5fa', general: '#6b7280' };
-    const catEmoji = { crypto: '₿', politics: '🏛', sports: '⚽', general: '◈' };
+    const catColor = { crypto: '#ffc800', politics: '#a855f7', sports: '#3b82f6', general: '#666666' };
     container.innerHTML = appState.markets.map((m, idx) => {
-        const isHighAlpha = m.alpha > 8;
-        const isMidAlpha = m.alpha > 6;
-        const neonClass = isHighAlpha ? 'neon-row' : '';
-        const heatClass = m.volume > 100000 ? 'row-hot' : '';
-        const alphaClass = isHighAlpha ? 'alpha-high' : (isMidAlpha ? 'alpha-mid' : 'alpha-low');
-        const volDisplay = m.volume < 100 ? `<span style="font-size:9px; color:var(--dim);">SCANNED</span>` : `$${m.volDisplay}`;
-        let countdown = '<span style="color:var(--dim); font-size:9px;">ONGOING</span>';
+        const isHighAlpha = m.alpha > 7;
+        const alphaColor = isHighAlpha ? '#ffc800' : (m.alpha > 5 ? 'var(--accent)' : '#666666');
+        const volDisplay = m.volume < 100 ? `<span style="font-size:10px; color:var(--text-3);">LOW</span>` : `$${m.volDisplay}`;
+        let countdown = '<span style="color:var(--text-3); font-size:10px;">OPEN</span>';
         if (m.endDate && !isNaN(m.endDate)) {
             const diff = m.endDate - Date.now();
             if (diff > 0) {
                 const days = Math.floor(diff / 86400000);
                 const hrs = Math.floor((diff % 86400000) / 3600000);
-                countdown = days > 0 ? `<span style="color:rgba(255,255,255,0.5); font-size:10px;">${days}d ${hrs}h</span>` : `<span style="color:#ef4444; font-size:10px; font-weight:900;">⏱ ${hrs}h LEFT</span>`;
-            } else { countdown = `<span style="color:var(--dim); font-size:9px;">RESOLVING</span>`; }
+                countdown = days > 0 ? `<span style="color:var(--text-2);">${days}d ${hrs}h</span>` : `<span style="color:#ef4444;">${hrs}h</span>`;
+            } else { countdown = `<span style="color:var(--text-3);">DONE</span>`; }
         }
-        const emoji = catEmoji[m.category] || '◈';
         const safeM = JSON.stringify(m).replace(/"/g, '&quot;');
-        return `<tr class="market-row transition-all duration-300 ${neonClass} ${heatClass}" style="animation-delay:${idx * 40}ms" onclick="openModal(${safeM})">
-            <td class="p-4"><div style="display:flex; flex-direction:column; gap:4px;"><div class="m-title truncate clickable-title" style="color:${isHighAlpha ? 'var(--cyan, #00CED1)' : 'white'}; font-weight:${isHighAlpha ? '700' : '400'};"><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:12px; width:20px; text-align:center;">${emoji}</span><span style="font-size:9px; font-weight:700; color:${catColor[m.category] || '#6b7280'}; letter-spacing:1px;">[${m.category.toUpperCase()}]</span>${m.question}${isHighAlpha ? '<span style="display:inline-block;margin-left:6px;width:8px;height:8px;background:#34d399;border-radius:50%;animation:pulse 1s infinite;"></span>' : ''}</div></div></div></td>
-            <td class="p-4 text-center"><span class="alpha-badge ${alphaClass}">${m.alpha}%</span></td>
-            <td class="p-4 text-center sparkline-cell"><canvas id="spark-${m.id}" width="60" height="24"></canvas></td>
-            <td class="p-4 text-center" style="font-weight:bold; font-size:11px;">${volDisplay}</td>
-            <td class="p-4 text-center"><div style="color:white; font-weight:bold;">${m.price}¢</div><div style="font-size:9px; color:var(--dim); font-weight:500;">SPR: ${(m.spread * 100).toFixed(2)}¢ | ${m.spread > 0.02 ? '<span style="color:#f0b90b;">⚠ ARB</span>' : '<span style="color:#34d399;">✓</span>'}</div></td>
+        return `<tr class="${isHighAlpha ? 'neon-row' : ''} ${m.volume > 100000 ? 'row-hot' : ''}" onclick="openModal(${safeM})">
+            <td><div class="m-title" style="color:${isHighAlpha ? 'var(--accent)' : 'var(--text)'}; font-weight:500;"><span style="font-size:10px; font-weight:700; color:${catColor[m.category] || '#666666'}; margin-right:6px;">[${(m.category || 'GEN').toUpperCase()}]</span>${m.question}</div></td>
+            <td style="text-align:center;"><span style="color:${alphaColor}; font-weight:600;">${m.alpha}%</span></td>
+            <td style="text-align:center;"><span style="color:var(--text-3);">${(m.spread * 100).toFixed(1)}%</span></td>
+            <td style="text-align:center; font-weight:600;">${volDisplay}</td>
+            <td style="text-align:center;"><span style="font-weight:600;">${m.price}c</span></td>
+            <td style="text-align:center;">${countdown}</td>
+            <td style="text-align:right;"><button class="trade-btn" onclick="event.stopPropagation();openMarket('${m.slug}')">Trade</button></td>
+        </tr>`;
+    });
+}
             <td class="p-4 text-center">${countdown}</td>
             <td class="p-4" style="text-align:right;" onclick="event.stopPropagation()"><button class="trade-btn" onclick="openMarket('${m.slug}')">Trade</button></td>
         </tr>`;
@@ -419,53 +449,60 @@ function monitorMarkets() {
 
 let recentTrades = [];
 function startWhaleFlow() {
-    const checkReady = setInterval(() => { if (appState.allMarkets.length > 0) { clearInterval(checkReady); document.getElementById('whale-log').innerHTML = ''; fetchRecentTrades(); setInterval(fetchRecentTrades, 20000); } }, 500);
+    const checkReady = setInterval(() => { if (appState.allMarkets.length > 0) { clearInterval(checkReady); document.getElementById('whale-log').innerHTML = ''; fetchRecentTrades(); setInterval(fetchRecentTrades, 25000); } }, 500);
 }
 
 async function fetchRecentTrades() {
     try {
-        const topMarkets = appState.allMarkets.slice(0, 5);
+        const topMarkets = appState.allMarkets.slice(0, 8);
         for (const market of topMarkets) {
             if (!market.id) continue;
-            const tradesUrl = `https://gamma-api.polymarket.com/markets/${market.id}/trades?limit=10`;
+            const tradesUrl = `https://clob.polymarket.com/markets/${market.slug}/trades?limit=20`;
             let trades = null;
-            try { const res = await fetchWithFallback(tradesUrl); if (res.ok) trades = await res.json(); } catch (e) { /* skip */ }
+            try { 
+                const res = await fetch(tradesUrl, { signal: AbortSignal.timeout(8000) });
+                if (res.ok) trades = await res.json();
+            } catch (e) { 
+                try {
+                    const res2 = await fetchWithFallback(`https://gamma-api.polymarket.com/markets/${market.id}/trades?limit=20`);
+                    if (res2.ok) trades = await res2.json();
+                } catch(e2) {}
+            }
             if (!Array.isArray(trades)) continue;
-            for (const trade of trades) {
+            for (const trade of trades.slice(0, 10)) {
                 if (recentTrades.some(t => t.id === trade.id)) continue;
                 const amount = parseFloat(trade.amount) || 0;
-                const price = parseFloat(trade.price) || 0;
+                const price = parseFloat(trade.price || trade.tick || 0.5) || 0;
                 const usdValue = amount * price;
                 if (usdValue >= CONFIG.WHALE_THRESHOLD_USD) {
-                    const entry = { id: trade.id || Math.random().toString(36), marketId: market.id, slug: market.slug, question: market.question, amount: usdValue, side: trade.side || 'buy', maker: trade.maker, timestamp: trade.timestamp ? new Date(trade.timestamp).getTime() : Date.now() };
+                    const entry = { id: trade.id || Math.random().toString(36), marketId: market.id, slug: market.slug, question: market.question, amount: usdValue, side: trade.side || trade.type || 'buy', maker: trade.maker || trade.account || 'anon', timestamp: trade.timestamp ? new Date(trade.timestamp).getTime() : Date.now() };
                     recentTrades.push(entry);
                     addWhaleAlert(entry);
                 }
             }
         }
         if (recentTrades.length > 50) recentTrades = recentTrades.slice(-50);
-    } catch (e) { console.warn('Whale fetch error:', e); }
+    } catch (e) { console.warn('Whale fetch error:', e.message); }
 }
 
 function addWhaleAlert(trade) {
     const log = document.getElementById('whale-log');
     if (!log) return;
     const isBig = trade.amount >= 50000;
-    let whaleCount = parseInt(document.getElementById('whale-count')?.textContent || '0');
+    let whaleCount = parseInt(document.getElementById('whale-count')?.textContent?.replace(/\D/g,'') || '0');
     whaleCount++;
     const countEl = document.getElementById('whale-count');
     if (countEl) countEl.textContent = `${whaleCount} SIGNALS`;
     const item = document.createElement('div');
     item.className = `flow-item clickable-flow ${isBig ? 'flow-hot' : ''}`;
-    item.style.animation = 'fadeIn 0.3s ease-out';
     item.onclick = () => openMarket(trade.slug);
     const timeStr = new Date(trade.timestamp).toLocaleTimeString();
-    const sideIcon = trade.side === 'sell' ? '🔴' : '🟢';
+    const sideIcon = trade.side === 'sell' ? '▼' : '▲';
     const sideLabel = trade.side === 'sell' ? 'SELL' : 'BUY';
     const makerStr = trade.maker ? trade.maker.substring(0, 8) : 'anon';
-    item.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span class="flow-tag" style="${isBig ? 'color:#fbbf24;' : ''}">${sideIcon} ${isBig ? '🔥 WHALE' : sideLabel}</span><span style="color:var(--text-dark); font-size:8px;">${timeStr}</span></div><p style="color:rgba(255,255,255,0.8); margin-top:5px; line-height:1.3; font-size:10px;"><span style="color:white;">${makerStr}...</span> moved <span style="color:${isBig ? '#fbbf24' : 'var(--accent)'}; font-weight:900;"> $${formatVolume(trade.amount)}</span> into "${(trade.question || '').substring(0, 25)}..."</p>`;
+    item.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span style="${isBig ? 'color:#ffc800;' : 'color:var(--accent);'}">${sideIcon} ${isBig ? 'WHALE' : sideLabel}</span><span style="color:var(--text-3); font-size:9px;">${timeStr}</span></div><p style="color:rgba(255,255,255,0.8); margin-top:5px; line-height:1.3; font-size:10px;"><span style="color:var(--text);">${makerStr}</span> moved <span style="color:${isBig ? '#ffc800' : 'var(--accent)'}; font-weight:600;">$${formatVolume(trade.amount)}</span> into "${(trade.question || '').substring(0, 20)}..."</p>`;
     log.prepend(item);
-    while (log.children.length > 25) log.lastChild.remove();
+    while (log.children.length > 20) log.lastChild.remove();
 }
 
 function animateCalibartor() {
