@@ -52,14 +52,15 @@ header {
 .logo-box {
     width: 36px;
     height: 36px;
-    background: var(--accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 20px;
-    color: var(--bg);
+    animation: logoPulse 3s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 8px var(--accent)); }
 }
 
 .brand-text h1 {
