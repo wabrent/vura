@@ -3,14 +3,13 @@
 // ============================================================
 
 const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?closed=false&order=volume&dir=desc&limit=30",
+    API: "https://gamma-api.polymarket.com/events?closed=false&limit=50",
     PROXIES: [
         url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
         url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
     ],
-    REFRESH: 20000,
-    WHALE_THRESHOLD_USD: 10000,
+    REFRESH: 30000,
+    WHALE_THRESHOLD_USD: 5000,
     ARBITRAGE_THRESHOLD: 2.0
 };
 
@@ -43,11 +42,11 @@ window.addEventListener('DOMContentLoaded', () => {
     startWhaleFlow();
     animateCalibartor();
     setInterval(fetchData, CONFIG.REFRESH);
-    setInterval(fetchBtcPrice, 60000);
-    setInterval(runArbitrageScan, 30000);
-    setTimeout(runArbitrageScan, 6000);
-    setTimeout(monitorMarkets, 8000);
-    setInterval(monitorMarkets, 20000);
+    setInterval(fetchBtcPrice, 120000);
+    setInterval(runArbitrageScan, 40000);
+    setTimeout(runArbitrageScan, 8000);
+    setTimeout(monitorMarkets, 10000);
+    setInterval(monitorMarkets, 30000);
 });
 
 async function fetchWithFallback(url) {
@@ -101,20 +100,20 @@ async function fetchBtcPrice() {
 
 async function fetchData() {
     try {
-        const polyRes = await fetchWithFallback(CONFIG.API);
-        const polyData = await polyRes.json();
-        updateHeaderStats(polyData);
-        appState.allMarkets = polyData.map(event => processEvent(event));
+        const res = await fetchWithFallback(CONFIG.API);
+        const data = await res.json();
+        updateHeaderStats(data);
+        appState.allMarkets = data.map(event => processEvent(event));
         appState.crossPlatformData.polymarket = appState.allMarkets;
         appState.error = false;
         appState.loading = false;
         applyFilters();
-        botLog('Polymarket sync complete — ' + appState.allMarkets.length + ' markets loaded');
+        botLog('Polymarket sync: ' + appState.allMarkets.length + ' markets');
     } catch (e) {
-        console.error('Fetch Error:', e);
+        console.warn('Fetch error:', e.message);
         appState.error = true;
         renderMarkets();
-        botLog('⚠ DATA STREAM INTERRUPTED: ' + e.message, '#ef4444');
+        botLog('⚠ DATA STREAM INTERRUPTED', 'var(--red)');
     }
 }
 
