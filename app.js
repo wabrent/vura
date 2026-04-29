@@ -194,13 +194,9 @@ function renderMarkets() {
             <div class="card-left">
                 <span class="card-category">${m.category.toUpperCase()}</span>
                 <span class="card-title">${m.question}</span>
-                <span class="card-meta">Alpha ${m.alpha} · ${m.volDisplay} vol · ${spreadBadge}</span>
+                <span class="card-meta">Alpha ${m.alpha} · ${m.volDisplay} vol${spreadBadge ? ' · ' + spreadBadge : ''}</span>
             </div>
-            <div class="card-center">
-                <div class="card-chart">
-                    <div class="mini-bar" style="width:${Math.min(price, 100)}%; background:${price > 50 ? 'var(--accent)' : '#dc2626'}"></div>
-                </div>
-            </div>
+            <div class="card-center"></div>
             <div class="card-right">
                 <span class="card-price">${price}c</span>
                 <span class="card-volume">${volumeItem}$${m.volDisplay}</span>
