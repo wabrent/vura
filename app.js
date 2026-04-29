@@ -61,7 +61,9 @@ function updateStats(data) {
 }
 
 function processEvent(event) {
-    const mainMarket = event.markets && event.markets.length > 0 ? event.markets[0] : {};
+    const markets = event.markets || [];
+    // Pick the first active/open market, not a closed one
+    const mainMarket = markets.find(m => m.active && !m.closed) || markets.find(m => m.active) || markets[0] || {};
     let yesPrice = 0.5, noPrice = 0.5;
 
     try {
