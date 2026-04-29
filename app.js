@@ -11,12 +11,17 @@ let appState = {
     allMarkets: [],
     arbitrageOpportunities: [],
     activeTab: 'all',
+    searchQuery: '',
+    sortBy: 'volume',
     loading: true,
     error: false
 };
 
 window.addEventListener('DOMContentLoaded', () => {
     setupTabs();
+    setupSearch();
+    setupSort();
+    setupCardClicks();
     fetchData();
     setInterval(fetchData, CONFIG.REFRESH);
     setInterval(runArbitrageScan, 45000);
@@ -31,6 +36,34 @@ function setupTabs() {
             appState.activeTab = btn.dataset.tab;
             renderAll();
         });
+    });
+}
+
+function setupSearch() {
+    const input = document.getElementById('search-input');
+    if (!input) return;
+    input.addEventListener('input', () => {
+        appState.searchQuery = input.value.toLowerCase();
+        if (appState.activeTab !== 'arbitrage') renderMarkets();
+    });
+}
+
+function setupSort() {
+    const select = document.getElementById('sort-select');
+    if (!select) return;
+    select.addEventListener('change', () => {
+        appState.sortBy = select.value;
+        if (appState.activeTab !== 'arbitrage') renderMarkets();
+    });
+}
+
+function setupCardClicks() {
+    // Delegated click for market cards
+    document.getElementById('market-feed').addEventListener('click', (e) => {
+        const card = e.target.closest('.market-card');
+        if (!card) return;
+        if (e.target.closest('a')) return; // Don't intercept link clicks
+        card.classList.toggle('card-expanded');
     });
 }
 
@@ -125,34 +158,53 @@ function renderAll() {
 
 function renderMarkets() {
     let markets = [...appState.allMarkets];
+    
+    // Filter by tab
     if (appState.activeTab !== 'all') {
         markets = markets.filter(m => m.category === appState.activeTab);
     }
+    
+    // Search filter
+    if (appState.searchQuery) {
+        markets = markets.filter(m => m.question.toLowerCase().includes(appState.searchQuery));
+    }
+    
+    // Sort
+    markets.sort((a, b) => {
+        switch (appState.sortBy) {
+            case 'alpha': return b.alpha - a.alpha;
+            case 'price': return b.yesPrice - a.yesPrice;
+            case 'category': return a.category.localeCompare(b.category);
+            default: return b.volume - a.volume;
+        }
+    });
+    
     const container = document.getElementById('market-feed');
     if (!container) return;
     if (markets.length === 0) {
-        container.innerHTML = '<div class="content-state"><p>No markets in this category.</p></div>';
+        container.innerHTML = '<div class="content-state"><p>No markets found.</p></div>';
         return;
     }
     container.innerHTML = markets.map((m, i) => {
-        const delay = i * 40;
-        const change = m.change24h;
-        const changeClass = change > 0 ? 'change-up' : (change < 0 ? 'change-down' : '');
-        const changeSign = change > 0 ? '+' : '';
+        const delay = i * 30;
         const price = Math.round(m.yesPrice * 100);
-        return `<div class="market-card" style="animation-delay:${delay}ms">
+        const volumeItem = m.volume > 1e6 ? '🔥 ' : '';
+        const spreadBadge = m.spread > 0.02 ? `<span class="spread-badge">SPREAD ${(m.spread*100).toFixed(1)}%</span>` : '';
+        return `<div class="market-card" style="animation-delay:${delay}ms" data-slug="${m.slug}">
             <div class="card-left">
                 <span class="card-category">${m.category.toUpperCase()}</span>
                 <span class="card-title">${m.question}</span>
+                <span class="card-meta">Alpha ${m.alpha} · ${m.volDisplay} vol · ${spreadBadge}</span>
             </div>
             <div class="card-center">
-                <div class="card-chart"></div>
+                <div class="card-chart">
+                    <div class="mini-bar" style="width:${Math.min(price, 100)}%; background:${price > 50 ? 'var(--accent)' : '#dc2626'}"></div>
+                </div>
             </div>
             <div class="card-right">
                 <span class="card-price">${price}c</span>
-                <span class="card-change ${changeClass}">${changeSign}${Math.abs(change).toFixed(1)}%</span>
-                <span class="card-volume">$${m.volDisplay} | Alpha ${m.alpha}</span>
-                <a class="btn-trade" href="https://polymarket.com/event/${m.slug}" target="_blank" onclick="event.stopPropagation()">Trade</a>
+                <span class="card-volume">${volumeItem}$${m.volDisplay}</span>
+                <a class="btn-trade" href="https://polymarket.com/event/${m.slug}" target="_blank" onclick="event.stopPropagation()">Trade ↗</a>
             </div>
         </div>`;
     }).join('');
