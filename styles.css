@@ -175,10 +175,30 @@ nav {
 .tab-btn.tab-active::after { display: none; }
 
 .tabs-meta {
-    display: flex; gap: 1.5rem;
+    display: flex; align-items: center; gap: 1rem;
     font-size: 0.65rem; letter-spacing: 0.05em;
     color: var(--text-3);
     padding-bottom: 0.5rem;
+}
+
+.search-input {
+    padding: 0.3rem 0.6rem;
+    font-family: var(--mono); font-size: 0.65rem;
+    background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--text);
+    outline: none; width: 180px;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus { border-color: var(--text); }
+.search-input::placeholder { color: var(--text-3); }
+
+.sort-select {
+    padding: 0.3rem 0.4rem;
+    font-family: var(--mono); font-size: 0.65rem;
+    background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--text); outline: none;
+    cursor: pointer;
 }
 
 .stat-vol { font-weight: 500; color: var(--accent); }
@@ -239,6 +259,15 @@ main {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+.card-meta {
+    font-size: 0.6rem; color: var(--text-3);
+    letter-spacing: 0.04em;
+}
+
+.spread-badge {
+    color: var(--accent); font-weight: 500;
+}
+
 .card-category {
     font-size: 0.65rem; letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -252,9 +281,16 @@ main {
 }
 
 .card-chart {
-    width: 100%; height: 3rem;
-    border-bottom: 1px solid var(--border);
-    opacity: 0.5;
+    width: 100%; height: 0.5rem;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mini-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
 }
 
 .card-right {
@@ -427,7 +463,9 @@ footer {
     .nav-links { gap: 1rem; }
     .nav-links a { font-size: 0.65rem; }
 
-    .tabs-bar { padding: 0 1rem; }
+    .tabs-bar { padding: 0 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .tabs-meta { flex-wrap: wrap; gap: 0.5rem; }
+    .search-input { width: 140px; }
     .tabs-inner { gap: 1rem; }
     .tab-btn { font-size: 0.65rem; }
 
