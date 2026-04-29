@@ -218,13 +218,12 @@ function findArbitrageOpportunities() {
     const polymarket = appState.crossPlatformData.polymarket;
     const manifold = appState.crossPlatformData.manifold;
 
-    // 1. Internal spread: yes + no != 1
+    // Internal spreads
     for (const pm of polymarket) {
         if (!pm.yesPrice || !pm.noPrice) continue;
         const spread = Math.abs(pm.yesPrice + pm.noPrice - 1);
         const spreadPct = spread * 100;
-        // Show even tiny spreads
-        if (spreadPct >= threshold * 0.5) {
+        if (spreadPct >= threshold) {
             opportunities.push({ 
                 polymarket: pm, other: null, platform: 'SPREAD', 
                 pricePoly: pm.yesPrice, priceOther: pm.noPrice, 
@@ -234,9 +233,9 @@ function findArbitrageOpportunities() {
         }
     }
 
-    // 2. Cross-platform (Manifold)
+    // Cross-platform with Manifold
     if (manifold.length > 0) {
-        for (const pm of polymarket.slice(0, 10)) {
+        for (const pm of polymarket.slice(0, 15)) {
             const keywords = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
             for (const m of manifold.slice(0, 30)) {
                 if (!m.yesPrice || !m.question) continue;
@@ -253,22 +252,6 @@ function findArbitrageOpportunities() {
                     }
                 }
             }
-        }
-    }
-
-    // 3. Top volume markets as "Hot" signals
-    if (opportunities.length === 0) {
-        const topVol = polymarket
-            .filter(m => m.volume > 50000 && m.yesPrice > 0.1 && m.yesPrice < 0.9)
-            .sort((a, b) => b.volume - a.volume)
-            .slice(0, 5);
-        for (const m of topVol) {
-            opportunities.push({
-                polymarket: m, other: null, platform: 'VOLUME',
-                pricePoly: m.yesPrice, priceOther: (1 - m.yesPrice),
-                gap: (m.volume / 1000000).toFixed(1), profit: (m.volume / 1000000).toFixed(1),
-                isProfitable: true, isInternal: false
-            });
         }
     }
 
@@ -301,31 +284,16 @@ function renderArbitragePanel() {
     }
 
     container.innerHTML = appState.arbitrageOpportunities.map(arb => {
-        const isHot = parseFloat(arb.gap) >= 5;
-        let color = 'var(--accent)';
-        let label = arb.platform;
-        let detail = '';
-        
-        if (arb.platform === 'SPREAD') {
-            color = '#059669';
-            label = 'SPREAD';
-            detail = `Yes: ${(arb.pricePoly*100).toFixed(0)}c | No: ${(arb.priceOther*100).toFixed(0)}c`;
-        } else if (arb.platform === 'MANIFOLD') {
-            color = '#3b82f6';
-            label = 'MANIFOLD';
-            detail = `PM: ${(arb.pricePoly*100).toFixed(0)}c | MF: ${(arb.priceOther*100).toFixed(0)}c`;
-        } else if (arb.platform === 'VOLUME') {
-            color = '#f59e0b';
-            label = 'HOT VOL';
-            detail = `$${(parseFloat(arb.gap) * 1000000).toFixed(0)} vol | ${(arb.pricePoly*100).toFixed(0)}c`;
-        }
-        
-        if (isHot) color = '#dc2626';
+        const color = arb.platform === 'SPREAD' ? 'var(--accent)' : '#3b82f6';
+        const label = arb.platform === 'SPREAD' ? 'SPREAD' : 'MANIFOLD';
+        const detail = arb.platform === 'SPREAD' 
+            ? `Yes: ${(arb.pricePoly*100).toFixed(0)}c | No: ${(arb.priceOther*100).toFixed(0)}c` 
+            : `PM: ${(arb.pricePoly*100).toFixed(0)}c | MF: ${(arb.priceOther*100).toFixed(0)}c`;
 
-        return `<div class="arb-item ${isHot ? 'arb-hot' : ''}">
+        return `<div class="arb-item">
             <div style="display:flex; justify-content:space-between; font-size:9px;">
                 <span style="color:${color}; font-weight:600;">${label}</span>
-                <span style="color:${color};">+${arb.profit}${arb.platform === 'VOLUME' ? 'M' : '%'}</span>
+                <span style="color:${color};">+${arb.profit}%</span>
             </div>
             <div style="color:var(--text); font-size:10px; margin-top:4px; line-height:1.3;">${(arb.polymarket.question || '').substring(0, 35)}</div>
             <div style="font-size:9px; color:var(--text-3); margin-top:2px;">${detail}</div>
