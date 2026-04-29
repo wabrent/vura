@@ -1,123 +1,52 @@
-# PolyEdge Quant Terminal
+# VURA | PREDICTION ENGINE
 
-Аналитический терминал для работы с prediction market платформой **Polymarket**.
+> Quantitative interfaces for prediction market liquidity.
 
-## 🚀 Возможности
+**VURA** is a high-precision, minimalist interface for Polymarket, built via the Polymarket Builder Program. It leverages the CLOB (Central Limit Order Book) to provide a professional-grade trading environment focused on data clarity and execution speed.
 
-### Реальные данные (v4.0)
-- **Alpha Score** — расчёт на основе объёма, волатильности и времени до завершения рынка
-- **Arbitrage Gap** — сравнение implied probability с реальными ценами Binance
-- **Spread** — арбитражный спред бинарных исходов (Yes + No - 1)
-- **Whale Flow** — отслеживание крупных транзакций в реальном времени
+## VISION
 
-### Фильтрация и поиск
-- Категории: Crypto, Politics, Sports
-- Поиск по названию рынка
-- Экспорт сигналов в CSV
+To transform raw prediction market data into actionable intelligence through a "Data-Heavy Minimalist" interface. VURA removes the noise of traditional betting platforms, offering a terminal-like experience for quantitative traders.
 
-### Интеграции
-- **Polymarket API** — данные о рынках и сделках
-- **Binance API** — цены криптоактивов
+## KEY FEATURES
 
----
+- **CLOB Integration:** Direct routing to Polymarket's Central Limit Order Book
+- **Real-time Analytics:** Alpha signals, Whale Flow monitoring, arbitrage detection
+- **Quantitative UI:** Minimalist dashboard with instant trend recognition
+- **Smart Attribution:** Builder-attributed trading
 
-## 📁 Структура проекта
+## TECHNICAL STACK
+
+- Pure HTML/CSS/JS (Vanilla)
+- No dependencies
+- CORS proxy for API access
+- Vercel deployment
+
+## REPOSITORY STRUCTURE
 
 ```
-polyedge-main/
-├── index.html          # UI терминала
-├── app.js              # Основная логика (real-time данные)
-├── styles.css          # Стили (cyberpunk/trading terminal)
-├── vercel.json         # Конфиг для Vercel
-├── logo.png            # Логотип
-├── .gitignore          # Игнорируемые файлы
-└── api/
-    └── proxy.js        # Serverless функция для CORS proxy
+vura/
+├── index.html      # Terminal UI
+├── app.js        # Core logic (real-time data)
+├── styles.css    # Seeker Labs inspired styling
+├── api/
+│   └── proxy.js  # Serverless CORS proxy
+└── vercel.json  # Vercel config
 ```
 
----
+## QUICK START
 
-## 🛠️ Установка и запуск
-
-### Локально (Live Server)
 ```bash
-# Открой index.html в браузере или используй Live Server
-# VS Code: установи расширение "Live Server" → Right Click → Open with Live Server
-```
-
-### Деплой на Vercel
-```bash
-# 1. Установи Vercel CLI
-npm i -g vercel
-
-# 2. Задеплой
+# Deploy to Vercel
 vercel
 
-# Или подключи репозиторий на vercel.com
+# Or connect GitHub repo at vercel.com
 ```
 
----
-
-## 📊 Как работает
-
-### Alpha Score
-```
-Базовый: 5.0
-+ Объём торгов: до +2 (> $1M = +2)
-+ Волатильность: до +2 (>15% = +2)
-+ Время до завершения: до +1 (<24ч = +1)
-─────────────────────────────────────
-Максимум: 10.0
-```
-
-### Arbitrage Gap
-```
-Gap = (impliedProb × 100 - 50) - (Binance 24h change / 10)
-
-Где:
-- impliedProb = цена Yes на Polymarket
-- Положительный Gap = потенциальная арбитражная возможность
-```
-
-### Spread
-```
-Spread = |Yes Price + No Price - 1|
-
-- Spread > 0.02 (2¢) = ⚠️ ARB сигнал
-- Spread < 0.02 = ✓ (норма)
-```
-
-### Whale Flow
-```
-- Мониторит топ-5 активных рынков
-- Загружает последние сделки через Polymarket API
-- Показывает сделки ≥ $10,000
-- 🔥 WHALE = сделки ≥ $50,000
-```
-
----
-
-## ⚙️ Конфигурация
-
-В `app.js` можно настроить:
-
-```javascript
-const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?...",
-    PROXY: "/api/proxy?url=",
-    REFRESH: 12000,              // Обновление данных (мс)
-    WHALE_THRESHOLD_USD: 10000   // Порог для whale алерта
-};
-```
-
----
-
-## 📝 Лицензия
+## LICENSE
 
 MIT
 
 ---
 
-## 📬 Контакты
-
-Telegram: [@waabrent](https://t.me/waabrent)
+**VURA: Trade the future with precision.**
