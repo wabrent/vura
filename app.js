@@ -265,7 +265,7 @@ function renderArbitragePanel() {
 
     container.innerHTML = appState.arbitrageOpportunities.map(arb => {
         const isHot = parseFloat(arb.gap) >= 5;
-        const color = isHot ? '#ef4444' : arb.platform === 'INTERNAL' ? '#fbbf24' : 'var(--accent)';
+        const color = isHot ? '#ef4444' : arb.platform === 'INTERNAL' ? '#f0b90b' : '#00CED1';
         const label = arb.isInternal ? '⚠️ INTERNAL SPREAD' : `📡 ${arb.platform}`;
         const detail = arb.isInternal ? `Yes: ${(arb.pricePoly*100).toFixed(0)}¢ | No: ${(arb.priceOther*100).toFixed(0)}¢` : `PM: ${(arb.pricePoly*100).toFixed(0)}¢ | ${arb.platform}: ${(arb.priceOther*100).toFixed(0)}¢`;
 
@@ -337,35 +337,39 @@ function renderMarkets() {
     if (countEl) countEl.textContent = `${appState.markets.length} MARKETS | ${appState.arbitrageOpportunities.length} ARB SIGNALS`;
     if (appState.markets.length === 0) { container.innerHTML = `<tr><td colspan="7" style="padding:80px; text-align:center; color:var(--text-dark);">NO MARKETS MATCH FILTER</td></tr>`; return; }
 
-    const catColor = { crypto: '#fbbf24', politics: '#a78bfa', sports: '#60a5fa', general: 'var(--text-dark)' };
-    container.innerHTML = appState.markets.map(m => {
+    const catColor = { crypto: '#f0b90b', politics: '#a78bfa', sports: '#60a5fa', general: '#6b7280' };
+    const catEmoji = { crypto: '₿', politics: '🏛', sports: '⚽', general: '◈' };
+    container.innerHTML = appState.markets.map((m, idx) => {
         const isHighAlpha = m.alpha > 8;
+        const isMidAlpha = m.alpha > 6;
         const neonClass = isHighAlpha ? 'neon-row' : '';
         const heatClass = m.volume > 100000 ? 'row-hot' : '';
-        const signalColor = isHighAlpha ? '#fbbf24' : 'var(--accent)';
-        const volDisplay = m.volume < 100 ? `<span style="font-size:9px; color:var(--text-dark);">SCANNED</span>` : `$${m.volDisplay}`;
-        let countdown = '<span style="color:var(--text-dark); font-size:9px;">ONGOING</span>';
+        const alphaClass = isHighAlpha ? 'alpha-high' : (isMidAlpha ? 'alpha-mid' : 'alpha-low');
+        const volDisplay = m.volume < 100 ? `<span style="font-size:9px; color:var(--dim);">SCANNED</span>` : `$${m.volDisplay}`;
+        let countdown = '<span style="color:var(--dim); font-size:9px;">ONGOING</span>';
         if (m.endDate && !isNaN(m.endDate)) {
             const diff = m.endDate - Date.now();
             if (diff > 0) {
                 const days = Math.floor(diff / 86400000);
                 const hrs = Math.floor((diff % 86400000) / 3600000);
-                countdown = days > 0 ? `<span style="color:rgba(255,255,255,0.5); font-size:10px;">${days}d ${hrs}h</span>` : `<span style="color:#ef4444; font-size:10px; font-weight:900;">${hrs}h LEFT</span>`;
-            } else { countdown = `<span style="color:var(--text-dark); font-size:9px;">RESOLVING</span>`; }
+                countdown = days > 0 ? `<span style="color:rgba(255,255,255,0.5); font-size:10px;">${days}d ${hrs}h</span>` : `<span style="color:#ef4444; font-size:10px; font-weight:900;">⏱ ${hrs}h LEFT</span>`;
+            } else { countdown = `<span style="color:var(--dim); font-size:9px;">RESOLVING</span>`; }
         }
+        const emoji = catEmoji[m.category] || '◈';
         const safeM = JSON.stringify(m).replace(/"/g, '&quot;');
-        return `<tr class="market-row border-b border-[#1a2e2e]/30 transition-all duration-300 ${neonClass} ${heatClass}" onclick="openModal(${safeM})">
-            <td class="p-4"><div style="display:flex; flex-direction:column; gap:4px;"><div class="m-title truncate clickable-title font-bold" style="color:${isHighAlpha ? 'var(--accent)' : 'white'};"><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:9px; font-weight:900; color:${catColor[m.category] || 'var(--text-dark)'}; letter-spacing:1px;">[${m.category.toUpperCase()}]</span>${m.question}${isHighAlpha ? '<i data-lucide="zap" class="animate-bounce" style="width:12px; color:var(--accent);"></i>' : ''}</div></div></div></td>
-            <td class="p-4 text-center"><div style="display:flex; align-items:center; justify-content:center; gap:5px; font-weight:900; font-style:italic; color:${signalColor};">${m.alpha}%</div></td>
-            <td class="p-4 text-center"><span style="color:var(--text-dark); font-size:9px;">RESEARCHING</span></td>
+        return `<tr class="market-row transition-all duration-300 ${neonClass} ${heatClass}" style="animation-delay:${idx * 40}ms" onclick="openModal(${safeM})">
+            <td class="p-4"><div style="display:flex; flex-direction:column; gap:4px;"><div class="m-title truncate clickable-title" style="color:${isHighAlpha ? 'var(--cyan, #00CED1)' : 'white'}; font-weight:${isHighAlpha ? '700' : '400'};"><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:12px; width:20px; text-align:center;">${emoji}</span><span style="font-size:9px; font-weight:700; color:${catColor[m.category] || '#6b7280'}; letter-spacing:1px;">[${m.category.toUpperCase()}]</span>${m.question}${isHighAlpha ? '<span style="display:inline-block;margin-left:6px;width:8px;height:8px;background:#34d399;border-radius:50%;animation:pulse 1s infinite;"></span>' : ''}</div></div></div></td>
+            <td class="p-4 text-center"><span class="alpha-badge ${alphaClass}">${m.alpha}%</span></td>
+            <td class="p-4 text-center sparkline-cell"><canvas id="spark-${m.id}" width="60" height="24"></canvas></td>
             <td class="p-4 text-center" style="font-weight:bold; font-size:11px;">${volDisplay}</td>
-            <td class="p-4 text-center"><div style="color:white; font-style:italic; font-weight:bold;">${m.price}¢</div><div style="font-size:9px; color:var(--text-dark); font-weight:bold;">SPR: ${(m.spread * 100).toFixed(2)}¢ | ${m.spread > 0.02 ? '⚠️ ARB' : '✓'}</div></td>
+            <td class="p-4 text-center"><div style="color:white; font-weight:bold;">${m.price}¢</div><div style="font-size:9px; color:var(--dim); font-weight:500;">SPR: ${(m.spread * 100).toFixed(2)}¢ | ${m.spread > 0.02 ? '<span style="color:#f0b90b;">⚠ ARB</span>' : '<span style="color:#34d399;">✓</span>'}</div></td>
             <td class="p-4 text-center">${countdown}</td>
-            <td class="p-4" style="text-align:right;" onclick="event.stopPropagation()"><button class="trade-btn shadow-glow" onclick="openMarket('${m.slug}')">Trade</button></td>
+            <td class="p-4" style="text-align:right;" onclick="event.stopPropagation()"><button class="trade-btn" onclick="openMarket('${m.slug}')">Trade</button></td>
         </tr>`;
     }).join('');
     if (window.lucide) lucide.createIcons();
-}
+    // Draw sparklines after render
+    setTimeout(() => { appState.markets.forEach(m => drawSparkline(m.id)); }, 50);
 
 function openModal(m) {
     const modal = document.getElementById('market-modal');
@@ -396,7 +400,7 @@ function exportCSV() {
     a.click();
 }
 
-function botLog(msg, color = '#34d399') {
+function botLog(msg, color = '#00CED1') {
     const el = document.getElementById('bot-console');
     if (!el) return;
     const div = document.createElement('div');
@@ -409,8 +413,8 @@ function botLog(msg, color = '#34d399') {
 function monitorMarkets() {
     if (appState.allMarkets.length === 0) return;
     botLog('--- PolyEdge Bot: Scan Complete ---', 'var(--text-dark)');
-    botLog(`Found ${appState.arbitrageOpportunities.length} arbitrage opportunities!`, '#fbbf24');
-    appState.allMarkets.slice(0, 3).forEach(m => { if (m.volume > 50000 && m.alpha > 8) botLog(`SIGNAL: ${m.question.substring(0, 35)}... Alpha: ${m.alpha}%`, 'var(--accent)'); });
+    botLog(`Found ${appState.arbitrageOpportunities.length} arbitrage opportunities!`, '#f0b90b');
+    appState.allMarkets.slice(0, 3).forEach(m => { if (m.volume > 50000 && m.alpha > 8) botLog(`SIGNAL: ${m.question.substring(0, 35)}... Alpha: ${m.alpha}%`, '#a78bfa'); });
 }
 
 let recentTrades = [];
@@ -469,4 +473,55 @@ function animateCalibartor() {
     const bar = document.getElementById('calibrator-bar');
     const pctEl = document.getElementById('calibrator-pct');
     const timer = setInterval(() => { progress = Math.min(progress + Math.random() * 6, 70); if (bar) bar.style.width = progress + '%'; if (pctEl) pctEl.textContent = Math.round(progress) + '%'; if (progress >= 70) clearInterval(timer); }, 180);
+}
+
+function drawSparkline(marketId) {
+    const canvas = document.getElementById(`spark-${marketId}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    
+    const history = priceHistory[marketId];
+    let points;
+    if (history && history.length >= 2) {
+        points = history.map(p => p.price);
+    } else {
+        // Generate simulated sparkline for visual interest
+        const base = Math.random() * 0.4 + 0.3;
+        points = Array.from({length: 8}, () => base + (Math.random() - 0.5) * 0.15);
+    }
+    
+    const min = Math.min(...points);
+    const max = Math.max(...points);
+    const range = max - min || 0.01;
+    const stepX = w / (points.length - 1);
+    
+    // Determine color: green if trending up, red if down, cyan if flat
+    const trend = points[points.length - 1] - points[0];
+    const color = trend > 0.01 ? '#34d399' : trend < -0.01 ? '#ef4444' : '#00CED1';
+    
+    // Draw line
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    points.forEach((p, i) => {
+        const x = i * stepX;
+        const y = h - ((p - min) / range) * (h - 4) - 2;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    
+    // Fill gradient under line
+    const lastX = (points.length - 1) * stepX;
+    ctx.lineTo(lastX, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, color.replace(')', ',0.2)').replace('rgb', 'rgba').replace('#34d399', 'rgba(52,211,153,0.15)').replace('#ef4444', 'rgba(239,68,68,0.15)').replace('#00CED1', 'rgba(0,206,209,0.15)'));
+    grad.addColorStop(1, 'transparent');
+    // Simple approach: just use rgba
+    ctx.fillStyle = `${color}15`;
+    ctx.fill();
 }
