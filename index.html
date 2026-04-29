@@ -3,225 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VURA | Vision Ultra Real-time Analytics</title>
-    <meta name="description" content="VURA — Advanced prediction market analytics. Real-time Alpha signals, Whale Flow monitoring, and Arbitrage detection.">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='white'/%3E%3Cpath d='M25 15 H75 V55 H48 L65 80 L48 100 L28 100 L45 80 L28 55 V15 Z' fill='black'/%3E%3C/svg%3E">
-    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <title>VURA | Prediction Terminal</title>
+    <meta name="description" content="VURA — Advanced prediction market analytics. Real-time Alpha signals and Arbitrage detection.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='black'/%3E%3Ctext x='50' y='72' text-anchor='middle' fill='white' font-family='Oswald,sans-serif' font-weight='700' font-size='70'%3EV%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="terminal-node">
 
-    <!-- HEADER -->
-    <header>
-        <div class="brand-unit">
-            <div class="logo-box">
-                <svg viewBox="0 0 100 100" fill="#0a0a0a">
-                    <rect width="100" height="100" fill="#ffffff"/>
-                    <text x="50" y="70" text-anchor="middle" font-family="var(--display)" font-size="55" font-weight="700" fill="#0a0a0a">V</text>
-                </svg>
-            </div>
-            <div class="brand-text">
-                <h1>VURA</h1>
-            </div>
-            <div class="node-status">
-                <span><span class="live-dot"></span>Live</span>
-                <span id="gas-display">GAS —</span>
-            </div>
+<!-- NAVBAR -->
+<nav>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo">
+            <span class="logo-mark">V</span>
+            <span>VURA</span>
+        </a>
+        <div class="nav-links">
+            <a href="#scanner" class="nav-link-active">Terminal</a>
+            <a href="#arbitrage">Arbitrage</a>
+            <a href="#">Docs</a>
         </div>
-
-        <!-- SEARCH + FILTERS -->
-        <div class="search-wrap" style="position:relative;">
-            <i data-lucide="search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:13px;color:var(--text-3);pointer-events:none;"></i>
-            <input id="search-input" type="text" placeholder="Search markets…">
-            <div class="filters">
-                <button onclick="setFilter('all')"      id="filter-all"      class="filter-btn filter-active">All</button>
-                <button onclick="setFilter('crypto')"   id="filter-crypto"   class="filter-btn">Crypto</button>
-                <button onclick="setFilter('politics')" id="filter-politics" class="filter-btn">Politics</button>
-                <button onclick="setFilter('sports')"   id="filter-sports"   class="filter-btn">Sports</button>
-            </div>
+        <div class="nav-status">
+            <span class="live-dot"></span>
+            <span id="nav-gas">Live</span>
         </div>
+    </div>
+</nav>
 
-        <!-- STATS -->
-        <div class="header-util">
-            <div class="stat-pill">
-                <div class="label">Vol 24h</div>
-                <div id="global-vol" class="value">—</div>
-            </div>
-            <div class="stat-pill">
-                <div class="label">Markets</div>
-                <div id="active-markets" class="value">—</div>
-            </div>
-            <div class="stat-pill">
-                <div class="label">BTC</div>
-                <div id="btc-price" class="value">—</div>
-            </div>
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-left">
+        <h2>PREDICTION</h2>
+        <h2>MARKET</h2>
+        <div class="hero-badge">TERMINAL</div>
+    </div>
+    <div class="hero-right">
+        <p>Real-time Polymarket data with Alpha scoring, spread detection, and cross-platform arbitrage scanning.</p>
+        <div class="hero-divider"></div>
+        <div class="hero-contact">
+            <span>Built on Polymarket CLOB</span>
+            <a href="https://polymarket.com" target="_blank">polymarket.com ↗</a>
         </div>
-    </header>
+    </div>
+</section>
 
-    <!-- MAIN SCANNER -->
-    <main class="scanner-container">
-        <div class="box-header">
-            <div class="box-header-title">
-                <i data-lucide="activity" style="width:14px;"></i>
-                Live Alpha Scanner
-                <span id="market-count"></span>
-            </div>
-            <button class="export-btn" onclick="exportCSV()">
-                <i data-lucide="download" style="width:12px;"></i>
-                Export CSV
-            </button>
-        </div>
-
-        <!-- TABLE AREA -->
-        <div class="table-scroll">
-            <!-- Error state -->
-            <div id="api-error" class="hidden">
-                <i data-lucide="wifi-off" style="width:28px;margin-bottom:4px;"></i>
-                <div>Data stream interrupted</div>
-                <div style="font-size:11px;font-family:var(--mono);color:var(--text-3);text-align:center;max-width:260px;line-height:1.6;">Attempting to reconnect via backup nodes…</div>
-                <button class="retry-btn" onclick="fetchData()">Retry connection</button>
-            </div>
-
-            <table class="market-table" id="data-table">
-                <thead>
-                    <tr>
-                        <th style="width:36%;">Market</th>
-                        <th style="text-align:center;width:9%;">Alpha</th>
-                        <th style="text-align:center;width:10%;">Gap</th>
-                        <th style="text-align:center;width:11%;">Volume</th>
-                        <th style="text-align:center;width:13%;">Price</th>
-                        <th style="text-align:center;width:12%;">Ends</th>
-                        <th style="text-align:right;width:9%;">Trade</th>
-                    </tr>
-                </thead>
-                <tbody id="market-rows">
-                    <tr class="loading-row"><td colspan="7">Synchronizing with Polymarket…</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- BOT CONSOLE -->
-        <div class="bot-console-wrap">
-            <div class="bot-console-hdr">
-                <span class="label">Signal Audit Console</span>
-                <span class="bot-status">
-                    <span class="live-dot"></span>
-                    POLARIS_NODE_01
-                </span>
-            </div>
-            <div id="bot-console">
-                <div>INIT_SEQUENCE: BOOTING QUANT_BOT_V2.0…</div>
-            </div>
-        </div>
-    </main>
-
-    <!-- SIDEBAR -->
-    <aside class="flow-container">
-
-        <!-- ARBITRAGE -->
-        <div class="sidebar-section">
-            <div class="sidebar-section-hdr">
-                <div class="sidebar-section-title">
-                    <i data-lucide="git-branch" style="width:13px;"></i>
-                    Arbitrage Signals
-                </div>
-                <span id="arb-count" class="count-badge">0 active</span>
-            </div>
-        </div>
-
-        <div class="arb-scroll" id="arb-log" style="max-height:200px;">
-            <div style="font-size:11px;font-family:var(--mono);color:var(--text-3);text-align:center;padding:20px 0;">
-                Scanning cross-platform…
-            </div>
-        </div>
-
-        <!-- THRESHOLD -->
-        <div class="threshold-wrap">
-            <span class="threshold-label">Min threshold</span>
-            <select id="arb-threshold" onchange="updateArbitrageThreshold(this.value)">
-                <option value="1">1%</option>
-                <option value="2" selected>2%</option>
-                <option value="3">3%</option>
-                <option value="5">5%</option>
-            </select>
-        </div>
-
-        <!-- WHALE FLOW -->
-        <div class="sidebar-section">
-            <div class="sidebar-section-hdr">
-                <div class="sidebar-section-title">
-                    <i data-lucide="bar-chart-3" style="width:13px;"></i>
-                    Whale Flow
-                </div>
-                <span id="whale-count" class="count-badge">0 signals</span>
-            </div>
-        </div>
-
-        <div class="whale-scroll" id="whale-log">
-            <div class="whale-skeleton"></div>
-            <div class="whale-skeleton"></div>
-            <div class="whale-skeleton"></div>
-        </div>
-
-        <!-- CALIBRATOR -->
-        <div class="calibrator-wrap">
-            <div class="calibrator-hdr">
-                <span>Internal Calibrator</span>
-                <span id="calibrator-pct">0%</span>
-            </div>
-            <div class="calibrator-track">
-                <div id="calibrator-bar"></div>
-            </div>
-            <div id="calibrator-label">Awaiting data stream…</div>
-        </div>
-
-    </aside>
-
-</div>
-
-<!-- MODAL -->
-<div id="market-modal">
-    <div class="modal-box">
-        <button class="modal-close" onclick="closeModal()">✕</button>
-        <div class="modal-tag">Market Analysis</div>
-        <h2 id="modal-title" class="modal-title"></h2>
-
-        <div class="modal-stats">
-            <div class="modal-stat">
-                <div class="label">Alpha Score</div>
-                <div id="modal-alpha" class="value"></div>
-            </div>
-            <div class="modal-stat">
-                <div class="label">Total Volume</div>
-                <div id="modal-vol" class="value"></div>
-            </div>
-            <div class="modal-stat">
-                <div class="label">Current Price</div>
-                <div id="modal-price" class="value"></div>
-            </div>
-        </div>
-
-        <div class="gauge-wrap">
-            <div class="gauge-label">Probability Gauge</div>
-            <div class="gauge-track">
-                <div id="modal-gauge"></div>
-            </div>
-            <div class="gauge-labels">
-                <span>0% NO</span>
-                <span>50%</span>
-                <span>100% YES</span>
-            </div>
-        </div>
-
-        <div class="modal-actions">
-            <button id="modal-trade-btn" class="modal-trade-btn">Trade on Polymarket ↗</button>
-            <button onclick="closeModal()" class="modal-cancel-btn">Close</button>
-        </div>
+<!-- TABS -->
+<div class="tabs-bar" id="tabs-bar">
+    <div class="tabs-inner">
+        <button class="tab-btn tab-active" data-tab="all">All Markets</button>
+        <button class="tab-btn" data-tab="crypto">Crypto</button>
+        <button class="tab-btn" data-tab="politics">Politics</button>
+        <button class="tab-btn" data-tab="sports">Sports</button>
+        <button class="tab-btn" data-tab="arbitrage">Arbitrage</button>
+    </div>
+    <div class="tabs-meta">
+        <span id="market-count">— markets</span>
+        <span id="global-vol" class="stat-vol">—</span>
     </div>
 </div>
 
+<!-- CONTENT -->
+<main id="scanner">
+    <!-- Loading -->
+    <div id="loading-state" class="content-state">
+        <p>Loading markets from Polymarket...</p>
+    </div>
+    <!-- Error -->
+    <div id="error-state" class="content-state hidden">
+        <p>Data stream interrupted</p>
+        <button class="btn-retry" onclick="fetchData()">Retry</button>
+    </div>
+    <!-- Market Feed -->
+    <div id="market-feed" class="hidden"></div>
+    <!-- Arbitrage Feed -->
+    <div id="arbitrage-feed" class="hidden"></div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+    <div class="footer-line"></div>
+    <div class="footer-inner">
+        <span>© 2025 VURA</span>
+        <div class="footer-links">
+            <a href="#">Twitter</a>
+            <a href="#">GitHub</a>
+            <a href="https://polymarket.com">Polymarket</a>
+        </div>
+    </div>
+</footer>
+
 <script src="app.js"></script>
-<script>lucide.createIcons();</script>
 </body>
 </html>
