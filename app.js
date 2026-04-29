@@ -51,24 +51,27 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchWithFallback(url) {
-    // Try local proxy first (for Vercel)
+    // Try direct first (Polymarket API supports CORS)
+    try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (res.ok) return res;
+    } catch (e) {}
+    
+    // Try local proxy (for Vercel)
     try {
         const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
         if (res.ok) return res;
-    } catch (e) { console.log('[Proxy] Local proxy failed'); }
+    } catch (e) {}
     
     // Try external CORS proxies
-    const errors = [];
     for (const buildProxy of CONFIG.PROXIES) {
         try {
             const proxyUrl = buildProxy(url);
-            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
             if (res.ok) return res;
-            errors.push(`${proxyUrl.substring(0,40)}: HTTP ${res.status}`);
-        } catch (e) { errors.push(e.message); }
+        } catch (e) {}
     }
-    console.warn('[Proxy] All proxies failed:', errors);
     throw new Error('All proxies failed');
 }
 
