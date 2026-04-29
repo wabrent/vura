@@ -188,7 +188,6 @@ function renderMarkets() {
     container.innerHTML = markets.map((m, i) => {
         const delay = i * 30;
         const price = Math.round(m.yesPrice * 100);
-        const volumeItem = m.volume > 1e6 ? '🔥 ' : '';
         const spreadBadge = m.spread > 0.02 ? `<span class="spread-badge">SPREAD ${(m.spread*100).toFixed(1)}%</span>` : '';
         return `<div class="market-card" style="animation-delay:${delay}ms" data-slug="${m.slug}">
             <div class="card-left">
@@ -199,7 +198,7 @@ function renderMarkets() {
             <div class="card-center"></div>
             <div class="card-right">
                 <span class="card-price">${price}c</span>
-                <span class="card-volume">${volumeItem}$${m.volDisplay}</span>
+                <span class="card-volume">$${m.volDisplay}</span>
                 <a class="btn-trade" href="https://polymarket.com/event/${m.slug}" target="_blank" onclick="event.stopPropagation()">Trade ↗</a>
             </div>
         </div>`;
