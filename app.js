@@ -36,7 +36,7 @@ function setupTabs() {
 
 async function fetchData() {
     try {
-        const res = await fetch(CONFIG.API);
+        const res = await fetch('/api/proxy?url=' + encodeURIComponent(CONFIG.API));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         appState.allMarkets = data.map(event => processEvent(event));
@@ -157,7 +157,7 @@ function renderMarkets() {
 
 async function runArbitrageScan() {
     try {
-        const res = await fetch('https://manifold.markets/api/v0/markets?limit=50&sort=liquidity');
+        const res = await fetch('/api/proxy?url=' + encodeURIComponent('https://manifold.markets/api/v0/markets?limit=50&sort=liquidity'));
         if (!res.ok) throw new Error('Manifold error');
         const data = await res.json();
         const manifold = (Array.isArray(data) ? data : [])
@@ -166,7 +166,6 @@ async function runArbitrageScan() {
         findArbitrage(manifold);
         if (appState.activeTab === 'arbitrage') renderArbitrage();
     } catch (e) {
-        // No Manifold data, just use internal spreads
         findArbitrage([]);
     }
 }
