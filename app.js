@@ -426,7 +426,7 @@ function exportCSV() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `polyedge_signals_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `vura_signals_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
 }
 
