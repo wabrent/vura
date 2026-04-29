@@ -277,41 +277,6 @@ function findArbitrageOpportunities() {
         .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
         .slice(0, 15);
 }
-        }
-
-        if (manifold.length > 0) {
-            const keywords = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-            for (const m of manifold.slice(0, 20)) {
-                if (!m.yesPrice || !m.question) continue;
-                const overlap = keywords.filter(k => m.question.toLowerCase().includes(k)).length;
-                if (overlap >= 1 && m.volume > 50) {
-                    const priceDiff = Math.abs(pm.yesPrice - m.yesPrice) * 100;
-                    if (priceDiff >= threshold) {
-                        opportunities.push({ 
-                            polymarket: pm, 
-                            other: m, 
-                            platform: 'MANIFOLD', 
-                            pricePoly: pm.yesPrice, 
-                            priceOther: m.yesPrice, 
-                            gap: priceDiff.toFixed(2), 
-                            profit: priceDiff.toFixed(2), 
-                            isProfitable: true 
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    appState.arbitrageOpportunities = opportunities
-        .filter(o => o.isProfitable)
-        .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
-        .slice(0, 15);
-    
-    if (appState.arbitrageOpportunities.length > 0) {
-        console.log('[ARB] Found:', appState.arbitrageOpportunities.length);
-    }
-}
 
 function findMatchingEvents(polyMarket, otherMarkets) {
     const polyWords = polyMarket.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
