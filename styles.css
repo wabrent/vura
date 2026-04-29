@@ -20,9 +20,72 @@ body {
     font-family: var(--mono);
     overflow-x: hidden;
     cursor: crosshair;
+    animation: bgPan 60s infinite alternate ease-in-out;
+}
+
+@keyframes bgPan {
+    0% { background-position: 0% 0%; background-size: 120% 120%; }
+    25% { background-position: 10% 10%; background-size: 115% 115%; }
+    50% { background-position: 20% 20%; background-size: 110% 110%; }
+    75% { background-position: 10% 10%; background-size: 115% 115%; }
+    100% { background-position: 0% 0%; background-size: 120% 120%; }
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 2, 2, 0.85);
+    pointer-events: none;
+    z-index: -1;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.035;
+    pointer-events: none;
+    z-index: 1000;
 }
 
 ::selection { background: var(--gold); color: var(--bg); }
+
+.fade-up {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.fade-up.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spinIn {
+    from { transform: rotateY(90deg); opacity: 0; }
+    to { transform: rotateY(0deg); opacity: 1; }
+}
+
+.spin-btn {
+    display: inline-block;
+    transition: transform 0.5s ease-out;
+    transform-style: preserve-3d;
+}
+
+.btn-primary:hover .spin-btn,
+.nav-cta:hover .spin-btn,
+.filter-btn:hover .spin-btn,
+.export-btn:hover .spin-btn,
+.trade-btn:hover .spin-btn {
+    transform: rotateY(360deg);
+}
 
 .terminal-node {
     display: grid;
@@ -123,10 +186,16 @@ header {
     background: #111;
     border: 1px solid #ffffff15;
     cursor: crosshair;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
 }
 
-.filter-btn:hover { color: var(--white); }
+.filter-btn:hover { 
+    color: var(--white); 
+    background: #1a1a1a;
+    border-color: var(--gold);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 206, 209, 0.2);
+}
 
 .filter-btn.filter-active {
     color: var(--bg);
@@ -233,9 +302,17 @@ table.market-table td {
     padding: 14px 8px;
     border-bottom: 1px solid #ffffff08;
     vertical-align: middle;
+    animation: fadeIn 0.4s ease-out backwards;
 }
 
-table.market-table tr:hover { background: rgba(0, 206, 209, 0.05); }
+table.market-table tr {
+    transition: all 0.3s ease;
+}
+
+table.market-table tr:hover { 
+    background: rgba(0, 206, 209, 0.08);
+    transform: translateX(4px);
+}
 
 table.market-table .m-title {
     max-width: 280px;
@@ -244,10 +321,24 @@ table.market-table .m-title {
     text-overflow: ellipsis;
 }
 
-table.market-table .clickable-title { cursor: pointer; }
-table.market-table .clickable-title:hover { color: var(--gold); }
+table.market-table .clickable-title { 
+    cursor: pointer; 
+    transition: color 0.3s ease;
+}
+table.market-table .clickable-title:hover { 
+    color: var(--gold); 
+    text-shadow: 0 0 10px var(--gold);
+}
 
-table.market-table .neon-row { box-shadow: inset 3px 0 0 var(--gold); }
+table.market-table .neon-row { 
+    box-shadow: inset 3px 0 0 var(--gold);
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { box-shadow: inset 3px 0 0 var(--gold), 0 0 5px var(--gold); }
+    50% { box-shadow: inset 3px 0 0 var(--gold), 0 0 15px var(--gold); }
+}
 table.market-table .row-hot { background: rgba(251, 191, 36, 0.05); }
 
 table.market-table .trade-btn {
@@ -260,7 +351,13 @@ table.market-table .trade-btn {
     background: var(--gold);
     border: none;
     cursor: crosshair;
-    transition: opacity 0.2s;
+    transition: all 0.3s ease;
+}
+
+.trade-btn:hover { 
+    opacity: 0.8; 
+    transform: scale(1.05);
+    box-shadow: 0 0 20px var(--gold);
 }
 
 table.market-table .trade-btn:hover { opacity: 0.85; }
@@ -391,12 +488,30 @@ aside.flow-container {
     padding: 10px;
     border-bottom: 1px solid #ffffff08;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s ease;
+    animation: slideIn 0.4s ease-out backwards;
 }
 
-.arb-item:hover, .flow-item:hover { background: rgba(0, 206, 209, 0.1); }
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
 
-.arb-item.arb-hot, .flow-item.flow-hot { border-left: 2px solid var(--gold); }
+.arb-item:hover, .flow-item:hover { 
+    background: rgba(0, 206, 209, 0.15);
+    transform: translateX(6px);
+    box-shadow: -3px 0 0 var(--gold);
+}
+
+.arb-item.arb-hot, .flow-item.flow-hot { 
+    border-left: 2px solid var(--gold);
+    animation: hotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hotPulse {
+    0%, 100% { border-left-color: var(--gold); }
+    50% { border-left-color: #ff6b6b; box-shadow: -3px 0 10px rgba(0, 206, 209, 0.4); }
+}
 
 .whale-skeleton {
     height: 48px;
@@ -496,6 +611,12 @@ aside.flow-container {
     max-width: 480px;
     width: 100%;
     position: relative;
+    animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-close {
