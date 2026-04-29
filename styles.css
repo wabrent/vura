@@ -34,7 +34,10 @@ body {
     grid-template-rows: 48px 1fr;
     height: 100vh;
     gap: 0;
+    animation: fadeIn 0.5s ease-out;
 }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 header {
     grid-column: 1 / -1;
@@ -55,7 +58,10 @@ header {
     font-family: var(--display);
     font-weight: 700; font-size: 16px;
     color: var(--bg);
+    animation: pulse 2s ease-in-out infinite;
 }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 
 .brand-text h1 {
     font-family: var(--display);
@@ -112,12 +118,24 @@ header {
     border: 1px solid var(--border);
     border-left: none;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
 }
 
-.filter-btn:hover { color: var(--text); background: var(--bg-1); border-color: var(--text); }
+.filter-btn:hover {
+    color: var(--text);
+    background: var(--bg-1);
+    border-color: var(--text);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+
 .filter-btn.filter-active {
     color: var(--bg); background: var(--text); border-color: var(--text);
+}
+
+.filter-btn.filter-active:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 .header-util { display: flex; gap: 16px; }
@@ -160,10 +178,14 @@ main.scanner-container { display: flex; flex-direction: column; padding: 8px; ov
     background: transparent;
     border: 1px solid var(--border);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
 }
 
-.export-btn:hover { color: var(--bg); background: var(--text); border-color: var(--text); }
+.export-btn:hover {
+    color: var(--bg); background: var(--text); border-color: var(--text);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
 
 .table-scroll { flex: 1; overflow-y: auto; }
 
@@ -188,9 +210,22 @@ table.market-table td {
     padding: 8px 6px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    animation: rowFadeIn 0.4s ease-out backwards;
 }
 
-table.market-table tr:hover { background: var(--bg-2); }
+@keyframes rowFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+table.market-table tr {
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+table.market-table tr:hover {
+    background: var(--bg-2);
+    transform: scale(1.002);
+}
 
 table.market-table .m-title {
     max-width: 220px;
@@ -208,10 +243,14 @@ table.market-table .trade-btn {
     text-transform: uppercase;
     color: var(--bg); background: var(--text);
     border: none; cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
 }
 
-table.market-table .trade-btn:hover { opacity: 0.8; }
+table.market-table .trade-btn:hover {
+    background: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(5,150,105,0.3);
+}
 
 .loading-row td { text-align: center; padding: 40px; color: var(--text-3); }
 .hidden { display: none !important; }
@@ -289,9 +328,33 @@ aside.flow-container {
     border: 1px solid var(--border);
 }
 
-.arb-item, .flow-item { padding: 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
-.arb-item:hover, .flow-item:hover { background: var(--bg-2); }
-.arb-item.arb-hot, .flow-item.flow-hot { border-left: 2px solid var(--amber); }
+.arb-item, .flow-item {
+    padding: 6px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    animation: slideIn 0.3s ease-out backwards;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.arb-item:hover, .flow-item:hover {
+    background: var(--bg-2);
+    transform: translateX(4px);
+}
+
+.arb-item.arb-hot, .flow-item.flow-hot {
+    border-left: 2px solid var(--amber);
+    animation: hotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hotPulse {
+    0%, 100% { border-left-color: var(--amber); }
+    50% { border-left-color: var(--red); }
+}
 
 .whale-skeleton { height: 28px; background: var(--bg-2); margin-bottom: 4px; }
 
