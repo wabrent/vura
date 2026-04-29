@@ -218,25 +218,65 @@ function findArbitrageOpportunities() {
     const polymarket = appState.crossPlatformData.polymarket;
     const manifold = appState.crossPlatformData.manifold;
 
+    // 1. Internal spread: yes + no != 1
     for (const pm of polymarket) {
         if (!pm.yesPrice || !pm.noPrice) continue;
-        
         const spread = Math.abs(pm.yesPrice + pm.noPrice - 1);
-        if (spread > 0.003 && pm.yesPrice > 0.02 && pm.yesPrice < 0.98) {
-            const spreadPct = spread * 100;
-            if (spreadPct >= threshold) {
-                opportunities.push({ 
-                    polymarket: pm, 
-                    other: null, 
-                    platform: 'INTERNAL', 
-                    pricePoly: pm.yesPrice, 
-                    priceOther: pm.noPrice, 
-                    gap: spreadPct.toFixed(2), 
-                    profit: spreadPct.toFixed(2), 
-                    isProfitable: true, 
-                    isInternal: true 
-                });
+        const spreadPct = spread * 100;
+        // Show even tiny spreads
+        if (spreadPct >= threshold * 0.5) {
+            opportunities.push({ 
+                polymarket: pm, other: null, platform: 'SPREAD', 
+                pricePoly: pm.yesPrice, priceOther: pm.noPrice, 
+                gap: spreadPct.toFixed(2), profit: spreadPct.toFixed(2), 
+                isProfitable: true, isInternal: true 
+            });
+        }
+    }
+
+    // 2. Cross-platform (Manifold)
+    if (manifold.length > 0) {
+        for (const pm of polymarket.slice(0, 10)) {
+            const keywords = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            for (const m of manifold.slice(0, 30)) {
+                if (!m.yesPrice || !m.question) continue;
+                const overlap = keywords.filter(k => m.question.toLowerCase().includes(k)).length;
+                if (overlap >= 1 && m.volume > 50) {
+                    const priceDiff = Math.abs(pm.yesPrice - m.yesPrice) * 100;
+                    if (priceDiff >= threshold) {
+                        opportunities.push({ 
+                            polymarket: pm, other: m, platform: 'MANIFOLD', 
+                            pricePoly: pm.yesPrice, priceOther: m.yesPrice, 
+                            gap: priceDiff.toFixed(2), profit: priceDiff.toFixed(2), 
+                            isProfitable: true 
+                        });
+                    }
+                }
             }
+        }
+    }
+
+    // 3. Top volume markets as "Hot" signals
+    if (opportunities.length === 0) {
+        const topVol = polymarket
+            .filter(m => m.volume > 50000 && m.yesPrice > 0.1 && m.yesPrice < 0.9)
+            .sort((a, b) => b.volume - a.volume)
+            .slice(0, 5);
+        for (const m of topVol) {
+            opportunities.push({
+                polymarket: m, other: null, platform: 'VOLUME',
+                pricePoly: m.yesPrice, priceOther: (1 - m.yesPrice),
+                gap: (m.volume / 1000000).toFixed(1), profit: (m.volume / 1000000).toFixed(1),
+                isProfitable: true, isInternal: false
+            });
+        }
+    }
+
+    appState.arbitrageOpportunities = opportunities
+        .filter(o => o.isProfitable)
+        .sort((a, b) => parseFloat(b.profit) - parseFloat(a.profit))
+        .slice(0, 15);
+}
         }
 
         if (manifold.length > 0) {
@@ -291,20 +331,36 @@ function renderArbitragePanel() {
     if (countEl) countEl.textContent = `${appState.arbitrageOpportunities.length} ACTIVE`;
 
     if (appState.arbitrageOpportunities.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-3); font-size:10px; text-align:center; padding:20px;">NO ARBITRAGE SIGNALS<br><span style="font-size:9px;opacity:0.6;">Scanning internal spreads...</span></div>`;
+        container.innerHTML = `<div style="color:var(--text-3); font-size:10px; text-align:center; padding:20px;">WAITING FOR DATA<br><span style="font-size:9px;opacity:0.6;">Refresh in progress...</span></div>`;
         return;
     }
 
     container.innerHTML = appState.arbitrageOpportunities.map(arb => {
         const isHot = parseFloat(arb.gap) >= 5;
-        const color = isHot ? '#ffc800' : arb.platform === 'INTERNAL' ? '#f0b90b' : 'var(--accent)';
-        const label = arb.isInternal ? 'SPREAD' : arb.platform;
-        const detail = arb.isInternal ? `Yes: ${(arb.pricePoly*100).toFixed(0)}c | No: ${(arb.priceOther*100).toFixed(0)}c` : `PM: ${(arb.pricePoly*100).toFixed(0)}c | ${arb.platform}: ${(arb.priceOther*100).toFixed(0)}c`;
+        let color = 'var(--accent)';
+        let label = arb.platform;
+        let detail = '';
+        
+        if (arb.platform === 'SPREAD') {
+            color = '#059669';
+            label = 'SPREAD';
+            detail = `Yes: ${(arb.pricePoly*100).toFixed(0)}c | No: ${(arb.priceOther*100).toFixed(0)}c`;
+        } else if (arb.platform === 'MANIFOLD') {
+            color = '#3b82f6';
+            label = 'MANIFOLD';
+            detail = `PM: ${(arb.pricePoly*100).toFixed(0)}c | MF: ${(arb.priceOther*100).toFixed(0)}c`;
+        } else if (arb.platform === 'VOLUME') {
+            color = '#f59e0b';
+            label = 'HOT VOL';
+            detail = `$${(parseFloat(arb.gap) * 1000000).toFixed(0)} vol | ${(arb.pricePoly*100).toFixed(0)}c`;
+        }
+        
+        if (isHot) color = '#dc2626';
 
         return `<div class="arb-item ${isHot ? 'arb-hot' : ''}">
             <div style="display:flex; justify-content:space-between; font-size:9px;">
                 <span style="color:${color}; font-weight:600;">${label}</span>
-                <span style="color:${color};">+${arb.profit}%</span>
+                <span style="color:${color};">+${arb.profit}${arb.platform === 'VOLUME' ? 'M' : '%'}</span>
             </div>
             <div style="color:var(--text); font-size:10px; margin-top:4px; line-height:1.3;">${(arb.polymarket.question || '').substring(0, 35)}</div>
             <div style="font-size:9px; color:var(--text-3); margin-top:2px;">${detail}</div>
