@@ -395,13 +395,6 @@ function renderMarkets() {
         </tr>`;
     });
 }
-            <td class="p-4 text-center">${countdown}</td>
-            <td class="p-4" style="text-align:right;" onclick="event.stopPropagation()"><button class="trade-btn" onclick="openMarket('${m.slug}')">Trade</button></td>
-        </tr>`;
-    }).join('');
-    if (window.lucide) lucide.createIcons();
-    // Draw sparklines after render
-    setTimeout(() => { appState.markets.forEach(m => drawSparkline(m.id)); }, 50);
 
 function openModal(m) {
     const modal = document.getElementById('market-modal');
