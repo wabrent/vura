@@ -252,17 +252,58 @@ function openModal(id) {
 }
 
 function drawModalChart(m, tf) {
-    const pts = tf === '1H' ? 30 : tf === '24H' ? 48 : 56;
-    const data = generateSparkData(m.yesPrice, pts);
-    const labels = generateTimeLabels(pts, tf);
-    if (appState.modalChart) { appState.modalChart.destroy(); appState.modalChart = null; }
-    const ctx = document.getElementById('modal-chart');
-    if (!ctx) return;
-    const color = data[data.length-1] >= data[0] ? '#059669' : '#dc2626';
-    appState.modalChart = new Chart(ctx, {
-        type: 'line', data: { labels, datasets: [{ data: data.map(v => Math.round(v * 100)), borderColor: color, borderWidth: 1.5, pointRadius: 0, tension: 0.35, fill: true, backgroundColor: color === '#059669' ? 'rgba(5,150,105,0.06)' : 'rgba(220,38,38,0.06)' }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 200 }, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.parsed.y + 'c' } } }, scales: { x: { grid: { color: '#e5e5e5' }, ticks: { color: '#737373', font: { size: 9 }, maxTicksLimit: 7 } }, y: { grid: { color: '#e5e5e5' }, ticks: { color: '#737373', font: { size: 9 }, callback: v => v + 'c' }, min: 0, max: 100 } } }
-    });
+    try {
+        const pts = tf === '1H' ? 30 : tf === '24H' ? 48 : 56;
+        const data = generateSparkData(m.yesPrice, pts);
+        const labels = generateTimeLabels(pts, tf);
+        
+        if (appState.modalChart) {
+            appState.modalChart.destroy();
+            appState.modalChart = null;
+        }
+        
+        const canvas = document.getElementById('modal-chart');
+        if (!canvas) return;
+        
+        // Reset canvas
+        const parent = canvas.parentElement;
+        canvas.remove();
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = 'modal-chart';
+        newCanvas.style.width = '100%';
+        newCanvas.style.height = '120px';
+        parent.appendChild(newCanvas);
+        
+        const ctx = newCanvas.getContext('2d');
+        const color = data[data.length-1] >= data[0] ? '#059669' : '#dc2626';
+        
+        appState.modalChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    data: data.map(v => Math.round(v * 100)),
+                    borderColor: color,
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.35,
+                    fill: true,
+                    backgroundColor: color === '#059669' ? 'rgba(5,150,105,0.06)' : 'rgba(220,38,38,0.06)'
+                }]
+            },
+            options: {
+                responsive: false,
+                animation: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#737373', font: { size: 8 }, maxTicksLimit: 6 } },
+                    y: { grid: { color: '#e5e5e5' }, ticks: { color: '#737373', font: { size: 8 }, callback: v => v + 'c' }, min: 0, max: 100 }
+                }
+            }
+        });
+    } catch (e) {
+        console.warn('Chart error:', e);
+    }
 }
 
 function generateTimeLabels(pts, tf) {
@@ -279,7 +320,11 @@ function generateTimeLabels(pts, tf) {
 function closeModal() {
     document.getElementById('pnl-modal').classList.add('hidden');
     document.body.classList.remove('modal-open');
-    if (appState.modalChart) { appState.modalChart.destroy(); appState.modalChart = null; }
+    if (appState.modalChart) {
+        try { appState.modalChart.destroy(); } catch (e) {}
+        appState.modalChart = null;
+    }
+    appState.selectedMarket = null;
 }
 
 function handleModalOverlayClick(e) { if (e.target.id === 'pnl-modal') closeModal(); }
