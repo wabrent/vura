@@ -1,31 +1,25 @@
 {
-  "name": "polyedge-quant",
-  "version": "4.0.0",
-  "description": "PolyEdge Quant Terminal — Real-time Polymarket analytics with Alpha Score, Arbitrage detection, and Whale Flow tracking",
-  "main": "app.js",
+  "name": "vura",
+  "version": "2.0.0",
+  "private": true,
   "scripts": {
-    "start": "node local-server.js",
-    "dev": "node local-server.js",
-    "build": "echo 'No build step required - vanilla JS'",
-    "deploy": "vercel --prod"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "keywords": [
-    "polymarket",
-    "trading",
-    "arbitrage",
-    "crypto",
-    "prediction-market",
-    "analytics",
-    "whale-tracking"
-  ],
-  "author": "waabrent",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wabrent/polyedge.git"
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "lucide-react": "^0.300.0"
   },
   "devDependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0"
   }
 }
