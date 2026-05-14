@@ -373,20 +373,16 @@ function handleTradeOverlayClick(e) {
 
 // ── WALLET & TRADING ─────────────────────────────────────────────────────────
 let walletAddress = null;
-let walletSigner = null;
 
 async function connectWallet() {
     try {
         if (!window.ethereum) {
-            alert('MetaMask not found. Install MetaMask to trade.');
+            showToast('MetaMask not installed');
             return;
         }
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send('eth_requestAccounts', []);
-        walletSigner = provider.getSigner();
-        walletAddress = await walletSigner.getAddress();
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        walletAddress = accounts[0];
         
-        // Switch to Polygon
         try {
             await window.ethereum.request({
                 method: 'wallet_switchEthereumChain',
@@ -398,7 +394,7 @@ async function connectWallet() {
                     method: 'wallet_addEthereumChain',
                     params: [{
                         chainId: '0x89',
-                        chainName: 'Polygon Mainnet',
+                        chainName: 'Polygon',
                         nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
                         rpcUrls: ['https://polygon-rpc.com'],
                         blockExplorerUrls: ['https://polygonscan.com']
@@ -410,9 +406,8 @@ async function connectWallet() {
         const short = walletAddress.slice(0,6) + '...' + walletAddress.slice(-4);
         document.getElementById('wallet-btn').textContent = short;
         document.getElementById('wallet-btn').classList.add('wallet-connected');
-        showToast('Wallet connected: ' + short);
+        showToast('Connected: ' + short);
     } catch (e) {
-        console.warn('Wallet error:', e.message);
         showToast('Wallet connection failed');
     }
 }
@@ -443,15 +438,18 @@ function closeTradeModal() {
 }
 
 function updateTradePrice() {
-    const m = appState.allMarkets.find(m => {
-        const el = document.getElementById('trade-mkt-name');
-        return el && m.question.substring(0, 50) === el.textContent;
-    });
+    const m = findTradeMarket();
     if (!m) return;
     const outcome = document.getElementById('trade-outcome').value;
     const price = outcome === 'YES' ? Math.round(m.yesPrice * 100) : Math.round(m.noPrice * 100);
     document.getElementById('trade-price').value = price;
     updateTradeEstimate();
+}
+
+function findTradeMarket() {
+    const nameEl = document.getElementById('trade-mkt-name');
+    if (!nameEl) return null;
+    return appState.allMarkets.find(m => m.question.substring(0, 50) === nameEl.textContent);
 }
 
 function updateTradeEstimate() {
@@ -460,12 +458,12 @@ function updateTradeEstimate() {
     if (price > 0 && amount > 0) {
         const shares = (amount / (price / 100)).toFixed(2);
         document.getElementById('trade-shares').textContent = shares;
-        document.getElementById('trade-total').textContent = '$' + amount;
+        document.getElementById('trade-total').textContent = '$' + amount.toFixed(2);
     }
 }
 
 async function submitTrade() {
-    if (!walletSigner) {
+    if (!walletAddress) {
         alert('Connect wallet first');
         return;
     }
@@ -475,29 +473,17 @@ async function submitTrade() {
     statusEl.style.color = 'var(--text-3)';
     
     try {
-        // Get market data
-        const mktName = document.getElementById('trade-mkt-name').textContent;
-        const m = appState.allMarkets.find(m => m.question.substring(0, 50) === mktName);
+        const m = findTradeMarket();
         if (!m) throw new Error('Market not found');
         
-        const side = document.getElementById('trade-side').value;
-        const outcome = document.getElementById('trade-outcome').value;
-        const price = parseFloat(document.getElementById('trade-price').value) / 100;
-        const amount = parseFloat(document.getElementById('trade-amount').value);
-        const shares = Math.floor(amount / price);
-        
-        // Build order for CLOB
-        // Note: Full CLOB integration requires token IDs from the API
-        // This is a simplified order that opens Polymarket with pre-filled params
-        const polymarketUrl = `https://polymarket.com/event/${m.slug}?side=${side}&outcome=${outcome}`;
-        
-        statusEl.textContent = 'Redirecting to Polymarket...';
+        const statusEl = document.getElementById('trade-status');
+        statusEl.textContent = 'Opening Polymarket...';
         statusEl.style.color = 'var(--accent)';
         
         setTimeout(() => {
-            window.open(polymarketUrl, '_blank');
+            window.open('https://polymarket.com/event/' + m.slug, '_blank');
             closeTradeModal();
-        }, 800);
+        }, 500);
         
     } catch (e) {
         statusEl.textContent = 'Error: ' + e.message;
@@ -505,9 +491,14 @@ async function submitTrade() {
     }
 }
 
-// Quick Trade - open in new tab
+// Quick Trade
 function quickTrade(slug) {
-    openTradeModal(slug);
+    const m = appState.allMarkets.find(m => m.slug === slug);
+    if (m && walletAddress) {
+        openTradeModal(slug);
+    } else {
+        window.open('https://polymarket.com/event/' + slug, '_blank');
+    }
 }
 
 function openAlertFromModal() {
