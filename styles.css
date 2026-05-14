@@ -280,3 +280,18 @@ footer { max-width: 72rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
     border-color: var(--accent) !important;
     color: var(--accent) !important;
 }
+
+/* ============ PORTFOLIO ============ */
+.portfolio-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.portfolio-stat { background: var(--bg-2); border: 1px solid var(--border); padding: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.portfolio-label { font-size: 0.6rem; letter-spacing: 0.1em; color: var(--text-3); }
+.portfolio-value { font-size: 1.4rem; font-weight: 600; }
+.positions-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.position-card { display: flex; justify-content: space-between; gap: 1rem; background: var(--bg-2); border: 1px solid var(--border); padding: 1rem; }
+.position-left { flex: 1; }
+.position-title { font-weight: 600; }
+.position-meta { font-size: 0.7rem; color: var(--text-3); margin-top: 0.2rem; }
+.position-center { font-size: 0.75rem; color: var(--text-2); display: flex; flex-direction: column; gap: 0.3rem; }
+.position-right { text-align: right; font-weight: 600; }
+.green { color: #059669; }
+.red { color: #dc2626; }

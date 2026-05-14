@@ -55,6 +55,7 @@
         <button class="tab-btn" data-tab="watchlist">Watchlist <span id="watchlist-count" class="tab-badge"></span></button>
         <button class="tab-btn" data-tab="whale">Whale Flow</button>
         <button class="tab-btn" data-tab="alerts">Alerts <span id="alert-count" class="tab-badge"></span></button>
+        <button class="tab-btn" data-tab="portfolio">Portfolio <span id="portfolio-count" class="tab-badge"></span></button>
     </div>
     <div class="tabs-meta">
         <input id="search-input" type="text" placeholder="/ search markets..." class="search-input">
@@ -85,6 +86,7 @@
     <div id="watchlist-feed" class="hidden"></div>
     <div id="whale-feed" class="hidden"></div>
     <div id="alerts-feed" class="hidden"></div>
+    <div id="portfolio-feed" class="hidden"></div>
 </main>
 
 <!-- P&L MODAL -->
@@ -209,7 +211,7 @@
                     <div class="pnl-input" style="display:flex;align-items:center;" id="trade-total">—</div>
                 </div>
             </div>
-            <button id="trade-submit-btn" class="btn-retry" style="width:100%;" onclick="submitTrade()">Place Order</button>
+            <button id="trade-submit-btn" class="btn-retry" style="width:100%;" onclick="executePaperTrade()">Place Order</button>
             <div id="trade-status" style="text-align:center;font-size:0.7rem;margin-top:0.5rem;color:var(--text-3);"></div>
         </div>
     </div>
