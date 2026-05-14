@@ -71,11 +71,11 @@ function setupKeyboard() {
     const tabs = ['all','crypto','politics','sports','arbitrage','watchlist','whale','alerts'];
     document.addEventListener('keydown', (e) => {
         const tag = document.activeElement.tagName;
-        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
-            if (e.key === 'Escape') { document.activeElement.blur(); closeModal(); closeAlertModal(); }
-            return;
-        }
-        if (e.key === 'Escape') { closeModal(); closeAlertModal(); return; }
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+                if (e.key === 'Escape') { document.activeElement.blur(); closeModal(); closeAlertModal(); closeTradeModal(); }
+                return;
+            }
+            if (e.key === 'Escape') { closeModal(); closeAlertModal(); closeTradeModal(); return; }
         if (e.key === '/') { e.preventDefault(); document.getElementById('search-input').focus(); return; }
         if (e.key === 'w' || e.key === 'W') { if (appState.selectedMarket) { toggleWatchlist(appState.selectedMarket.id); } return; }
         if (e.key === 'a' || e.key === 'A') { if (appState.selectedMarket) { openAlertFromModal(); } return; }
@@ -186,7 +186,7 @@ function buildCard(m, i) {
             <span class="card-volume">$${m.volDisplay}</span>
             <div class="card-actions">
                 <button class="star-btn${inWl ? ' starred' : ''}" data-id="${m.id}" title="Watchlist">★</button>
-                <a class="btn-trade" href="https://polymarket.com/event/${m.slug}" target="_blank" onclick="event.stopPropagation()">Trade ↗</a>
+                <button class="btn-trade" onclick="event.stopPropagation();quickTrade('${m.slug}')">Trade</button>
             </div>
         </div>
     </div>`;
@@ -241,7 +241,7 @@ function openModal(id) {
     document.getElementById('modal-no').textContent = Math.round(m.noPrice * 100) + 'c';
     document.getElementById('modal-vol').textContent = '$' + m.volDisplay;
     document.getElementById('modal-alpha').textContent = m.alpha;
-    document.getElementById('modal-trade-link').href = 'https://polymarket.com/event/' + m.slug;
+    document.getElementById('modal-trade-link').onclick = (e) => { e.preventDefault(); quickTrade(m.slug); };
     updateModalWlBtn(); calcPnl();
     document.getElementById('pnl-modal').classList.remove('hidden');
     document.body.classList.add('modal-open');
@@ -352,7 +352,28 @@ function calcPnl() {
     roiEl.className = 'pnl-result-val ' + (roi >= 0 ? 'accent' : 'red');
 }
 
-function openAlertFromModal() {
+function openTradeModal(slug) {
+    const iframe = document.getElementById('trade-iframe');
+    iframe.src = 'https://polymarket.com/event/' + slug;
+    document.getElementById('trade-modal-title').textContent = 'Trade on Polymarket';
+    document.getElementById('trade-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+}
+
+function closeTradeModal() {
+    document.getElementById('trade-modal').classList.add('hidden');
+    document.getElementById('trade-iframe').src = '';
+    document.body.classList.remove('modal-open');
+}
+
+function handleTradeOverlayClick(e) {
+    if (e.target.id === 'trade-modal') closeTradeModal();
+}
+
+// Quick Trade buttons - open trade modal
+function quickTrade(slug) {
+    openTradeModal(slug);
+}
     const m = appState.selectedMarket; if (!m) return;
     document.getElementById('alert-mkt-name').textContent = m.question.substring(0, 60) + (m.question.length > 60 ? '...' : '');
     document.getElementById('alert-price-val').value = Math.round(m.yesPrice * 100);
