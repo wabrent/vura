@@ -330,6 +330,58 @@ function closeModal() {
 
 function handleModalOverlayClick(e) { if (e.target.id === 'pnl-modal') closeModal(); }
 
+// ── ALERTS ──────────────────────────────────────────────────────────────────
+function openAlertFromModal() {
+    const m = appState.selectedMarket; if (!m) return;
+    document.getElementById('alert-mkt-name').textContent = m.question.substring(0, 60) + (m.question.length > 60 ? '...' : '');
+    document.getElementById('alert-price-val').value = Math.round(m.yesPrice * 100);
+    document.getElementById('alert-modal').classList.remove('hidden');
+}
+
+function closeAlertModal() { document.getElementById('alert-modal').classList.add('hidden'); }
+function handleAlertOverlayClick(e) { if (e.target.id === 'alert-modal') closeAlertModal(); }
+
+function saveAlert() {
+    const m = appState.selectedMarket; if (!m) return;
+    const dir = document.getElementById('alert-dir').value;
+    const val = parseInt(document.getElementById('alert-price-val').value);
+    if (!val || val < 1 || val > 99) return;
+    appState.alerts.push({ id: Date.now(), marketId: m.id, question: m.question, dir, val, triggered: false });
+    localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts));
+    closeAlertModal(); updateBadges();
+    if (appState.activeTab === 'alerts') renderAlerts();
+    showToast('Alert set: ' + m.question.substring(0, 30) + '...');
+}
+
+function renderAlerts() {
+    const container = document.getElementById('alerts-feed');
+    if (appState.alerts.length === 0) { container.innerHTML = '<div class="content-state"><p>No alerts set. Press A on any market.</p></div>'; return; }
+    container.innerHTML = `<div class="alerts-list">${appState.alerts.map(a => {
+        const m = appState.allMarkets.find(m => m.id === a.marketId);
+        const cp = m ? Math.round(m.yesPrice * 100) : '?';
+        return `<div class="alert-row${a.triggered ? ' alert-row-triggered' : ''}">
+            <div class="alert-info"><span class="alert-mkt">${a.question.substring(0, 50)}</span><span class="alert-cond">${a.dir.toUpperCase()} ${a.val}c · now: ${cp}c${a.triggered ? ' TRIGGERED' : ''}</span></div>
+            <button class="alert-del" onclick="deleteAlert(${a.id})">✕</button></div>`;
+    }).join('')}</div>`;
+}
+
+function deleteAlert(id) { appState.alerts = appState.alerts.filter(a => a.id !== id); localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts)); updateBadges(); renderAlerts(); }
+
+function tickAlerts() {
+    let changed = false;
+    appState.alerts.forEach(a => {
+        const m = appState.allMarkets.find(m => m.id === a.marketId); if (!m) return;
+        const price = Math.round(m.yesPrice * 100);
+        if ((a.dir === 'above' && price >= a.val || a.dir === 'below' && price <= a.val) && !a.triggered) {
+            a.triggered = true; changed = true;
+            showToast('Alert: ' + a.question.substring(0, 30) + '...');
+        }
+    });
+    if (changed) { localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts)); if (appState.activeTab === 'alerts') renderAlerts(); }
+}
+
+// ── PNL ─────────────────────────────────────────────────────────────────────
+
 function setupPnlCalc() {
     ['pnl-stake','pnl-side','pnl-exit'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', calcPnl); });
 }
@@ -459,7 +511,62 @@ function quickTrade(slug) {
     openTradeModal(slug);
 }
 
-async function runArbitrageScan() {
+// ── WHALE FLOW ──────────────────────────────────────────────────────────────
+const WHALE_NAMES = ['0x3f...a12','0x8b...c44','0x1d...f88','0xaa...901','0x5c...b22','0x9e...d55','0x2f...710','0x7a...e33'];
+const SIDES = ['YES','NO'];
+
+function generateWhaleData() {
+    const mkts = appState.allMarkets.length ? appState.allMarkets : [{ question: 'Bitcoin above $100k', slug: '' }, { question: 'Trump wins 2024', slug: '' }, { question: 'Fed cuts rates Q3', slug: '' }];
+    const now = Date.now();
+    appState.whaleEvents = Array.from({ length: 18 }, (_, i) => {
+        const m = mkts[Math.floor(Math.random() * Math.min(mkts.length, 10))];
+        return { time: new Date(now - i * 90000 - Math.random() * 60000), addr: WHALE_NAMES[Math.floor(Math.random() * WHALE_NAMES.length)], market: m ? m.question : '—', slug: m ? m.slug : '', side: SIDES[Math.floor(Math.random() * 2)], amount: Math.round((Math.random() * 80 + 5) * 1000), isNew: i < 2 };
+    }).sort((a, b) => b.time - a.time);
+}
+
+function tickWhales() {
+    const mkts = appState.allMarkets; if (!mkts.length) return;
+    const m = mkts[Math.floor(Math.random() * Math.min(mkts.length, 10))];
+    appState.whaleEvents.unshift({ time: new Date(), addr: WHALE_NAMES[Math.floor(Math.random() * WHALE_NAMES.length)], market: m.question, slug: m.slug, side: SIDES[Math.floor(Math.random() * 2)], amount: Math.round((Math.random() * 80 + 5) * 1000), isNew: true });
+    appState.whaleEvents = appState.whaleEvents.slice(0, 30);
+    setTimeout(() => { appState.whaleEvents.forEach(w => w.isNew = false); }, 3000);
+    if (appState.activeTab === 'whale') renderWhale();
+}
+
+function renderWhale() {
+    const container = document.getElementById('whale-feed');
+    if (!appState.whaleEvents.length) { container.innerHTML = '<div class="content-state"><p>Scanning for whale activity...</p></div>'; return; }
+    const totalWhaleVol = appState.whaleEvents.reduce((s, w) => s + w.amount, 0);
+    const yesCount = appState.whaleEvents.filter(w => w.side === 'YES').length;
+    container.innerHTML = `<div class="whale-stats">
+        <div class="whale-stat"><span class="whale-stat-label">WHALE VOL (LAST 30)</span><span class="whale-stat-val">$${formatVol(totalWhaleVol)}</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">YES BIAS</span><span class="whale-stat-val accent">${Math.round(yesCount / appState.whaleEvents.length * 100)}%</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">AVG SIZE</span><span class="whale-stat-val">$${formatVol(totalWhaleVol / appState.whaleEvents.length)}</span></div>
+    </div>
+    <div class="whale-header"><span>TIME</span><span>ADDRESS</span><span>MARKET</span><span>SIDE</span><span>AMOUNT</span></div>
+    ${appState.whaleEvents.map(w => `<div class="whale-row${w.isNew ? ' whale-row-new' : ''}">
+        <span class="whale-time">${w.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+        <span class="whale-addr">${w.addr}</span><span class="whale-mkt">${w.market.substring(0, 38)}${w.market.length > 38 ? '...' : ''}</span>
+        <span class="whale-side ${w.side === 'YES' ? 'accent' : 'red'}">${w.side}</span>
+        <span class="whale-amount">$${w.amount.toLocaleString()}</span></div>`).join('')}`;
+}
+
+// ── BADGES / TOAST ──────────────────────────────────────────────────────────
+function updateBadges() {
+    const wlEl = document.getElementById('watchlist-count');
+    const alEl = document.getElementById('alert-count');
+    if (wlEl) wlEl.textContent = appState.watchlist.size || '';
+    if (alEl) alEl.textContent = appState.alerts.length || '';
+}
+
+function showToast(msg) {
+    let t = document.getElementById('vura-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'vura-toast'; t.className = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('toast-show');
+    clearTimeout(t._timeout); t._timeout = setTimeout(() => t.classList.remove('toast-show'), 3500);
+}
+
+// ── ARBITRAGE ───────────────────────────────────────────────────────────────
     try {
         const res = await fetch('/api/proxy?url=' + encodeURIComponent('https://manifold.markets/api/v0/markets?limit=50&sort=liquidity'));
         if (!res.ok) throw new Error('Manifold error');
