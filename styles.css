@@ -216,3 +216,67 @@ footer { max-width: 72rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
     .whale-stats { flex-direction: column; gap: 1px; }
     .pnl-row { grid-template-columns: 1fr 1fr; }
 }
+/* ── WALLET MODAL ─────────────────────────────────────────────────────────── */
+.wallet-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: left;
+    color: var(--text);
+}
+.wallet-option:hover {
+    border-color: var(--accent);
+    background: rgba(5, 150, 105, 0.04);
+}
+.wallet-option img, .wallet-option svg {
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+.wallet-option-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    flex: 1;
+}
+.wallet-option-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+}
+.wallet-option-desc {
+    font-size: 0.65rem;
+    color: var(--text-3);
+}
+.wallet-option-arrow {
+    color: var(--text-3);
+    font-size: 1rem;
+    transition: color 0.15s, transform 0.15s;
+}
+.wallet-option:hover .wallet-option-arrow {
+    color: var(--accent);
+    transform: translateX(3px);
+}
+.wallet-spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.wallet-connected {
+    background: rgba(5, 150, 105, 0.1) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
