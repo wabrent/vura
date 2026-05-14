@@ -1,17 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { TrendingUp, DollarSign, Activity, Zap } from "lucide-react"
-import { useAccount, useWalletClient } from "wagmi"
-import { ClobClient, Side, OrderType } from "@polymarket/clob-client"
 import { ethers } from "ethers"
+import { Activity, DollarSign, Zap, Wallet, TrendingUp } from "lucide-react"
 
 interface Market {
   conditionId: string
   question: string
   volume: number
-  outcomes: string[]
   outcomePrices: string[]
   clobTokenIds: string
   slug: string
@@ -21,8 +17,7 @@ export default function VuraTradingTerminal() {
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
   const [tradeStatus, setTradeStatus] = useState("")
-  const { address } = useAccount()
-  const { data: walletClient } = useWalletClient()
+  const [wallet, setWallet] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadMarkets() {
@@ -30,92 +25,40 @@ export default function VuraTradingTerminal() {
         const res = await fetch("/api/proxy?url=" + encodeURIComponent(
           "https://gamma-api.polymarket.com/events?closed=false&limit=12"
         ))
+        if (!res.ok) throw new Error("API error")
         const data = await res.json()
-        const active = data.filter((m: any) => m.active).slice(0, 12)
-        setMarkets(active)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+        setMarkets(data.filter((m: any) => m.active).slice(0, 12))
+      } catch (err) { console.error(err) }
+      finally { setLoading(false) }
     }
     loadMarkets()
-    const interval = setInterval(loadMarkets, 20000)
+    const interval = setInterval(loadMarkets, 25000)
     return () => clearInterval(interval)
   }, [])
 
-  async function tradeMarket(market: Market, outcome: string, price: number) {
-    if (!walletClient || !address) {
-      setTradeStatus("Connect wallet first")
+  async function connectWallet() {
+    if (!(window as any).ethereum) {
+      setTradeStatus("MetaMask not installed")
       return
     }
-
-    setTradeStatus("Preparing order...")
-
     try {
-      const tokenIds = JSON.parse(market.clobTokenIds || "[]")
-      const tokenId = outcome === "YES" ? tokenIds[0] : tokenIds[1]
-      if (!tokenId) throw new Error("Missing token ID")
-
-      const provider = new ethers.providers.Web3Provider(window.ethereum as any)
-      const signer = provider.getSigner()
+      const provider = new ethers.BrowserProvider((window as any).ethereum)
       await provider.send("eth_requestAccounts", [])
-
-      // Switch to Polygon
+      const signer = await provider.getSigner()
+      const addr = await signer.getAddress()
+      setWallet(addr)
       try {
-        await (window as any).ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x89" }],
-        })
-      } catch (e: any) {
-        if (e.code === 4902) {
-          await (window as any).ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [{
-              chainId: "0x89", chainName: "Polygon",
-              nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-              rpcUrls: ["https://polygon-rpc.com"],
-              blockExplorerUrls: ["https://polygonscan.com"],
-            }],
-          })
-        }
-      }
+        await (window as any).ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x89" }] })
+      } catch (e: any) { if (e.code === 4902) {
+        await (window as any).ethereum.request({ method: "wallet_addEthereumChain", params: [{ chainId: "0x89", chainName: "Polygon", nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 }, rpcUrls: ["https://polygon-rpc.com"], blockExplorerUrls: ["https://polygonscan.com"] }] })
+      }}
+    } catch (e) { console.error(e) }
+  }
 
-      // USDC approval
-      const USDC = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
-      const USDC_ABI = [
-        "function approve(address spender, uint256 amount) public returns (bool)",
-        "function allowance(address owner, address spender) view returns (uint256)",
-      ]
-      const usdc = new ethers.Contract(USDC, USDC_ABI, signer)
-
-      const client = new ClobClient("https://clob.polymarket.com", 137, signer)
-      const allowance = await usdc.allowance(address, client.exchangeAddress)
-      const amount = ethers.utils.parseUnits("10", 6)
-
-      if (allowance.lt(amount)) {
-        setTradeStatus("Approving USDC...")
-        const tx = await usdc.approve(address, ethers.constants.MaxUint256)
-        await tx.wait()
-      }
-
-      // Place order
-      setTradeStatus("Placing order...")
-      const order = await client.createOrder({
-        tokenID: tokenId,
-        price,
-        size: 10 / price,
-        side: Side.BUY,
-      })
-
-      const result = await client.postOrder(order)
-      console.log("Order placed:", result)
-      setTradeStatus("Order executed!")
-      setTimeout(() => setTradeStatus(""), 3000)
-    } catch (err: any) {
-      console.error(err)
-      setTradeStatus(err.message || "Trade failed")
-    }
+  async function tradeMarket(market: Market, outcome: string) {
+    if (!wallet) { setTradeStatus("Connect wallet first"); return }
+    setTradeStatus("Opening " + outcome + " on Polymarket...")
+    setTimeout(() => { window.open("https://polymarket.com/event/" + market.slug, "_blank"); setTradeStatus("") }, 500)
   }
 
   return (
@@ -126,7 +69,21 @@ export default function VuraTradingTerminal() {
             <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
             <h1 className="text-2xl font-black tracking-tight">VURA<span className="text-green-400">.INK</span></h1>
           </div>
-          <ConnectButton />
+          <div className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
+            <span>Markets</span><span>Signals</span><span>Whales</span><span>Arbitrage</span>
+          </div>
+          <div className="flex items-center gap-4">
+            {wallet ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-zinc-400">{wallet.slice(0,6)}...{wallet.slice(-4)}</span>
+                <button onClick={() => setWallet(null)} className="text-sm text-zinc-500 hover:text-white transition">Disconnect</button>
+              </div>
+            ) : (
+              <button onClick={connectWallet} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 text-black font-bold hover:bg-green-400 transition">
+                <Wallet size={16} />Connect
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -147,9 +104,7 @@ export default function VuraTradingTerminal() {
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-3xl border border-zinc-800 bg-zinc-900/40 p-6 animate-pulse">
-                <div className="h-6 bg-zinc-800 rounded w-3/4" />
-                <div className="h-4 bg-zinc-800 rounded w-1/2 mt-4" />
-                <div className="h-10 bg-zinc-800 rounded mt-8" />
+                <div className="h-6 bg-zinc-800 rounded w-3/4" /><div className="h-4 bg-zinc-800 rounded w-1/2 mt-4" /><div className="h-10 bg-zinc-800 rounded mt-8" />
               </div>
             ))}
           </div>
@@ -157,23 +112,20 @@ export default function VuraTradingTerminal() {
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
             {markets.map((m) => {
               const yesPrice = Number(m.outcomePrices?.[0] || 0.5)
-              const noPrice = Number(m.outcomePrices?.[1] || 0.5)
+              const noPrice = m.outcomePrices?.[1] ? Number(m.outcomePrices[1]) : 1 - yesPrice
               return (
                 <div key={m.conditionId} className="rounded-3xl border border-zinc-800 bg-zinc-900/40 p-6 hover:border-green-500/40 transition">
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="font-semibold leading-snug">{m.question}</h3>
-                    <div className="text-right">
-                      <div className="text-green-400 text-2xl font-black">{Math.round(yesPrice * 100)}c</div>
-                      <div className="text-xs text-zinc-500">YES</div>
-                    </div>
+                    <div className="text-right"><div className="text-green-400 text-2xl font-black">{Math.round(yesPrice * 100)}c</div><div className="text-xs text-zinc-500">YES</div></div>
                   </div>
                   <div className="mt-4 flex items-center justify-between text-sm text-zinc-500">
                     <div className="flex items-center gap-2"><DollarSign size={14} />Vol ${Number(m.volume || 0).toLocaleString()}</div>
                     <div className="flex items-center gap-1 text-green-400"><Zap size={14} />Trade</div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-6">
-                    <button onClick={() => tradeMarket(m, "YES", yesPrice)} className="bg-green-500 hover:bg-green-400 text-black font-bold py-3 rounded-2xl transition">Buy YES {Math.round(yesPrice * 100)}c</button>
-                    <button onClick={() => tradeMarket(m, "NO", noPrice)} className="bg-red-500 hover:bg-red-400 text-white font-bold py-3 rounded-2xl transition">Buy NO {Math.round(noPrice * 100)}c</button>
+                    <button onClick={() => tradeMarket(m, "YES")} className="bg-green-500 hover:bg-green-400 text-black font-bold py-3 rounded-2xl transition">Buy YES {Math.round(yesPrice * 100)}c</button>
+                    <button onClick={() => tradeMarket(m, "NO")} className="bg-red-500 hover:bg-red-400 text-white font-bold py-3 rounded-2xl transition">Buy NO {Math.round(noPrice * 100)}c</button>
                   </div>
                 </div>
               )
