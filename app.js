@@ -1,5 +1,6 @@
 const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?closed=false&limit=40",
+    API: "https://gamma-api.polymarket.com/events?closed=false&limit=40&active=true",
+    MANIFOLD_API: "https://manifold.markets/api/v0/markets?limit=50&sort=liquidity",
     REFRESH: 30000, WHALE_THRESHOLD_USD: 5000, ARBITRAGE_THRESHOLD: 1.0
 };
 
@@ -86,14 +87,25 @@ function setupKeyboard() {
 
 async function fetchData() {
     try {
-        const res = await fetch('/api/proxy?url=' + encodeURIComponent(CONFIG.API));
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        appState.allMarkets = data.map(event => processEvent(event));
+        let data = null;
+        const urls = [
+            CONFIG.API,
+            'https://gamma-api.polymarket.com/events?closed=false&limit=40',
+            '/api/proxy?url=' + encodeURIComponent(CONFIG.API)
+        ];
+        for (const url of urls) {
+            try {
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                if (res.ok) { data = await res.json(); break; }
+            } catch (e) { continue; }
+        }
+        if (!data) throw new Error('All endpoints failed');
+        const events = Array.isArray(data) ? data : (data.data || data.events || []);
+        appState.allMarkets = events.map(event => processEvent(event));
         appState.error = false; appState.loading = false;
         document.getElementById('loading-state').classList.add('hidden');
         document.getElementById('error-state').classList.add('hidden');
-        updateStats(data); renderAll(); updateBadges(); tickAlerts();
+        updateStats(events); renderAll(); updateBadges(); tickAlerts();
     } catch (e) {
         console.warn('Fetch error:', e.message);
         appState.error = true;
@@ -405,45 +417,126 @@ function calcPnl() {
     roiEl.className = 'pnl-result-val ' + (roi >= 0 ? 'accent' : 'red');
 }
 
-// ── WALLET & TRADING ─────────────────────────────────────────────────────────
+// ── WALLET ───────────────────────────────────────────────────────────────────
 let walletAddress = null;
 
-async function connectWallet() {
+function connectWallet() {
+    // Show wallet selector modal instead of auto-connecting
+    document.getElementById('wallet-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+}
+
+function closeWalletModal() {
+    document.getElementById('wallet-modal').classList.add('hidden');
+    document.body.classList.remove('modal-open');
+    // Reset to options view
+    document.getElementById('wallet-options').classList.remove('hidden');
+    document.getElementById('wallet-connecting').classList.add('hidden');
+}
+
+function showWalletConnecting(text) {
+    document.getElementById('wallet-options').classList.add('hidden');
+    document.getElementById('wallet-connecting').classList.remove('hidden');
+    document.getElementById('wallet-connecting-text').textContent = text;
+}
+
+async function switchToPolygon(provider) {
     try {
-        if (!window.ethereum) {
-            showToast('MetaMask not installed');
-            return;
-        }
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        walletAddress = accounts[0];
-        
-        try {
-            await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x89' }]
-            });
-        } catch (e) {
-            if (e.code === 4902) {
-                await window.ethereum.request({
-                    method: 'wallet_addEthereumChain',
-                    params: [{
-                        chainId: '0x89',
-                        chainName: 'Polygon',
-                        nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
-                        rpcUrls: ['https://polygon-rpc.com'],
-                        blockExplorerUrls: ['https://polygonscan.com']
-                    }]
-                });
-            }
-        }
-        
-        const short = walletAddress.slice(0,6) + '...' + walletAddress.slice(-4);
-        document.getElementById('wallet-btn').textContent = short;
-        document.getElementById('wallet-btn').classList.add('wallet-connected');
-        showToast('Connected: ' + short);
+        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
     } catch (e) {
-        showToast('Wallet connection failed');
+        if (e.code === 4902) {
+            await provider.request({
+                method: 'wallet_addEthereumChain',
+                params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com'], blockExplorerUrls: ['https://polygonscan.com'] }]
+            });
+        }
     }
+}
+
+function onWalletConnected(address) {
+    walletAddress = address;
+    const short = address.slice(0, 6) + '...' + address.slice(-4);
+    const btn = document.getElementById('wallet-btn');
+    btn.textContent = short;
+    btn.classList.add('wallet-connected');
+    closeWalletModal();
+    showToast('Connected: ' + short);
+}
+
+async function connectMetaMask() {
+    // Find MetaMask specifically (not Coinbase or others injected as window.ethereum)
+    const provider = window.ethereum?.providers?.find(p => p.isMetaMask && !p.isCoinbaseWallet)
+        || (window.ethereum?.isMetaMask && !window.ethereum?.isCoinbaseWallet ? window.ethereum : null);
+
+    if (!provider) {
+        window.open('https://metamask.io/download/', '_blank');
+        showToast('MetaMask not found — install it first');
+        return;
+    }
+    try {
+        showWalletConnecting('Opening MetaMask...');
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts.length) throw new Error('No accounts');
+        await switchToPolygon(provider);
+        onWalletConnected(accounts[0]);
+    } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
+        showToast(e.code === 4001 ? 'Rejected by user' : 'MetaMask connection failed');
+    }
+}
+
+async function connectCoinbase() {
+    const provider = window.ethereum?.providers?.find(p => p.isCoinbaseWallet)
+        || (window.ethereum?.isCoinbaseWallet ? window.ethereum : null);
+
+    if (!provider) {
+        window.open('https://www.coinbase.com/wallet/downloads', '_blank');
+        showToast('Coinbase Wallet not found — install it first');
+        return;
+    }
+    try {
+        showWalletConnecting('Opening Coinbase Wallet...');
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts.length) throw new Error('No accounts');
+        await switchToPolygon(provider);
+        onWalletConnected(accounts[0]);
+    } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
+        showToast(e.code === 4001 ? 'Rejected by user' : 'Coinbase Wallet connection failed');
+    }
+}
+
+async function connectRabby() {
+    const provider = window.ethereum?.providers?.find(p => p.isRabby)
+        || (window.ethereum?.isRabby ? window.ethereum : null)
+        || window.rabby
+        || null;
+
+    if (!provider) {
+        window.open('https://rabby.io/', '_blank');
+        showToast('Rabby not found — install it first');
+        return;
+    }
+    try {
+        showWalletConnecting('Opening Rabby...');
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts.length) throw new Error('No accounts');
+        await switchToPolygon(provider);
+        onWalletConnected(accounts[0]);
+    } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
+        showToast(e.code === 4001 ? 'Rejected by user' : 'Rabby connection failed');
+    }
+}
+
+async function connectWalletConnect() {
+    // WalletConnect requires their SDK; redirect to Polymarket which has it built in
+    showToast('Use WalletConnect on Polymarket directly');
+    setTimeout(() => window.open('https://polymarket.com', '_blank'), 600);
+    closeWalletModal();
 }
 
 function openTradeModal(slug) {
@@ -569,9 +662,12 @@ function showToast(msg) {
 // ── ARBITRAGE ───────────────────────────────────────────────────────────────
 async function runArbitrageScan() {
     try {
-        const res = await fetch('/api/proxy?url=' + encodeURIComponent('https://manifold.markets/api/v0/markets?limit=50&sort=liquidity'));
-        if (!res.ok) throw new Error('Manifold error');
-        const data = await res.json();
+        const manifoldUrl = 'https://manifold.markets/api/v0/markets?limit=50&sort=liquidity';
+        let data = null;
+        for (const url of [manifoldUrl, '/api/proxy?url=' + encodeURIComponent(manifoldUrl)]) {
+            try { const r = await fetch(url); if (r.ok) { data = await r.json(); break; } } catch(e) { continue; }
+        }
+        if (!data) throw new Error('Manifold error');
         const manifold = (Array.isArray(data) ? data : []).filter(m => m.outcomeType === 'BINARY' && typeof m.probability === 'number').map(m => ({ id: m.id, question: m.question, yesPrice: m.probability, volume: m.volume || 0, source: 'manifold' }));
         findArbitrage(manifold);
         if (appState.activeTab === 'arbitrage') renderArbitrage();
