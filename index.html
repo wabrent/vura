@@ -22,6 +22,7 @@
             <a href="https://github.com/wabrent/vura" target="_blank">GitHub</a>
         </div>
         <div class="nav-status">
+            <button id="wallet-btn" class="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
             <span class="live-dot"></span>
             <span id="nav-gas">Live</span>
         </div>
@@ -173,7 +174,60 @@
     </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- TRADE MODAL -->
+<div id="trade-modal" class="modal-overlay hidden" onclick="handleTradeOverlayClick(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="trade-modal-title">Place Order</span>
+            <button class="modal-close" onclick="closeTradeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-prices">
+                <div class="modal-price-block"><span class="modal-price-label">MARKET</span><span class="modal-price-val" id="trade-mkt-name" style="font-size:0.75rem;">—</span></div>
+                <div class="modal-price-block"><span class="modal-price-label">BEST BID</span><span class="modal-price-val accent" id="trade-bid">—</span></div>
+                <div class="modal-price-block"><span class="modal-price-label">BEST ASK</span><span class="modal-price-val red" id="trade-ask">—</span></div>
+            </div>
+            <div class="pnl-row">
+                <div class="pnl-field">
+                    <label class="pnl-label">SIDE</label>
+                    <select id="trade-side" class="pnl-input" onchange="updateTradePrice()">
+                        <option value="BUY">BUY</option>
+                        <option value="SELL">SELL</option>
+                    </select>
+                </div>
+                <div class="pnl-field">
+                    <label class="pnl-label">OUTCOME</label>
+                    <select id="trade-outcome" class="pnl-input" onchange="updateTradePrice()">
+                        <option value="YES">YES</option>
+                        <option value="NO">NO</option>
+                    </select>
+                </div>
+                <div class="pnl-field">
+                    <label class="pnl-label">PRICE (c)</label>
+                    <input type="number" id="trade-price" class="pnl-input" value="50" min="1" max="99" onchange="updateTradeEstimate()">
+                </div>
+            </div>
+            <div class="pnl-row">
+                <div class="pnl-field">
+                    <label class="pnl-label">AMOUNT ($)</label>
+                    <input type="number" id="trade-amount" class="pnl-input" value="10" min="1" onchange="updateTradeEstimate()">
+                </div>
+                <div class="pnl-field">
+                    <label class="pnl-label">SHARES</label>
+                    <div class="pnl-input" style="display:flex;align-items:center;" id="trade-shares">—</div>
+                </div>
+                <div class="pnl-field">
+                    <label class="pnl-label">TOTAL</label>
+                    <div class="pnl-input" style="display:flex;align-items:center;" id="trade-total">—</div>
+                </div>
+            </div>
+            <button id="trade-submit-btn" class="btn-retry" style="width:100%;" onclick="submitTrade()">Place Order</button>
+            <div id="trade-status" style="text-align:center;font-size:0.7rem;margin-top:0.5rem;color:var(--text-3);"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
