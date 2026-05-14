@@ -567,6 +567,7 @@ function showToast(msg) {
 }
 
 // ── ARBITRAGE ───────────────────────────────────────────────────────────────
+async function runArbitrageScan() {
     try {
         const res = await fetch('/api/proxy?url=' + encodeURIComponent('https://manifold.markets/api/v0/markets?limit=50&sort=liquidity'));
         if (!res.ok) throw new Error('Manifold error');
