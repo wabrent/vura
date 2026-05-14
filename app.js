@@ -371,9 +371,143 @@ function handleTradeOverlayClick(e) {
     if (e.target.id === 'trade-modal') closeTradeModal();
 }
 
+// ── WALLET & TRADING ─────────────────────────────────────────────────────────
+let walletAddress = null;
+let walletSigner = null;
+
+async function connectWallet() {
+    try {
+        if (!window.ethereum) {
+            alert('MetaMask not found. Install MetaMask to trade.');
+            return;
+        }
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);
+        walletSigner = provider.getSigner();
+        walletAddress = await walletSigner.getAddress();
+        
+        // Switch to Polygon
+        try {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x89' }]
+            });
+        } catch (e) {
+            if (e.code === 4902) {
+                await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                        chainId: '0x89',
+                        chainName: 'Polygon Mainnet',
+                        nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+                        rpcUrls: ['https://polygon-rpc.com'],
+                        blockExplorerUrls: ['https://polygonscan.com']
+                    }]
+                });
+            }
+        }
+        
+        const short = walletAddress.slice(0,6) + '...' + walletAddress.slice(-4);
+        document.getElementById('wallet-btn').textContent = short;
+        document.getElementById('wallet-btn').classList.add('wallet-connected');
+        showToast('Wallet connected: ' + short);
+    } catch (e) {
+        console.warn('Wallet error:', e.message);
+        showToast('Wallet connection failed');
+    }
+}
+
+function openTradeModal(slug) {
+    if (!walletAddress) {
+        connectWallet().then(() => {
+            if (walletAddress) openTradeModal(slug);
+        });
+        return;
+    }
+    const m = appState.allMarkets.find(m => m.slug === slug);
+    if (!m) return;
+    document.getElementById('trade-mkt-name').textContent = m.question.substring(0, 50);
+    document.getElementById('trade-bid').textContent = Math.round(m.yesPrice * 100) + 'c';
+    document.getElementById('trade-ask').textContent = Math.round((1 - m.yesPrice) * 100) + 'c';
+    document.getElementById('trade-price').value = Math.round(m.yesPrice * 100);
+    document.getElementById('trade-amount').value = 10;
+    document.getElementById('trade-status').textContent = '';
+    document.getElementById('trade-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    updateTradeEstimate();
+}
+
+function closeTradeModal() {
+    document.getElementById('trade-modal').classList.add('hidden');
+    document.body.classList.remove('modal-open');
+}
+
+function updateTradePrice() {
+    const m = appState.allMarkets.find(m => {
+        const el = document.getElementById('trade-mkt-name');
+        return el && m.question.substring(0, 50) === el.textContent;
+    });
+    if (!m) return;
+    const outcome = document.getElementById('trade-outcome').value;
+    const price = outcome === 'YES' ? Math.round(m.yesPrice * 100) : Math.round(m.noPrice * 100);
+    document.getElementById('trade-price').value = price;
+    updateTradeEstimate();
+}
+
+function updateTradeEstimate() {
+    const price = parseFloat(document.getElementById('trade-price').value) || 0;
+    const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
+    if (price > 0 && amount > 0) {
+        const shares = (amount / (price / 100)).toFixed(2);
+        document.getElementById('trade-shares').textContent = shares;
+        document.getElementById('trade-total').textContent = '$' + amount;
+    }
+}
+
+async function submitTrade() {
+    if (!walletSigner) {
+        alert('Connect wallet first');
+        return;
+    }
+    
+    const statusEl = document.getElementById('trade-status');
+    statusEl.textContent = 'Preparing order...';
+    statusEl.style.color = 'var(--text-3)';
+    
+    try {
+        // Get market data
+        const mktName = document.getElementById('trade-mkt-name').textContent;
+        const m = appState.allMarkets.find(m => m.question.substring(0, 50) === mktName);
+        if (!m) throw new Error('Market not found');
+        
+        const side = document.getElementById('trade-side').value;
+        const outcome = document.getElementById('trade-outcome').value;
+        const price = parseFloat(document.getElementById('trade-price').value) / 100;
+        const amount = parseFloat(document.getElementById('trade-amount').value);
+        const shares = Math.floor(amount / price);
+        
+        // Build order for CLOB
+        // Note: Full CLOB integration requires token IDs from the API
+        // This is a simplified order that opens Polymarket with pre-filled params
+        const polymarketUrl = `https://polymarket.com/event/${m.slug}?side=${side}&outcome=${outcome}`;
+        
+        statusEl.textContent = 'Redirecting to Polymarket...';
+        statusEl.style.color = 'var(--accent)';
+        
+        setTimeout(() => {
+            window.open(polymarketUrl, '_blank');
+            closeTradeModal();
+        }, 800);
+        
+    } catch (e) {
+        statusEl.textContent = 'Error: ' + e.message;
+        statusEl.style.color = 'var(--red)';
+    }
+}
+
 // Quick Trade - open in new tab
 function quickTrade(slug) {
-    window.open('https://polymarket.com/event/' + slug, '_blank');
+    openTradeModal(slug);
 }
 
 function openAlertFromModal() {
