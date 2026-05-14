@@ -242,6 +242,7 @@ function openModal(id) {
     document.getElementById('modal-vol').textContent = '$' + m.volDisplay;
     document.getElementById('modal-alpha').textContent = m.alpha;
     document.getElementById('modal-trade-link').onclick = (e) => { e.preventDefault(); quickTrade(m.slug); };
+    document.getElementById('modal-trade-link').href = '#';
     updateModalWlBtn(); calcPnl();
     document.getElementById('pnl-modal').classList.remove('hidden');
     document.body.classList.add('modal-open');
@@ -370,9 +371,9 @@ function handleTradeOverlayClick(e) {
     if (e.target.id === 'trade-modal') closeTradeModal();
 }
 
-// Quick Trade buttons - open trade modal
+// Quick Trade - open in new tab
 function quickTrade(slug) {
-    openTradeModal(slug);
+    window.open('https://polymarket.com/event/' + slug, '_blank');
 }
 
 function openAlertFromModal() {
