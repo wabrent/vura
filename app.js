@@ -413,12 +413,65 @@ async function connectWallet() {
 }
 
 function openTradeModal(slug) {
-    if (!walletAddress) {
-        connectWallet().then(() => {
-            if (walletAddress) openTradeModal(slug);
-        });
+    const m = appState.allMarkets.find(m => m.slug === slug);
+    if (!m) return;
+    document.getElementById('trade-mkt-name').textContent = m.question.substring(0, 50);
+    document.getElementById('trade-bid').textContent = Math.round(m.yesPrice * 100) + 'c';
+    document.getElementById('trade-ask').textContent = Math.round((1 - m.yesPrice) * 100) + 'c';
+    document.getElementById('trade-price').value = Math.round(m.yesPrice * 100);
+    document.getElementById('trade-amount').value = 10;
+    document.getElementById('trade-status').textContent = '';
+    document.getElementById('trade-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    updateTradeEstimate();
+}
+
+function closeTradeModal() {
+    document.getElementById('trade-modal').classList.add('hidden');
+    document.body.classList.remove('modal-open');
+}
+
+function updateTradePrice() {
+    const m = findTradeMarket();
+    if (!m) return;
+    const outcome = document.getElementById('trade-outcome').value;
+    const price = outcome === 'YES' ? Math.round(m.yesPrice * 100) : Math.round(m.noPrice * 100);
+    document.getElementById('trade-price').value = price;
+    updateTradeEstimate();
+}
+
+function findTradeMarket() {
+    const nameEl = document.getElementById('trade-mkt-name');
+    if (!nameEl) return null;
+    return appState.allMarkets.find(m => m.question.substring(0, 50) === nameEl.textContent);
+}
+
+function updateTradeEstimate() {
+    const price = parseFloat(document.getElementById('trade-price').value) || 0;
+    const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
+    if (price > 0 && amount > 0) {
+        const shares = (amount / (price / 100)).toFixed(2);
+        document.getElementById('trade-shares').textContent = shares;
+        document.getElementById('trade-total').textContent = '$' + amount.toFixed(2);
+    }
+}
+
+function submitTrade() {
+    const statusEl = document.getElementById('trade-status');
+    const m = findTradeMarket();
+    if (!m) {
+        statusEl.textContent = 'Market not found';
+        statusEl.style.color = 'var(--red)';
         return;
     }
+    statusEl.textContent = 'Opening Polymarket...';
+    statusEl.style.color = 'var(--accent)';
+    setTimeout(() => window.open('https://polymarket.com/event/' + m.slug, '_blank'), 300);
+}
+
+function quickTrade(slug) {
+    openTradeModal(slug);
+}
     const m = appState.allMarkets.find(m => m.slug === slug);
     if (!m) return;
     document.getElementById('trade-mkt-name').textContent = m.question.substring(0, 50);
