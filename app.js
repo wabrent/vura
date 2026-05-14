@@ -353,24 +353,6 @@ function calcPnl() {
     roiEl.className = 'pnl-result-val ' + (roi >= 0 ? 'accent' : 'red');
 }
 
-function openTradeModal(slug) {
-    const iframe = document.getElementById('trade-iframe');
-    iframe.src = 'https://polymarket.com/event/' + slug;
-    document.getElementById('trade-modal-title').textContent = 'Trade on Polymarket';
-    document.getElementById('trade-modal').classList.remove('hidden');
-    document.body.classList.add('modal-open');
-}
-
-function closeTradeModal() {
-    document.getElementById('trade-modal').classList.add('hidden');
-    document.getElementById('trade-iframe').src = '';
-    document.body.classList.remove('modal-open');
-}
-
-function handleTradeOverlayClick(e) {
-    if (e.target.id === 'trade-modal') closeTradeModal();
-}
-
 // ── WALLET & TRADING ─────────────────────────────────────────────────────────
 let walletAddress = null;
 
@@ -429,6 +411,10 @@ function openTradeModal(slug) {
 function closeTradeModal() {
     document.getElementById('trade-modal').classList.add('hidden');
     document.body.classList.remove('modal-open');
+}
+
+function handleTradeOverlayClick(e) {
+    if (e.target.id === 'trade-modal') closeTradeModal();
 }
 
 function updateTradePrice() {
