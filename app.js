@@ -374,6 +374,8 @@ function handleTradeOverlayClick(e) {
 function quickTrade(slug) {
     openTradeModal(slug);
 }
+
+function openAlertFromModal() {
     const m = appState.selectedMarket; if (!m) return;
     document.getElementById('alert-mkt-name').textContent = m.question.substring(0, 60) + (m.question.length > 60 ? '...' : '');
     document.getElementById('alert-price-val').value = Math.round(m.yesPrice * 100);
