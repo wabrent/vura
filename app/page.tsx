@@ -1,5 +1,5 @@
-import VuraTerminal from "@/components/VuraTerminal"
+import VuraTradingTerminal from "@/components/VuraTradingTerminal"
 
-export default function Home() {
-  return <VuraTerminal />
+export default function HomePage() {
+  return <VuraTradingTerminal />
 }
