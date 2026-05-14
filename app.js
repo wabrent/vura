@@ -10,8 +10,6 @@ let appState = {
     loading: true, error: false,
     watchlist: new Set(JSON.parse(localStorage.getItem('vura_watchlist') || '[]')),
     alerts: JSON.parse(localStorage.getItem('vura_alerts') || '[]'),
-    portfolio: JSON.parse(localStorage.getItem('vura_portfolio') || '[]'),
-    tradeHistory: JSON.parse(localStorage.getItem('vura_history') || '[]'),
     selectedMarket: null, modalChart: null, currentTf: '24H', whaleEvents: []
 };
 
@@ -23,7 +21,6 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(runArbitrageScan, 45000);
     setInterval(tickAlerts, 10000);
     setInterval(tickWhales, 15000);
-    setInterval(updatePortfolioPnL, 3000);
     setTimeout(runArbitrageScan, 8000);
 });
 
@@ -44,7 +41,7 @@ function setupSearch() {
     if (!input) return;
     input.addEventListener('input', () => {
         appState.searchQuery = input.value.toLowerCase();
-        if (!['arbitrage','watchlist','whale','alerts','portfolio'].includes(appState.activeTab)) renderMarkets();
+        if (!['arbitrage','watchlist','whale','alerts'].includes(appState.activeTab)) renderMarkets();
     });
 }
 
@@ -53,7 +50,7 @@ function setupSort() {
     if (!select) return;
     select.addEventListener('change', () => {
         appState.sortBy = select.value;
-        if (!['arbitrage','watchlist','whale','alerts','portfolio'].includes(appState.activeTab)) renderMarkets();
+        if (!['arbitrage','watchlist','whale','alerts'].includes(appState.activeTab)) renderMarkets();
     });
 }
 
@@ -72,7 +69,7 @@ function setupCardClicks() {
 }
 
 function setupKeyboard() {
-    const tabs = ['all','crypto','politics','sports','arbitrage','watchlist','whale','alerts','portfolio'];
+    const tabs = ['all','crypto','politics','sports','arbitrage','watchlist','whale','alerts'];
     document.addEventListener('keydown', (e) => {
         const tag = document.activeElement.tagName;
             if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
@@ -156,13 +153,12 @@ function formatVol(v) {
 }
 
 function renderAll() {
-    ['market-feed','arbitrage-feed','watchlist-feed','whale-feed','alerts-feed','portfolio-feed'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['market-feed','arbitrage-feed','watchlist-feed','whale-feed','alerts-feed'].forEach(id => document.getElementById(id).classList.add('hidden'));
     switch (appState.activeTab) {
         case 'arbitrage': document.getElementById('arbitrage-feed').classList.remove('hidden'); renderArbitrage(); break;
         case 'watchlist': document.getElementById('watchlist-feed').classList.remove('hidden'); renderWatchlist(); break;
         case 'whale':     document.getElementById('whale-feed').classList.remove('hidden'); renderWhale(); break;
         case 'alerts':    document.getElementById('alerts-feed').classList.remove('hidden'); renderAlerts(); break;
-        case 'portfolio': document.getElementById('portfolio-feed').classList.remove('hidden'); renderPortfolio(); break;
         default:          document.getElementById('market-feed').classList.remove('hidden'); renderMarkets(); break;
     }
 }
@@ -710,85 +706,4 @@ function renderArbitrage() {
             <div class="arb-right"><span class="arb-gap">+${a.gap}%</span><span class="arb-label">Gap</span></div>
         </div>`;
     }).join('');
-}
-
-// ── PORTFOLIO ────────────────────────────────────────────────────────────────
-function executePaperTrade() {
-    const market = findTradeMarket();
-    if (!market) return;
-
-    const side = document.getElementById('trade-side').value;
-    const outcome = document.getElementById('trade-outcome').value;
-    const amount = Number(document.getElementById('trade-amount').value);
-    const price = Number(document.getElementById('trade-price').value) / 100;
-    const shares = amount / price;
-
-    const position = {
-        id: Date.now(),
-        marketId: market.id,
-        question: market.question,
-        outcome, side,
-        entryPrice: price,
-        currentPrice: price,
-        amount, shares,
-        pnl: 0, roi: 0,
-        createdAt: Date.now(),
-        category: market.category,
-    };
-
-    appState.portfolio.push(position);
-    appState.tradeHistory.unshift({ ...position, type: 'OPEN' });
-    localStorage.setItem('vura_portfolio', JSON.stringify(appState.portfolio));
-    localStorage.setItem('vura_history', JSON.stringify(appState.tradeHistory));
-
-    const statusEl = document.getElementById('trade-status');
-    if (statusEl) { statusEl.textContent = 'Position opened'; statusEl.style.color = 'var(--accent)'; }
-    updatePortfolioBadge();
-    setTimeout(() => closeTradeModal(), 500);
-}
-
-function updatePortfolioPnL() {
-    appState.portfolio.forEach(pos => {
-        const market = appState.allMarkets.find(m => m.id === pos.marketId);
-        if (!market) return;
-        const currentPrice = pos.outcome === 'YES' ? market.yesPrice : market.noPrice;
-        pos.currentPrice = currentPrice;
-        const currentValue = pos.shares * currentPrice;
-        pos.pnl = currentValue - pos.amount;
-        pos.roi = (pos.pnl / pos.amount) * 100;
-    });
-    localStorage.setItem('vura_portfolio', JSON.stringify(appState.portfolio));
-    if (appState.activeTab === 'portfolio') renderPortfolio();
-}
-
-function updatePortfolioBadge() {
-    const el = document.getElementById('portfolio-count');
-    if (el) el.textContent = appState.portfolio.length || '';
-}
-
-function renderPortfolio() {
-    const container = document.getElementById('portfolio-feed');
-    if (!container) return;
-    if (appState.portfolio.length === 0) {
-        container.innerHTML = '<div class="content-state"><p>No open positions. Use Trade to open a paper trade.</p></div>';
-        return;
-    }
-    const totalValue = appState.portfolio.reduce((s, p) => s + p.shares * p.currentPrice, 0);
-    const totalPnL = appState.portfolio.reduce((s, p) => s + p.pnl, 0);
-
-    container.innerHTML = `
-    <div class="portfolio-stats">
-        <div class="portfolio-stat"><span class="portfolio-label">TOTAL VALUE</span><span class="portfolio-value">$${totalValue.toFixed(2)}</span></div>
-        <div class="portfolio-stat"><span class="portfolio-label">TOTAL PNL</span><span class="portfolio-value ${totalPnL >= 0 ? 'green' : 'red'}">${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}</span></div>
-    </div>
-    <div class="positions-list">
-        ${appState.portfolio.map(p => {
-            const pnlClass = p.pnl >= 0 ? 'green' : 'red';
-            return `<div class="position-card">
-                <div class="position-left"><div class="position-title">${p.question}</div><div class="position-meta">${p.outcome} · ${p.shares.toFixed(2)} shares</div></div>
-                <div class="position-center"><div>Entry: ${Math.round(p.entryPrice * 100)}c</div><div>Now: ${Math.round(p.currentPrice * 100)}c</div></div>
-                <div class="position-right"><div class="${pnlClass}">${p.pnl >= 0 ? '+' : ''}$${p.pnl.toFixed(2)}</div><div class="${pnlClass}">${p.roi >= 0 ? '+' : ''}${p.roi.toFixed(1)}%</div></div>
-            </div>`;
-        }).join('')}
-    </div>`;
 }
