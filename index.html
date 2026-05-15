@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VURA | Prediction Terminal</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav>
+    <div class="logo">VURA</div>
+    <div class="status"><span class="dot"></span>LIVE</div>
+</nav>
+
+<section class="hero">
+    <h1>PREDICTION TERMINAL</h1>
+    <p>Real-time intelligence for Polymarket</p>
+</section>
+
+<div class="tabs">
+    <button onclick="setTab('all')" id="tab-all" class="tab-active">ALL</button>
+    <button onclick="setTab('crypto')" id="tab-crypto">CRYPTO</button>
+    <button onclick="setTab('politics')" id="tab-politics">POLITICS</button>
+    <button onclick="setTab('sports')" id="tab-sports">SPORTS</button>
+</div>
+
+<div class="layout">
+    <main id="markets"><div class="loading">Loading markets...</div></main>
+    <aside>
+        <div class="panel">
+            <div class="panel-title">WHALE FLOW</div>
+            <div id="whales"><div class="whale-empty">Waiting for data...</div></div>
+        </div>
+    </aside>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
