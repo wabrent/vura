@@ -1,6 +1,5 @@
 const CONFIG = {
     API: "https://gamma-api.polymarket.com/events?closed=false&limit=40",
-    PROXY: "https://vura.fly.dev",
     REFRESH: 30000, WHALE_THRESHOLD_USD: 5000, ARBITRAGE_THRESHOLD: 1.0
 };
 
@@ -90,7 +89,7 @@ async function fetchData() {
         let data = null;
         const urls = [
             CONFIG.API,
-            CONFIG.PROXY + '/api/proxy?url=' + encodeURIComponent(CONFIG.API)
+            '/api/proxy?url=' + encodeURIComponent(CONFIG.API)
         ];
         for (const url of urls) {
             try {
@@ -594,67 +593,14 @@ function updateTradeEstimate() {
     }
 }
 
-async function submitTrade() {
+function submitTrade() {
     const statusEl = document.getElementById('trade-status');
     const m = findTradeMarket();
-    if (!m) { statusEl.textContent = 'Market not found'; return; }
-
-    const side = document.getElementById('trade-side').value;
-    const outcome = document.getElementById('trade-outcome').value;
-    const price = parseFloat(document.getElementById('trade-price').value) / 100;
-    const amount = parseFloat(document.getElementById('trade-amount').value);
-    const size = amount / price;
-
-    // Connect wallet
-    if (!window.ethereum) {
-        statusEl.textContent = 'MetaMask not found';
-        return;
-    }
-
-    statusEl.textContent = 'Connect wallet to sign...';
+    if (!m) return;
+    statusEl.textContent = 'Opening Polymarket...';
     statusEl.style.color = 'var(--accent)';
-
-    try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        if (!accounts.length) throw new Error('No account');
-
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-
-        // Switch to Polygon
-        try {
-            await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
-        } catch (e) {
-            if (e.code === 4902) {
-                await window.ethereum.request({
-                    method: 'wallet_addEthereumChain',
-                    params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com'], blockExplorerUrls: ['https://polygonscan.com'] }]
-                });
-            }
-        }
-
-        statusEl.textContent = 'Signing order...';
-        const orderData = { tokenId: outcome === 'YES' ? m.yesTokenId : m.noTokenId, side: side.toUpperCase(), price, size, timestamp: Date.now() };
-        const message = JSON.stringify(orderData);
-        const signature = await signer.signMessage(message);
-
-        statusEl.textContent = 'Submitting to CLOB...';
-        const response = await fetch(CONFIG.PROXY + '/api/trade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...orderData, signature, address: accounts[0] }),
-        });
-
-        const result = await response.json();
-        if (result.error) throw new Error(result.error);
-
-        statusEl.textContent = 'Order placed!';
-        statusEl.style.color = 'var(--accent)';
-        setTimeout(() => closeTradeModal(), 1000);
-    } catch (e) {
-        statusEl.textContent = e.message || 'Failed';
-        statusEl.style.color = 'var(--red)';
-    }
+    window.open('https://polymarket.com/event/' + m.slug, '_blank');
+    closeTradeModal();
 }
 
 function quickTrade(slug) {
@@ -721,7 +667,7 @@ async function runArbitrageScan() {
     try {
         const manifoldUrl = 'https://manifold.markets/api/v0/markets?limit=50&sort=liquidity';
         let data = null;
-        for (const url of [manifoldUrl, CONFIG.PROXY + '/api/proxy?url=' + encodeURIComponent(manifoldUrl)]) {
+        for (const url of [manifoldUrl, '/api/proxy?url=' + encodeURIComponent(manifoldUrl)]) {
             try { const r = await fetch(url); if (r.ok) { data = await r.json(); break; } } catch(e) { continue; }
         }
         if (!data) throw new Error('Manifold error');
