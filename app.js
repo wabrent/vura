@@ -594,43 +594,67 @@ function updateTradeEstimate() {
     }
 }
 
-function submitTrade() {
+async function submitTrade() {
     const statusEl = document.getElementById('trade-status');
     const m = findTradeMarket();
     if (!m) { statusEl.textContent = 'Market not found'; return; }
 
-    // Real CLOB order via authenticated proxy
     const side = document.getElementById('trade-side').value;
     const outcome = document.getElementById('trade-outcome').value;
     const price = parseFloat(document.getElementById('trade-price').value) / 100;
     const amount = parseFloat(document.getElementById('trade-amount').value);
     const size = amount / price;
 
-    statusEl.textContent = 'Placing order via Builder API...';
+    // Connect wallet
+    if (!window.ethereum) {
+        statusEl.textContent = 'MetaMask not found';
+        return;
+    }
+
+    statusEl.textContent = 'Connect wallet to sign...';
     statusEl.style.color = 'var(--accent)';
 
-    fetch(CONFIG.PROXY + '/api/trade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            action: 'trade',
-            tokenId: outcome === 'YES' ? m.yesTokenId : m.noTokenId,
-            side: side.toUpperCase(),
-            price,
-            size,
-        }),
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) throw new Error(data.error);
-        statusEl.textContent = 'Order placed: ' + (data.orderID || 'OK');
+    try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (!accounts.length) throw new Error('No account');
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        // Switch to Polygon
+        try {
+            await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+        } catch (e) {
+            if (e.code === 4902) {
+                await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com'], blockExplorerUrls: ['https://polygonscan.com'] }]
+                });
+            }
+        }
+
+        statusEl.textContent = 'Signing order...';
+        const orderData = { tokenId: outcome === 'YES' ? m.yesTokenId : m.noTokenId, side: side.toUpperCase(), price, size, timestamp: Date.now() };
+        const message = JSON.stringify(orderData);
+        const signature = await signer.signMessage(message);
+
+        statusEl.textContent = 'Submitting to CLOB...';
+        const response = await fetch(CONFIG.PROXY + '/api/trade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...orderData, signature, address: accounts[0] }),
+        });
+
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+
+        statusEl.textContent = 'Order placed!';
         statusEl.style.color = 'var(--accent)';
         setTimeout(() => closeTradeModal(), 1000);
-    })
-    .catch(err => {
-        statusEl.textContent = err.message;
+    } catch (e) {
+        statusEl.textContent = e.message || 'Failed';
         statusEl.style.color = 'var(--red)';
-    });
+    }
 }
 
 function quickTrade(slug) {
