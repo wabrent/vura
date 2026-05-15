@@ -39,4 +39,4 @@ app.post('/api/trade', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.listen(process.env.PORT || 8080, () => console.log('VURA proxy on', process.env.PORT || 8080))
+app.listen(process.env.PORT || 3000, '0.0.0.0', () => console.log('VURA proxy on', process.env.PORT || 3000))
