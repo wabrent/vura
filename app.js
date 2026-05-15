@@ -1,6 +1,6 @@
 const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?closed=false&limit=40&active=true",
-    MANIFOLD_API: "https://manifold.markets/api/v0/markets?limit=50&sort=liquidity",
+    API: "https://gamma-api.polymarket.com/events?closed=false&limit=40",
+    PROXY: "https://vura.fly.dev",
     REFRESH: 30000, WHALE_THRESHOLD_USD: 5000, ARBITRAGE_THRESHOLD: 1.0
 };
 
@@ -90,8 +90,7 @@ async function fetchData() {
         let data = null;
         const urls = [
             CONFIG.API,
-            'https://gamma-api.polymarket.com/events?closed=false&limit=40',
-            '/api/proxy?url=' + encodeURIComponent(CONFIG.API)
+            CONFIG.PROXY + '/api/proxy?url=' + encodeURIComponent(CONFIG.API)
         ];
         for (const url of urls) {
             try {
@@ -610,7 +609,7 @@ function submitTrade() {
     statusEl.textContent = 'Placing order via Builder API...';
     statusEl.style.color = 'var(--accent)';
 
-    fetch('/api/proxy', {
+    fetch(CONFIG.PROXY + '/api/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -698,7 +697,7 @@ async function runArbitrageScan() {
     try {
         const manifoldUrl = 'https://manifold.markets/api/v0/markets?limit=50&sort=liquidity';
         let data = null;
-        for (const url of [manifoldUrl, '/api/proxy?url=' + encodeURIComponent(manifoldUrl)]) {
+        for (const url of [manifoldUrl, CONFIG.PROXY + '/api/proxy?url=' + encodeURIComponent(manifoldUrl)]) {
             try { const r = await fetch(url); if (r.ok) { data = await r.json(); break; } } catch(e) { continue; }
         }
         if (!data) throw new Error('Manifold error');
