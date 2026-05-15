@@ -143,13 +143,21 @@ function processEvent(event) {
     for (const [cat, words] of Object.entries(cats)) if (words.some(w => lower.includes(w))) { category = cat; break; }
     const alpha = Math.min(5 + Math.min(volume / 500000, 2) + Math.random() * 3, 10).toFixed(1);
     const spread = Math.abs(yesPrice + noPrice - 1);
-    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, spread, change24h: parseFloat(volChange) || 0 };
+    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, spread, change24h: parseFloat(volChange) || 0, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
 }
 
 function formatVol(v) {
     if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
     if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
     return Math.round(v).toString();
+}
+
+function getTokenId(clobTokenIds, idx) {
+    try {
+        if (!clobTokenIds) return null;
+        const ids = typeof clobTokenIds === 'string' ? JSON.parse(clobTokenIds) : clobTokenIds;
+        return ids[idx] || null;
+    } catch { return null; }
 }
 
 function renderAll() {
@@ -590,14 +598,40 @@ function updateTradeEstimate() {
 function submitTrade() {
     const statusEl = document.getElementById('trade-status');
     const m = findTradeMarket();
-    if (!m) {
-        statusEl.textContent = 'Market not found';
-        statusEl.style.color = 'var(--red)';
-        return;
-    }
-    statusEl.textContent = 'Opening Polymarket...';
+    if (!m) { statusEl.textContent = 'Market not found'; return; }
+
+    // Real CLOB order via authenticated proxy
+    const side = document.getElementById('trade-side').value;
+    const outcome = document.getElementById('trade-outcome').value;
+    const price = parseFloat(document.getElementById('trade-price').value) / 100;
+    const amount = parseFloat(document.getElementById('trade-amount').value);
+    const size = amount / price;
+
+    statusEl.textContent = 'Placing order via Builder API...';
     statusEl.style.color = 'var(--accent)';
-    setTimeout(() => window.open('https://polymarket.com/event/' + m.slug, '_blank'), 300);
+
+    fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'trade',
+            tokenId: outcome === 'YES' ? m.yesTokenId : m.noTokenId,
+            side: side.toUpperCase(),
+            price,
+            size,
+        }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+        statusEl.textContent = 'Order placed: ' + (data.orderID || 'OK');
+        statusEl.style.color = 'var(--accent)';
+        setTimeout(() => closeTradeModal(), 1000);
+    })
+    .catch(err => {
+        statusEl.textContent = err.message;
+        statusEl.style.color = 'var(--red)';
+    });
 }
 
 function quickTrade(slug) {
