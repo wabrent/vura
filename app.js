@@ -679,22 +679,46 @@ async function runArbitrageScan() {
 
 function findArbitrage(manifold) {
     const ops = [];
+    
+    // Internal spreads (yes + no != 1)
     for (const pm of appState.allMarkets) {
         if (!pm.yesPrice || !pm.noPrice) continue;
         const spreadPct = Math.abs(pm.yesPrice + pm.noPrice - 1) * 100;
-        if (spreadPct >= CONFIG.ARBITRAGE_THRESHOLD && pm.yesPrice > 0.02 && pm.yesPrice < 0.98) ops.push({ market: pm, platform: 'SPREAD', gap: spreadPct.toFixed(1), priceA: pm.yesPrice, priceB: pm.noPrice });
+        if (spreadPct > 0.01) {
+            ops.push({ market: pm, platform: 'SPREAD', gap: spreadPct.toFixed(2), priceA: pm.yesPrice, priceB: pm.noPrice });
+        }
     }
+
+    // Cross-platform with Manifold
     for (const pm of appState.allMarkets.slice(0, 10)) {
         const kw = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
         for (const m of manifold.slice(0, 20)) {
             const overlap = kw.filter(k => m.question.toLowerCase().includes(k)).length;
             if (overlap >= 1 && m.volume > 50) {
                 const diff = Math.abs(pm.yesPrice - m.yesPrice) * 100;
-                if (diff >= CONFIG.ARBITRAGE_THRESHOLD) ops.push({ market: pm, platform: 'MANIFOLD', gap: diff.toFixed(1), priceA: pm.yesPrice, priceB: m.yesPrice });
+                if (diff >= 1) {
+                    ops.push({ market: pm, platform: 'MANIFOLD', gap: diff.toFixed(2), priceA: pm.yesPrice, priceB: m.yesPrice });
+                }
             }
         }
     }
-    appState.arbitrageOpportunities = ops.sort((a, b) => parseFloat(b.gap) - parseFloat(a.gap)).slice(0, 15);
+
+    // Fallback: top volume markets
+    if (ops.length === 0) {
+        const top = appState.allMarkets
+            .filter(m => m.volume > 10000 && m.yesPrice > 0.05 && m.yesPrice < 0.95)
+            .sort((a, b) => b.volume - a.volume)
+            .slice(0, 8);
+        for (const m of top) {
+            ops.push({
+                market: m, platform: 'VOLUME',
+                gap: (m.volume / 1e6).toFixed(1),
+                priceA: m.yesPrice, priceB: 1 - m.yesPrice
+            });
+        }
+    }
+
+    appState.arbitrageOpportunities = ops.slice(0, 15);
 }
 
 function renderArbitrage() {
