@@ -768,6 +768,3 @@ function renderArbitrage() {
         </div>`
     }).join('')
 }
-        </div>`;
-    }).join('');
-}
