@@ -194,7 +194,7 @@ function buildCard(m, i) {
     const spreadBadge = m.spread > 0.01 ? `<span class="spread-badge">SPREAD ${(m.spread*100).toFixed(2)}%</span>` : '';
     const chgClass = m.change24h > 0 ? 'change-up' : m.change24h < 0 ? 'change-down' : '';
     const chgSign = m.change24h > 0 ? '+' : '';
-    const chgStr = Math.abs(m.change24h * 100) > 0.1 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}% 24h</span>` : '';
+    const chgStr = Math.abs(m.change24h * 100) > 0.01 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}% 24h</span>` : '';
     const sparkData = generateSparkData(m.yesPrice, 20);
     const sparkSvg = buildSparkline(sparkData, 80, 28);
     return `<div class="market-card" style="animation-delay:${delay}ms" data-id="${m.id}" data-slug="${m.slug}">
