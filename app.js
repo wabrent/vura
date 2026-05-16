@@ -729,34 +729,45 @@ function findArbitrage(manifold) {
         }
     }
 
-    // Fallback: top volume markets
+    // Fallback: show real market data with clickable links
     if (ops.length === 0) {
         const top = appState.allMarkets
-            .filter(m => m.volume > 10000 && m.yesPrice > 0.05 && m.yesPrice < 0.95)
+            .filter(m => m.volume > 10000)
             .sort((a, b) => b.volume - a.volume)
-            .slice(0, 8);
+            .slice(0, 8)
         for (const m of top) {
             ops.push({
-                market: m, platform: 'VOLUME',
-                gap: (m.volume / 1e6).toFixed(1),
-                priceA: m.yesPrice, priceB: 1 - m.yesPrice
-            });
+                market: m, platform: 'MARKET',
+                gap: '$' + m.volDisplay,
+                priceA: m.yesPrice,
+                priceB: (typeof m.noPrice === 'number' && m.noPrice > 0) ? m.noPrice : 1 - m.yesPrice
+            })
         }
     }
 
-    appState.arbitrageOpportunities = ops.slice(0, 15);
+    appState.arbitrageOpportunities = ops.slice(0, 15)
 }
 
 function renderArbitrage() {
-    const container = document.getElementById('arbitrage-feed');
-    if (!container) return;
-    if (appState.arbitrageOpportunities.length === 0) { container.innerHTML = '<div class="content-state"><p>No arbitrage signals found. Scanning internal spreads and cross-platform...</p></div>'; return; }
+    const container = document.getElementById('arbitrage-feed')
+    if (!container) return
+    if (appState.arbitrageOpportunities.length === 0) {
+        container.innerHTML = '<div class="content-state"><p>No arbitrage signals found. Scanning internal spreads and cross-platform...</p></div>'
+        return
+    }
     container.innerHTML = appState.arbitrageOpportunities.map((a, i) => {
-        const delay = i * 50; const pmPrice = Math.round(a.priceA * 100); const otherPrice = Math.round(a.priceB * 100);
-        return `<div class="arb-card" style="animation-delay:${delay}ms">
-            <div class="arb-left"><span class="arb-platform">${a.platform}</span><span class="arb-title">${(a.market.question || '').substring(0, 45)}</span></div>
+        const delay = i * 50
+        const pmPrice = Math.round(a.priceA * 100)
+        const otherPrice = Math.round(a.priceB * 100)
+        const slug = a.market.slug || ''
+        const label = a.platform === 'SPREAD' ? 'Spread' : a.platform === 'MANIFOLD' ? 'Manifold' : 'Market'
+        return `<div class="arb-card" style="animation-delay:${delay}ms;cursor:pointer" onclick="window.open('https://polymarket.com/event/${slug}','_blank')">
+            <div class="arb-left"><span class="arb-platform">${label}</span><span class="arb-title">${(a.market.question || '').substring(0, 45)}</span></div>
             <div class="arb-center"><div class="arb-price-pair"><span class="arb-pm-price">${pmPrice}c</span><span class="arb-arrow">→</span><span class="arb-other-price">${otherPrice}c</span></div></div>
-            <div class="arb-right"><span class="arb-gap">+${a.gap}%</span><span class="arb-label">Gap</span></div>
+            <div class="arb-right"><span class="arb-gap">${a.gap}</span><span class="arb-label">${a.platform === 'MARKET' ? 'Volume' : a.platform === 'SPREAD' ? 'Gap' : 'Diff'}</span></div>
+        </div>`
+    }).join('')
+}
         </div>`;
     }).join('');
 }
