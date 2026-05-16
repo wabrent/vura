@@ -3,270 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VURA | Prediction Terminal</title>
-    <meta name="description" content="VURA — Advanced prediction market analytics. Real-time Alpha signals and Arbitrage detection.">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='black'/%3E%3Ctext x='50' y='72' text-anchor='middle' fill='white' font-family='Oswald,sans-serif' font-weight='700' font-size='70'%3EV%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="styles.css">
+    <title>VURA | Cross-Platform Scanner</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box }
+        body { background:#111; color:#eee; font-family:'Courier New',monospace; padding:20px }
+        h1 { font-size:16px; margin-bottom:4px }
+        .sub { color:#666; font-size:11px; margin-bottom:20px }
+        .row { display:flex; align-items:center; gap:12px; padding:8px 12px; border:1px solid #222; margin-bottom:4px; background:#181818; font-size:11px }
+        .row:hover { background:#1f1f1f }
+        .q { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+        .src { color:#888; font-size:9px; min-width:30px }
+        .price { min-width:40px; text-align:right; font-weight:bold }
+        .diff { min-width:50px; text-align:right }
+        .up { color:#00cc66 } .down { color:#ff4444 }
+        .loading { text-align:center; color:#666; padding:40px }
+        .error { text-align:center; color:#ff4444; padding:20px; font-size:11px }
+        .header { color:#666; font-size:10px; border-bottom:1px solid #333; margin-bottom:8px }
+        .header .price,.header .diff { font-weight:normal }
+    </style>
 </head>
 <body>
+<h1>VURA Scanner</h1>
+<div class="sub" id="status">Loading Polymarket...</div>
 
-<nav>
-    <div class="nav-inner">
-        <a href="/" class="nav-logo">
-            <span class="logo-mark">V</span>
-            <span>VURA</span>
-        </a>
-        <div class="nav-links">
-            <a href="/" onclick="event.preventDefault();switchTab('all');window.scrollTo(0,0)" class="nav-link-active">Terminal</a>
-            <a href="#" onclick="event.preventDefault();switchTab('arbitrage')">Arbitrage</a>
-            <a href="https://github.com/wabrent/vura" target="_blank">GitHub</a>
-        </div>
-        <div class="nav-status">
-            <button id="wallet-btn" class="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
-            <span class="live-dot"></span>
-            <span id="nav-gas">Live</span>
-        </div>
-    </div>
-</nav>
-
-<section class="hero">
-    <div class="hero-left">
-        <h2>REAL-TIME</h2>
-        <h2>PREDICTION</h2>
-        <div class="hero-badge">ANALYTICS</div>
-    </div>
-    <div class="hero-right">
-        <p>Track Polymarket order books, volume flows, and cross-platform price discrepancies. Built for traders who need speed.</p>
-        <div class="hero-divider"></div>
-        <div class="hero-contact">
-            <span>Powered by Polymarket CLOB</span>
-            <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
-        </div>
-    </div>
-</section>
-
-<div class="tabs-bar" id="tabs-bar">
-    <div class="tabs-inner">
-        <button class="tab-btn tab-active" data-tab="all">All Markets</button>
-        <button class="tab-btn" data-tab="crypto">Crypto</button>
-        <button class="tab-btn" data-tab="politics">Politics</button>
-        <button class="tab-btn" data-tab="sports">Sports</button>
-        <button class="tab-btn" data-tab="arbitrage">Arbitrage</button>
-        <button class="tab-btn" data-tab="watchlist">Watchlist <span id="watchlist-count" class="tab-badge"></span></button>
-        <button class="tab-btn" data-tab="whale">Whale Flow</button>
-        <button class="tab-btn" data-tab="alerts">Alerts <span id="alert-count" class="tab-badge"></span></button>
-    </div>
-    <div class="tabs-meta">
-        <input id="search-input" type="text" placeholder="/ search markets..." class="search-input">
-        <select id="sort-select" class="sort-select">
-            <option value="volume">Volume</option>
-            <option value="alpha">Alpha</option>
-            <option value="price">Price</option>
-            <option value="category">Category</option>
-        </select>
-        <span id="market-count">— markets</span>
-        <span id="global-vol" class="stat-vol">—</span>
-    </div>
+<div class="row header">
+    <span class="q">Market</span>
+    <span class="src">PM</span>
+    <span class="price">Price</span>
+    <span class="src">MF</span>
+    <span class="price">Price</span>
+    <span class="diff">Δ%</span>
 </div>
 
-<div class="kbd-bar">
-    <span><kbd>1-8</kbd> switch tabs</span>
-    <span><kbd>/</kbd> search</span>
-    <span><kbd>W</kbd> watchlist toggle</span>
-    <span><kbd>A</kbd> set alert</span>
-    <span><kbd>Esc</kbd> close</span>
-</div>
+<div id="feed"><div class="loading">Connecting...</div></div>
 
-<main id="scanner">
-    <div id="loading-state" class="content-state"><p>Loading markets from Polymarket...</p></div>
-    <div id="error-state" class="content-state hidden"><p>Data stream interrupted</p><button class="btn-retry" onclick="fetchData()">Retry</button></div>
-    <div id="market-feed" class="hidden"></div>
-    <div id="arbitrage-feed" class="hidden"></div>
-    <div id="watchlist-feed" class="hidden"></div>
-    <div id="whale-feed" class="hidden"></div>
-    <div id="alerts-feed" class="hidden"></div>
-</main>
+<script>
+const PM_API = '/api/proxy?url=' + encodeURIComponent('https://gamma-api.polymarket.com/events?closed=false&limit=30')
+const MF_API = 'https://manifold.markets/api/v0/markets?limit=100&sort=liquidity'
 
-<!-- P&L MODAL -->
-<div id="pnl-modal" class="modal-overlay hidden" onclick="handleModalOverlayClick(event)">
-    <div class="modal">
-        <div class="modal-header">
-            <span class="modal-title" id="modal-market-title">—</span>
-            <button class="modal-close" onclick="closeModal()">✕</button>
-        </div>
-        <div class="modal-body">
-            <div class="modal-prices">
-                <div class="modal-price-block"><span class="modal-price-label">YES</span><span class="modal-price-val accent" id="modal-yes">—</span></div>
-                <div class="modal-price-block"><span class="modal-price-label">NO</span><span class="modal-price-val red" id="modal-no">—</span></div>
-                <div class="modal-price-block"><span class="modal-price-label">VOLUME</span><span class="modal-price-val" id="modal-vol">—</span></div>
-                <div class="modal-price-block"><span class="modal-price-label">ALPHA</span><span class="modal-price-val" id="modal-alpha">—</span></div>
-            </div>
-            <div class="mini-chart-wrap">
-                <div class="mini-chart-label">PRICE HISTORY</div>
-                <div class="mini-chart-timeframes">
-                    <button class="tf-btn tf-active" data-tf="1H">1H</button>
-                    <button class="tf-btn" data-tf="24H">24H</button>
-                    <button class="tf-btn" data-tf="7D">7D</button>
-                </div>
-                <canvas id="modal-chart" height="90"></canvas>
-            </div>
-            <div class="pnl-section">
-                <div class="pnl-title">P&L CALCULATOR</div>
-                <div class="pnl-row">
-                    <div class="pnl-field"><label class="pnl-label">STAKE ($)</label><input type="number" id="pnl-stake" class="pnl-input" value="100" min="1"></div>
-                    <div class="pnl-field"><label class="pnl-label">SIDE</label><select id="pnl-side" class="pnl-input"><option value="yes">YES</option><option value="no">NO</option></select></div>
-                    <div class="pnl-field"><label class="pnl-label">EXIT (c)</label><input type="number" id="pnl-exit" class="pnl-input" value="90" min="1" max="99"></div>
-                </div>
-                <div class="pnl-result">
-                    <div class="pnl-result-row"><span class="pnl-result-label">SHARES</span><span class="pnl-result-val" id="res-shares">—</span></div>
-                    <div class="pnl-result-row"><span class="pnl-result-label">PAYOUT</span><span class="pnl-result-val" id="res-payout">—</span></div>
-                    <div class="pnl-result-row"><span class="pnl-result-label">P&L</span><span class="pnl-result-val pnl-big" id="res-pnl">—</span></div>
-                    <div class="pnl-result-row"><span class="pnl-result-label">ROI</span><span class="pnl-result-val" id="res-roi">—</span></div>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="modal-wl-btn" id="modal-wl-btn" onclick="toggleWatchlistModal()">★ Watchlist</button>
-                <button class="modal-alert-btn" onclick="openAlertFromModal()">Alert</button>
-                <a class="btn-trade modal-trade-btn" id="modal-trade-link" href="#" target="_blank" onclick="event.stopPropagation()">Trade ↗</a>
-            </div>
-        </div>
-    </div>
-</div>
+let polyMarkets = []
+let manifoldMarkets = []
 
-<div id="alert-modal" class="modal-overlay hidden" onclick="handleAlertOverlayClick(event)">
-    <div class="modal modal-sm">
-        <div class="modal-header">
-            <span class="modal-title">SET PRICE ALERT</span>
-            <button class="modal-close" onclick="closeAlertModal()">✕</button>
-        </div>
-        <div class="modal-body">
-            <div class="pnl-field" style="margin-bottom:0.75rem;"><label class="pnl-label">MARKET</label><div class="alert-mkt-name" id="alert-mkt-name">—</div></div>
-            <div class="pnl-row">
-                <div class="pnl-field"><label class="pnl-label">WHEN PRICE IS</label><select id="alert-dir" class="pnl-input"><option value="above">Above</option><option value="below">Below</option></select></div>
-                <div class="pnl-field"><label class="pnl-label">PRICE (c)</label><input type="number" id="alert-price-val" class="pnl-input" value="75" min="1" max="99"></div>
-            </div>
-            <button class="btn-retry" style="width:100%;margin-top:1rem;" onclick="saveAlert()">Set Alert</button>
-        </div>
-    </div>
-</div>
+function parsePrice(prices, idx) {
+    if (!prices) return null
+    const p = typeof prices === 'string' ? JSON.parse(prices) : prices
+    return parseFloat(p[idx]) || null
+}
 
-<footer>
-    <div class="footer-line"></div>
-    <div class="footer-inner">
-        <span>© 2026 VURA</span>
-        <div class="footer-links">
-            <a href="https://x.com/0x_Vura" target="_blank">Twitter</a>
-            <a href="#">GitHub</a>
-            <a href="https://polymarket.com">Polymarket</a>
-        </div>
-    </div>
-</footer>
+function keywords(q) {
+    return q.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+}
 
-<!-- TRADE MODAL -->
-<div id="trade-modal" class="modal-overlay hidden" onclick="handleTradeOverlayClick(event)">
-    <div class="modal">
-        <div class="modal-header">
-            <span class="modal-title" id="trade-modal-title">Place Order</span>
-            <button class="modal-close" onclick="closeTradeModal()">✕</button>
-        </div>
-        <div class="modal-body">
-            <div class="modal-prices">
-                <div class="modal-price-block"><span class="modal-price-label">MARKET</span><span class="modal-price-val" id="trade-mkt-name" style="font-size:0.75rem;">—</span></div>
-                <div class="modal-price-block"><span class="modal-price-label">BEST BID</span><span class="modal-price-val accent" id="trade-bid">—</span></div>
-                <div class="modal-price-block"><span class="modal-price-label">BEST ASK</span><span class="modal-price-val red" id="trade-ask">—</span></div>
-            </div>
-            <div class="pnl-row">
-                <div class="pnl-field">
-                    <label class="pnl-label">SIDE</label>
-                    <select id="trade-side" class="pnl-input" onchange="updateTradePrice()">
-                        <option value="BUY">BUY</option>
-                        <option value="SELL">SELL</option>
-                    </select>
-                </div>
-                <div class="pnl-field">
-                    <label class="pnl-label">OUTCOME</label>
-                    <select id="trade-outcome" class="pnl-input" onchange="updateTradePrice()">
-                        <option value="YES">YES</option>
-                        <option value="NO">NO</option>
-                    </select>
-                </div>
-                <div class="pnl-field">
-                    <label class="pnl-label">PRICE (c)</label>
-                    <input type="number" id="trade-price" class="pnl-input" value="50" min="1" max="99" onchange="updateTradeEstimate()">
-                </div>
-            </div>
-            <div class="pnl-row">
-                <div class="pnl-field">
-                    <label class="pnl-label">AMOUNT ($)</label>
-                    <input type="number" id="trade-amount" class="pnl-input" value="10" min="1" onchange="updateTradeEstimate()">
-                </div>
-                <div class="pnl-field">
-                    <label class="pnl-label">SHARES</label>
-                    <div class="pnl-input" style="display:flex;align-items:center;" id="trade-shares">—</div>
-                </div>
-                <div class="pnl-field">
-                    <label class="pnl-label">TOTAL</label>
-                    <div class="pnl-input" style="display:flex;align-items:center;" id="trade-total">—</div>
-                </div>
-            </div>
-            <button id="trade-submit-btn" class="btn-retry" style="width:100%;" onclick="submitTrade()">Place Order</button>
-            <div id="trade-status" style="text-align:center;font-size:0.7rem;margin-top:0.5rem;color:var(--text-3);"></div>
-        </div>
-    </div>
-</div>
+async function fetchPoly() {
+    try {
+        const r = await fetch(PM_API)
+        const d = await r.json()
+        polyMarkets = d.filter(e => e.active).map(e => {
+            const m = (e.markets||[]).find(x => x.active && !x.closed) || (e.markets||[])[0] || {}
+            const yes = parsePrice(m.outcomePrices, 0)
+            const no = parsePrice(m.outcomePrices, 1)
+            return {
+                id: e.id, title: e.title||'', slug: e.slug||'',
+                yes: yes, no: no,
+                vol: m.volumeNum || m.volume || 0,
+                words: keywords(e.title||'')
+            }
+        }).filter(m => m.yes !== null && m.no !== null && m.yes > 0.01 && m.yes < 0.99)
+        document.getElementById('status').textContent = `Polymarket: ${polyMarkets.length} markets`
+    } catch(e) {
+        document.getElementById('status').textContent = 'Polymarket failed: ' + e.message
+    }
+}
 
-<!-- WALLET MODAL -->
-<div id="wallet-modal" class="modal-overlay hidden" onclick="if(event.target.id==='wallet-modal')closeWalletModal()">
-    <div class="modal modal-sm">
-        <div class="modal-header">
-            <span class="modal-title">CONNECT WALLET</span>
-            <button class="modal-close" onclick="closeWalletModal()">✕</button>
-        </div>
-        <div class="modal-body" style="padding:1.25rem;">
-            <div id="wallet-options">
-                <button class="wallet-option" onclick="connectMetaMask()">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" width="32" height="32" alt="">
-                    <div class="wallet-option-info">
-                        <span class="wallet-option-name">MetaMask</span>
-                        <span class="wallet-option-desc">Browser extension wallet</span>
-                    </div>
-                    <span class="wallet-option-arrow">→</span>
-                </button>
-                <button class="wallet-option" onclick="connectWalletConnect()">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#3B99FC"/><path d="M9.6 13.2c3.5-3.5 9.3-3.5 12.8 0l.4.4c.2.2.2.5 0 .7l-1.4 1.4c-.1.1-.3.1-.4 0l-.6-.6c-2.4-2.4-6.4-2.4-8.8 0l-.6.6c-.1.1-.3.1-.4 0L9.2 14.3c-.2-.2-.2-.5 0-.7l.4-.4zm15.8 2.9l1.3 1.3c.2.2.2.5 0 .7l-5.7 5.7c-.2.2-.5.2-.7 0l-4-4c-.1-.1-.2-.1-.3 0l-4 4c-.2.2-.5.2-.7 0L5.6 18c-.2-.2-.2-.5 0-.7l1.3-1.3c.2-.2.5-.2.7 0l4 4c.1.1.2.1.3 0l4-4c.2-.2.5-.2.7 0l4 4c.1.1.2.1.3 0l4-4c.2-.2.5-.2.7 0z" fill="white"/></svg>
-                    <div class="wallet-option-info">
-                        <span class="wallet-option-name">WalletConnect</span>
-                        <span class="wallet-option-desc">Mobile & hardware wallets</span>
-                    </div>
-                    <span class="wallet-option-arrow">→</span>
-                </button>
-                <button class="wallet-option" onclick="connectCoinbase()">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#0052FF"/><path d="M16 6C10.48 6 6 10.48 6 16s4.48 10 10 10 10-4.48 10-10S21.52 6 16 6zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S13.51 11.5 16 11.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5z" fill="white"/></svg>
-                    <div class="wallet-option-info">
-                        <span class="wallet-option-name">Coinbase Wallet</span>
-                        <span class="wallet-option-desc">Coinbase browser extension</span>
-                    </div>
-                    <span class="wallet-option-arrow">→</span>
-                </button>
-                <button class="wallet-option" onclick="connectRabby()">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#7B4FFF"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-family="sans-serif">R</text></svg>
-                    <div class="wallet-option-info">
-                        <span class="wallet-option-name">Rabby</span>
-                        <span class="wallet-option-desc">Multi-chain smart wallet</span>
-                    </div>
-                    <span class="wallet-option-arrow">→</span>
-                </button>
-            </div>
-            <div id="wallet-connecting" class="hidden" style="text-align:center;padding:1.5rem 0;">
-                <div class="wallet-spinner"></div>
-                <p id="wallet-connecting-text" style="margin-top:1rem;font-size:0.8rem;color:var(--text-2);">Connecting...</p>
-            </div>
-            <p style="font-size:0.65rem;color:var(--text-3);margin-top:1rem;text-align:center;">By connecting you agree to Polymarket's Terms of Service</p>
-        </div>
-    </div>
-</div>
+async function fetchManifold() {
+    try {
+        // Try direct then proxy
+        let r
+        try { r = await fetch(MF_API) } catch(e) {
+            r = await fetch('/api/proxy?url=' + encodeURIComponent(MF_API))
+        }
+        const d = await r.json()
+        manifoldMarkets = (Array.isArray(d)?d:[]).filter(m =>
+            m.outcomeType==='BINARY' && typeof m.probability==='number' && m.probability>0.01 && m.probability<0.99
+        ).map(m => ({
+            title: m.question, prob: m.probability, vol: m.volume||0,
+            words: keywords(m.question)
+        }))
+        document.getElementById('status').textContent += ` | Manifold: ${manifoldMarkets.length} markets`
+    } catch(e) { /* manifold optional */ }
+}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="app.js"></script>
+function findMatch(pm) {
+    let best = null, bestOverlap = 0
+    for (const mm of manifoldMarkets) {
+        const overlap = pm.words.filter(w => mm.words.includes(w)).length
+        if (overlap > bestOverlap && overlap >= 2) {
+            bestOverlap = overlap; best = mm
+        }
+    }
+    return best
+}
+
+function render() {
+    const feed = document.getElementById('feed')
+    if (!polyMarkets.length) {
+        feed.innerHTML = '<div class="loading">No Polymarket data yet</div>'
+        return
+    }
+
+    const rows = polyMarkets.map(pm => {
+        const mf = findMatch(pm)
+        const pmPrice = Math.round(pm.yes * 100)
+        const mfPrice = mf ? Math.round(mf.prob * 100) : null
+        const diff = (mfPrice !== null) ? (pmPrice - mfPrice) : null
+        const diffClass = diff !== null ? (diff > 0 ? 'up' : diff < 0 ? 'down' : '') : ''
+
+        let mfCol = '<span class="src">-</span><span class="price">-</span>'
+        if (mf) {
+            mfCol = `<span class="src">MF</span><span class="price">${mfPrice}c</span>`
+        }
+
+        let diffCol = '<span class="diff">-</span>'
+        if (diff !== null && Math.abs(diff) >= 2) {
+            diffCol = `<span class="diff ${diffClass}">${diff>0?'+':''}${diff}c</span>`
+        }
+
+        return `<div class="row" onclick="window.open('https://polymarket.com/event/${pm.slug}','_blank')" style="cursor:pointer">
+            <span class="q" title="${pm.title}">${pm.title}</span>
+            <span class="src">PM</span>
+            <span class="price">${pmPrice}c</span>
+            ${mfCol}
+            ${diffCol}
+        </div>`
+    }).join('')
+
+    feed.innerHTML = rows
+}
+
+async function scan() {
+    await Promise.all([fetchPoly(), fetchManifold()])
+    render()
+}
+
+scan()
+setInterval(scan, 30000)
+</script>
 </body>
 </html>
