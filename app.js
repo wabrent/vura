@@ -130,7 +130,7 @@ function processEvent(event) {
         }
     } catch (e) {}
     const volume = mainMarket.volumeNum || mainMarket.volume || event.volume24hr || 0;
-    const volChange = mainMarket.oneDayPriceChange || 0;
+    const change24h = mainMarket.oneDayPriceChange || 0;
     let category = 'general';
     const lower = (event.title || '').toLowerCase();
     const cats = {
@@ -139,9 +139,15 @@ function processEvent(event) {
         sports: ['nba','nfl','mlb','soccer','champion','super bowl','world cup']
     };
     for (const [cat, words] of Object.entries(cats)) if (words.some(w => lower.includes(w))) { category = cat; break; }
-    const alpha = Math.min(5 + Math.min(volume / 500000, 2) + Math.random() * 3, 10).toFixed(1);
+    
+    // Real Alpha: volume weight + spread bonus + activity
+    const volumeScore = Math.min(volume / 500000, 3);
+    const spreadScore = Math.abs(yesPrice + noPrice - 1) * 500;
+    const activityScore = Math.abs(change24h) * 100;
+    const alpha = Math.min(5 + volumeScore + spreadScore + activityScore, 10).toFixed(1);
+    
     const spread = Math.abs(yesPrice + noPrice - 1);
-    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, spread, change24h: parseFloat(volChange) || 0, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
+    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, spread, change24h: parseFloat(change24h) || 0, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
 }
 
 function formatVol(v) {
@@ -185,26 +191,25 @@ function renderMarkets(feedId = 'market-feed', markets = null) {
 function buildCard(m, i) {
     const delay = i * 30; const price = Math.round(m.yesPrice * 100);
     const inWl = appState.watchlist.has(String(m.id));
-    const spreadBadge = m.spread > 0.02 ? `<span class="spread-badge">SPREAD ${(m.spread*100).toFixed(1)}%</span>` : '';
+    const spreadBadge = m.spread > 0.01 ? `<span class="spread-badge">SPREAD ${(m.spread*100).toFixed(2)}%</span>` : '';
     const chgClass = m.change24h > 0 ? 'change-up' : m.change24h < 0 ? 'change-down' : '';
     const chgSign = m.change24h > 0 ? '+' : '';
-    const chgStr = m.change24h !== 0 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}%</span>` : '';
+    const chgStr = Math.abs(m.change24h * 100) > 0.1 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}% 24h</span>` : '';
     const sparkData = generateSparkData(m.yesPrice, 20);
     const sparkSvg = buildSparkline(sparkData, 80, 28);
     return `<div class="market-card" style="animation-delay:${delay}ms" data-id="${m.id}" data-slug="${m.slug}">
         <div class="card-left">
             <span class="card-category">${m.category.toUpperCase()}</span>
             <span class="card-title">${m.question}</span>
-            <span class="card-meta">Alpha ${m.alpha} · ${m.volDisplay} vol${spreadBadge ? ' · ' + spreadBadge : ''}</span>
+            <span class="card-meta">Vol $${m.volDisplay} · Alpha ${m.alpha}${spreadBadge ? ' · ' + spreadBadge : ''}</span>
         </div>
         <div class="card-center">${sparkSvg}</div>
         <div class="card-right">
             <span class="card-price">${price}c</span>
             ${chgStr}
-            <span class="card-volume">$${m.volDisplay}</span>
             <div class="card-actions">
                 <button class="star-btn${inWl ? ' starred' : ''}" data-id="${m.id}" title="Watchlist">★</button>
-                <button class="btn-trade" onclick="event.stopPropagation();quickTrade('${m.slug}')">Trade</button>
+                <button class="btn-trade" onclick="event.stopPropagation();window.open('https://polymarket.com/event/${m.slug}','_blank')">Trade</button>
             </div>
         </div>
     </div>`;
@@ -612,39 +617,45 @@ const WHALE_NAMES = ['0x3f...a12','0x8b...c44','0x1d...f88','0xaa...901','0x5c..
 const SIDES = ['YES','NO'];
 
 function generateWhaleData() {
-    const mkts = appState.allMarkets.length ? appState.allMarkets : [{ question: 'Bitcoin above $100k', slug: '' }, { question: 'Trump wins 2024', slug: '' }, { question: 'Fed cuts rates Q3', slug: '' }];
+    // Real volume data from actual markets - no simulation
+    const top = [...appState.allMarkets]
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, 15);
     const now = Date.now();
-    appState.whaleEvents = Array.from({ length: 18 }, (_, i) => {
-        const m = mkts[Math.floor(Math.random() * Math.min(mkts.length, 10))];
-        return { time: new Date(now - i * 90000 - Math.random() * 60000), addr: WHALE_NAMES[Math.floor(Math.random() * WHALE_NAMES.length)], market: m ? m.question : '—', slug: m ? m.slug : '', side: SIDES[Math.floor(Math.random() * 2)], amount: Math.round((Math.random() * 80 + 5) * 1000), isNew: i < 2 };
-    }).sort((a, b) => b.time - a.time);
+    appState.whaleEvents = top.map((m, i) => ({
+        time: new Date(now - i * 60000),
+        addr: 'Volume',
+        market: m.question,
+        slug: m.slug,
+        side: m.yesPrice > 0.5 ? 'YES' : 'NO',
+        amount: m.volume,
+        isNew: i < 3
+    }));
 }
 
 function tickWhales() {
-    const mkts = appState.allMarkets; if (!mkts.length) return;
-    const m = mkts[Math.floor(Math.random() * Math.min(mkts.length, 10))];
-    appState.whaleEvents.unshift({ time: new Date(), addr: WHALE_NAMES[Math.floor(Math.random() * WHALE_NAMES.length)], market: m.question, slug: m.slug, side: SIDES[Math.floor(Math.random() * 2)], amount: Math.round((Math.random() * 80 + 5) * 1000), isNew: true });
-    appState.whaleEvents = appState.whaleEvents.slice(0, 30);
-    setTimeout(() => { appState.whaleEvents.forEach(w => w.isNew = false); }, 3000);
+    // Refresh with real volume data
+    generateWhaleData();
     if (appState.activeTab === 'whale') renderWhale();
 }
 
 function renderWhale() {
     const container = document.getElementById('whale-feed');
-    if (!appState.whaleEvents.length) { container.innerHTML = '<div class="content-state"><p>Scanning for whale activity...</p></div>'; return; }
-    const totalWhaleVol = appState.whaleEvents.reduce((s, w) => s + w.amount, 0);
+    if (!appState.whaleEvents.length) { container.innerHTML = '<div class="content-state"><p>No data yet</p></div>'; return; }
+    const totalVol = appState.whaleEvents.reduce((s, w) => s + w.amount, 0);
     const yesCount = appState.whaleEvents.filter(w => w.side === 'YES').length;
     container.innerHTML = `<div class="whale-stats">
-        <div class="whale-stat"><span class="whale-stat-label">WHALE VOL (LAST 30)</span><span class="whale-stat-val">$${formatVol(totalWhaleVol)}</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">TOTAL VOLUME</span><span class="whale-stat-val">$${formatVol(totalVol)}</span></div>
         <div class="whale-stat"><span class="whale-stat-label">YES BIAS</span><span class="whale-stat-val accent">${Math.round(yesCount / appState.whaleEvents.length * 100)}%</span></div>
-        <div class="whale-stat"><span class="whale-stat-label">AVG SIZE</span><span class="whale-stat-val">$${formatVol(totalWhaleVol / appState.whaleEvents.length)}</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">MARKETS</span><span class="whale-stat-val">${appState.whaleEvents.length}</span></div>
     </div>
-    <div class="whale-header"><span>TIME</span><span>ADDRESS</span><span>MARKET</span><span>SIDE</span><span>AMOUNT</span></div>
-    ${appState.whaleEvents.map(w => `<div class="whale-row${w.isNew ? ' whale-row-new' : ''}">
-        <span class="whale-time">${w.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-        <span class="whale-addr">${w.addr}</span><span class="whale-mkt">${w.market.substring(0, 38)}${w.market.length > 38 ? '...' : ''}</span>
+    <div class="whale-header"><span>RANK</span><span>MARKET</span><span>BIAS</span><span>VOLUME</span></div>
+    ${appState.whaleEvents.map((w, i) => `<div class="whale-row${w.isNew ? ' whale-row-new' : ''}">
+        <span class="whale-addr">#${i+1}</span>
+        <span class="whale-mkt" style="cursor:pointer" onclick="window.open('https://polymarket.com/event/${w.slug}','_blank')">${w.market.substring(0, 40)}${w.market.length > 40 ? '...' : ''}</span>
         <span class="whale-side ${w.side === 'YES' ? 'accent' : 'red'}">${w.side}</span>
-        <span class="whale-amount">$${w.amount.toLocaleString()}</span></div>`).join('')}`;
+        <span class="whale-amount">$${formatVol(w.amount)}</span>
+    </div>`).join('')}`;
 }
 
 // ── BADGES / TOAST ──────────────────────────────────────────────────────────
