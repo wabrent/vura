@@ -617,45 +617,60 @@ const WHALE_NAMES = ['0x3f...a12','0x8b...c44','0x1d...f88','0xaa...901','0x5c..
 const SIDES = ['YES','NO'];
 
 function generateWhaleData() {
-    // Real volume data from actual markets - no simulation
-    const top = [...appState.allMarkets]
-        .sort((a, b) => b.volume - a.volume)
-        .slice(0, 15);
-    const now = Date.now();
-    appState.whaleEvents = top.map((m, i) => ({
-        time: new Date(now - i * 60000),
-        addr: 'Volume',
-        market: m.question,
-        slug: m.slug,
-        side: m.yesPrice > 0.5 ? 'YES' : 'NO',
-        amount: m.volume,
-        isNew: i < 3
-    }));
+    const now = Date.now()
+    const signals = []
+    
+    // Signal 1: Top volume markets
+    const byVol = [...appState.allMarkets].sort((a,b) => b.volume - a.volume).slice(0, 5)
+    byVol.forEach((m, i) => {
+        signals.push({ time: new Date(now - i * 1000), addr: 'VOLUME', market: m.question, slug: m.slug, side: `$${m.volDisplay}`, amount: m.volume, isNew: i < 2, signalType: 'volume' })
+    })
+    
+    // Signal 2: Biggest 24h movers
+    const byChange = [...appState.allMarkets].sort((a,b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 5)
+    byChange.forEach((m, i) => {
+        const dir = m.change24h > 0 ? 'UP' : 'DOWN'
+        signals.push({ time: new Date(now - i * 1000), addr: '24H', market: m.question, slug: m.slug, side: `${dir} ${Math.abs(m.change24h*100).toFixed(1)}%`, amount: Math.abs(m.change24h*100), isNew: false, signalType: 'change' })
+    })
+    
+    // Signal 3: Spread opportunities
+    const bySpread = [...appState.allMarkets].filter(m => m.spread > 0.005).sort((a,b) => b.spread - a.spread).slice(0, 5)
+    bySpread.forEach((m, i) => {
+        signals.push({ time: new Date(now - i * 1000), addr: 'SPREAD', market: m.question, slug: m.slug, side: `${(m.spread*100).toFixed(2)}% gap`, amount: m.spread*100, isNew: false, signalType: 'spread' })
+    })
+    
+    appState.whaleEvents = signals.slice(0, 15)
 }
 
 function tickWhales() {
-    // Refresh with real volume data
-    generateWhaleData();
-    if (appState.activeTab === 'whale') renderWhale();
+    generateWhaleData()
+    if (appState.activeTab === 'whale') renderWhale()
 }
 
 function renderWhale() {
-    const container = document.getElementById('whale-feed');
+    const container = document.getElementById('whale-feed')
     if (!appState.whaleEvents.length) { container.innerHTML = '<div class="content-state"><p>No data yet</p></div>'; return; }
-    const totalVol = appState.whaleEvents.reduce((s, w) => s + w.amount, 0);
-    const yesCount = appState.whaleEvents.filter(w => w.side === 'YES').length;
-    container.innerHTML = `<div class="whale-stats">
-        <div class="whale-stat"><span class="whale-stat-label">TOTAL VOLUME</span><span class="whale-stat-val">$${formatVol(totalVol)}</span></div>
-        <div class="whale-stat"><span class="whale-stat-label">YES BIAS</span><span class="whale-stat-val accent">${Math.round(yesCount / appState.whaleEvents.length * 100)}%</span></div>
-        <div class="whale-stat"><span class="whale-stat-label">MARKETS</span><span class="whale-stat-val">${appState.whaleEvents.length}</span></div>
+    const volSignals = appState.whaleEvents.filter(w => w.signalType === 'volume') 
+    const changeSignals = appState.whaleEvents.filter(w => w.signalType === 'change')
+    const spreadSignals = appState.whaleEvents.filter(w => w.signalType === 'spread')
+    
+    container.innerHTML = `
+    <div class="whale-stats">
+        <div class="whale-stat"><span class="whale-stat-label">TOP VOLUME</span><span class="whale-stat-val">${volSignals.length} markets</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">24H MOVERS</span><span class="whale-stat-val accent">${changeSignals.length} moves</span></div>
+        <div class="whale-stat"><span class="whale-stat-label">SPREAD GAPS</span><span class="whale-stat-val" style="color:#f59e0b">${spreadSignals.length} gaps</span></div>
     </div>
-    <div class="whale-header"><span>RANK</span><span>MARKET</span><span>BIAS</span><span>VOLUME</span></div>
-    ${appState.whaleEvents.map((w, i) => `<div class="whale-row${w.isNew ? ' whale-row-new' : ''}">
-        <span class="whale-addr">#${i+1}</span>
-        <span class="whale-mkt" style="cursor:pointer" onclick="window.open('https://polymarket.com/event/${w.slug}','_blank')">${w.market.substring(0, 40)}${w.market.length > 40 ? '...' : ''}</span>
-        <span class="whale-side ${w.side === 'YES' ? 'accent' : 'red'}">${w.side}</span>
-        <span class="whale-amount">$${formatVol(w.amount)}</span>
-    </div>`).join('')}`;
+    <div class="whale-header"><span>SIGNAL</span><span>MARKET</span><span>VALUE</span></div>
+    ${appState.whaleEvents.map(w => {
+        let bg = ''
+        if (w.signalType === 'volume') bg = 'background:rgba(5,150,105,0.03)'
+        if (w.signalType === 'spread') bg = 'background:rgba(245,158,11,0.03)'
+        return `<div class="whale-row${w.isNew ? ' whale-row-new' : ''}" style="${bg};cursor:pointer" onclick="window.open('https://polymarket.com/event/${w.slug}','_blank')">
+            <span class="whale-addr">${w.addr}</span>
+            <span class="whale-mkt">${w.market.substring(0, 38)}${w.market.length > 38 ? '...' : ''}</span>
+            <span class="${w.signalType === 'spread' ? 'red' : w.side.includes('UP') ? 'accent' : w.side.includes('DOWN') ? 'red' : ''}">${w.side}</span>
+        </div>`
+    }).join('')}`;
 }
 
 // ── BADGES / TOAST ──────────────────────────────────────────────────────────
