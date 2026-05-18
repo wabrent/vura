@@ -155,27 +155,6 @@ function processEvent(event) {
     const spread = Math.abs(yesPrice + noPrice - 1);
     return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0, context, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
 }
-    } catch (e) {}
-    const volume = mainMarket.volumeNum || mainMarket.volume || event.volume24hr || 0;
-    const change24h = mainMarket.oneDayPriceChange || 0;
-    let category = 'general';
-    const lower = (event.title || '').toLowerCase();
-    const cats = {
-        crypto: ['bitcoin','ethereum','crypto','btc','eth','sol','token','blockchain','defi','nft'],
-        politics: ['election','president','congress','trump','biden','vote','war','government','senate'],
-        sports: ['nba','nfl','mlb','soccer','champion','super bowl','world cup']
-    };
-    for (const [cat, words] of Object.entries(cats)) if (words.some(w => lower.includes(w))) { category = cat; break; }
-    
-    // Real Alpha: volume weight + spread bonus + activity
-    const volumeScore = Math.min(volume / 500000, 3);
-    const spreadScore = Math.abs(yesPrice + noPrice - 1) * 500;
-    const activityScore = Math.abs(change24h) * 100;
-    const alpha = Math.min(5 + volumeScore + spreadScore + activityScore, 10).toFixed(1);
-    
-    const spread = Math.abs(yesPrice + noPrice - 1);
-    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, spread, change24h: parseFloat(change24h) || 0, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
-}
 
 function formatVol(v) {
     if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
