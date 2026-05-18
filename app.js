@@ -3,6 +3,12 @@ const CONFIG = {
     REFRESH: 30000, WHALE_THRESHOLD_USD: 5000, ARBITRAGE_THRESHOLD: 1.0
 };
 
+(function() { if (localStorage.getItem('vura_theme') === 'dark') document.body.classList.add('dark') })()
+function toggleTheme() {
+    document.body.classList.toggle('dark')
+    localStorage.setItem('vura_theme', document.body.classList.contains('dark') ? 'dark' : 'light')
+}
+
 let appState = {
     markets: [], allMarkets: [], arbitrageOpportunities: [],
     activeTab: 'all', searchQuery: '', sortBy: 'volume',
@@ -121,13 +127,34 @@ function updateStats(data) {
 function processEvent(event) {
     const markets = event.markets || [];
     const mainMarket = markets.find(m => m.active && !m.closed) || markets.find(m => m.active) || markets[0] || {};
-    let yesPrice = 0.5, noPrice = 0.5;
+    let yesPrice = 0.5, noPrice = 0.5, bestBid = null, bestAsk = null;
     try {
         if (mainMarket && mainMarket.outcomePrices) {
             const parsed = typeof mainMarket.outcomePrices === 'string' ? JSON.parse(mainMarket.outcomePrices) : mainMarket.outcomePrices;
             yesPrice = parseFloat(parsed[0]) || 0;
             noPrice = parseFloat(parsed[1]) || 0;
         }
+        bestBid = mainMarket.bestBid !== undefined ? parseFloat(mainMarket.bestBid) : null;
+        bestAsk = mainMarket.bestAsk !== undefined ? parseFloat(mainMarket.bestAsk) : null;
+    } catch (e) {}
+    const volume = mainMarket.volumeNum || mainMarket.volume || event.volume24hr || 0;
+    const change24h = mainMarket.oneDayPriceChange || 0;
+    const context = (event.eventMetadata && event.eventMetadata.context_description) || '';
+    let category = 'general';
+    const lower = (event.title || '').toLowerCase();
+    const cats = {
+        crypto: ['bitcoin','ethereum','crypto','btc','eth','sol','token','blockchain','defi','nft'],
+        politics: ['election','president','congress','trump','biden','vote','war','government','senate'],
+        sports: ['nba','nfl','mlb','soccer','champion','super bowl','world cup']
+    };
+    for (const [cat, words] of Object.entries(cats)) if (words.some(w => lower.includes(w))) { category = cat; break; }
+    const volumeScore = Math.min(volume / 500000, 3);
+    const spreadScore = Math.abs(yesPrice + noPrice - 1) * 500;
+    const activityScore = Math.abs(change24h) * 100;
+    const alpha = Math.min(5 + volumeScore + spreadScore + activityScore, 10).toFixed(1);
+    const spread = Math.abs(yesPrice + noPrice - 1);
+    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0, context, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
+}
     } catch (e) {}
     const volume = mainMarket.volumeNum || mainMarket.volume || event.volume24hr || 0;
     const change24h = mainMarket.oneDayPriceChange || 0;
@@ -195,13 +222,15 @@ function buildCard(m, i) {
     const chgClass = m.change24h > 0 ? 'change-up' : m.change24h < 0 ? 'change-down' : '';
     const chgSign = m.change24h > 0 ? '+' : '';
     const chgStr = Math.abs(m.change24h * 100) > 0.01 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}% 24h</span>` : '';
+    const bidAsk = m.bestBid !== null && m.bestAsk !== null ? 
+        `<span class="card-bidask">Bid ${Math.round(m.bestBid*100)}c · Ask ${Math.round(m.bestAsk*100)}c</span>` : '';
     const sparkData = generateSparkData(m.yesPrice, 20);
     const sparkSvg = buildSparkline(sparkData, 80, 28);
     return `<div class="market-card" style="animation-delay:${delay}ms" data-id="${m.id}" data-slug="${m.slug}">
         <div class="card-left">
             <span class="card-category">${m.category.toUpperCase()}</span>
             <span class="card-title">${m.question}</span>
-            <span class="card-meta">Vol $${m.volDisplay} · Alpha ${m.alpha}${spreadBadge ? ' · ' + spreadBadge : ''}</span>
+            <span class="card-meta">Vol $${m.volDisplay} · Alpha ${m.alpha}${spreadBadge ? ' · ' + spreadBadge : ''}${bidAsk ? '<br>' + bidAsk : ''}</span>
         </div>
         <div class="card-center">${sparkSvg}</div>
         <div class="card-right">
@@ -264,6 +293,14 @@ function openModal(id) {
     document.getElementById('modal-no').textContent = Math.round(m.noPrice * 100) + 'c';
     document.getElementById('modal-vol').textContent = '$' + m.volDisplay;
     document.getElementById('modal-alpha').textContent = m.alpha;
+    // Show context if available
+    const ctxEl = document.getElementById('modal-context');
+    if (ctxEl && m.context && m.context.length > 20) {
+        ctxEl.textContent = m.context.substring(0, 300) + '...';
+        ctxEl.style.display = 'block';
+    } else if (ctxEl) {
+        ctxEl.style.display = 'none';
+    }
     document.getElementById('modal-trade-link').onclick = (e) => { e.preventDefault(); quickTrade(m.slug); };
     document.getElementById('modal-trade-link').href = '#';
     updateModalWlBtn(); calcPnl();
@@ -689,6 +726,14 @@ function showToast(msg) {
 }
 
 // ── ARBITRAGE ───────────────────────────────────────────────────────────────
+function fuzzyMatch(a, b) {
+    const aw = a.toLowerCase().split(/\W+/).filter(w => w.length > 2)
+    const bw = b.toLowerCase().split(/\W+/).filter(w => w.length > 2)
+    let score = 0
+    for (const w of aw) { if (bw.includes(w)) score += 2; else for (const w2 of bw) if (w2.includes(w) || w.includes(w2)) score += 1 }
+    return score
+}
+
 async function runArbitrageScan() {
     try {
         const manifoldUrl = 'https://manifold.markets/api/v0/markets?limit=50&sort=liquidity';
@@ -715,15 +760,14 @@ function findArbitrage(manifold) {
         }
     }
 
-    // Cross-platform with Manifold
-    for (const pm of appState.allMarkets.slice(0, 10)) {
-        const kw = pm.question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-        for (const m of manifold.slice(0, 20)) {
-            const overlap = kw.filter(k => m.question.toLowerCase().includes(k)).length;
-            if (overlap >= 1 && m.volume > 50) {
-                const diff = Math.abs(pm.yesPrice - m.yesPrice) * 100;
-                if (diff >= 1) {
-                    ops.push({ market: pm, platform: 'MANIFOLD', gap: diff.toFixed(2), priceA: pm.yesPrice, priceB: m.yesPrice });
+    // Cross-platform with Manifold (fuzzy matching)
+    for (const pm of appState.allMarkets.slice(0, 15)) {
+        for (const m of manifold.slice(0, 30)) {
+            const score = fuzzyMatch(pm.question, m.question)
+            if (score >= 3 && m.volume > 50) {
+                const diff = Math.abs(pm.yesPrice - m.yesPrice) * 100
+                if (diff >= 0.5) {
+                    ops.push({ market: pm, platform: 'MANIFOLD', gap: diff.toFixed(2), priceA: pm.yesPrice, priceB: m.yesPrice })
                 }
             }
         }

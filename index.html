@@ -21,6 +21,7 @@
             <a href="#" onclick="event.preventDefault();switchTab('arbitrage')">Arbitrage</a>
         </div>
         <div class="nav-status">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
             <button class="wallet-btn" disabled style="opacity:0.5;cursor:default">Coming Soon</button>
             <span class="live-dot"></span>
             <span id="nav-gas">Live</span>
@@ -100,6 +101,7 @@
                 <div class="modal-price-block"><span class="modal-price-label">VOLUME</span><span class="modal-price-val" id="modal-vol">—</span></div>
                 <div class="modal-price-block"><span class="modal-price-label">ALPHA</span><span class="modal-price-val" id="modal-alpha">—</span></div>
             </div>
+            <div id="modal-context" style="display:none;font-size:0.7rem;color:var(--text-2);line-height:1.5;padding:0.5rem 0;border-top:1px solid var(--border);margin-top:-0.5rem;"></div>
             <div class="mini-chart-wrap">
                 <div class="mini-chart-label">PRICE HISTORY</div>
                 <div class="mini-chart-timeframes">
