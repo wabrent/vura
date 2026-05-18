@@ -280,3 +280,30 @@ footer { max-width: 72rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
     border-color: var(--accent) !important;
     color: var(--accent) !important;
 }
+
+/* Badges in side nav */
+.card-bidask { font-size: 0.55rem; color: var(--text-3); letter-spacing: 0.03em; display: block; margin-top: 1px; }
+
+/* Dark theme */
+body.dark,
+.dark body { --bg: #080808; --bg-2: #111; --text: #eee; --text-2: #999; --text-3: #555; --border: #222; --border-md: #2a2a2a; }
+.theme-toggle { background: none; border: 1px solid var(--border); color: var(--text-3); padding: 3px 8px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+
+/* Better responsive */
+@media (max-width: 768px) {
+    .card-right { align-items: flex-start !important; }
+    .card-price { font-size: 1.2rem !important; }
+    .layout-row { flex-direction: column !important; gap: 1rem !important; }
+    nav .nav-links { display: none; }
+    .hero h2 { font-size: 1.8rem !important; }
+    .tabs-inner { overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+    .tab-btn { font-size: 0.7rem !important; padding: 0.3rem 0.6rem !important; }
+    .market-card { flex-direction: column !important; align-items: flex-start !important; padding: 1rem !important; }
+    .card-left { flex: 1 !important; width: 100% !important; }
+    .card-center { display: none !important; }
+    .card-right { flex: 1 !important; width: 100% !important; align-items: flex-start !important; }
+    .tabs-meta { flex-wrap: wrap !important; }
+    .search-input { width: 120px !important; }
+    main { padding: 0.5rem !important; }
+    .kbd-bar { display: none !important; }
+}
