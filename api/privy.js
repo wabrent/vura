@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const PRIVY_BASE = 'https://api.privy.io/v1';
 
   try {
-    // Create user with embedded wallet in one request
+    // Create user — try without linked_accounts first
     const userRes = await fetch(`${PRIVY_BASE}/users`, {
       method: 'POST',
       headers: {
@@ -27,10 +27,7 @@ export default async function handler(req, res) {
         'privy-app-id': PRIVY_APP_ID,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        linked_accounts: [],
-        wallets: [{ chain_type: 'ethereum' }]
-      }),
+      body: JSON.stringify({}),
       signal: AbortSignal.timeout(15000)
     });
 
@@ -41,37 +38,29 @@ export default async function handler(req, res) {
     }
 
     const user = await userRes.json();
-    const wallet = user.wallets?.[0];
 
-    if (!wallet?.address) {
-      // Wallet not created with user, create separately
-      const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
-        method: 'POST',
-        headers: {
-          'Authorization': PRIVY_AUTH,
-          'privy-app-id': PRIVY_APP_ID,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          chain_type: 'ethereum',
-          owner: { user_id: user.id }
-        }),
-        signal: AbortSignal.timeout(15000)
-      });
+    // Create embedded wallet
+    const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
+      method: 'POST',
+      headers: {
+        'Authorization': PRIVY_AUTH,
+        'privy-app-id': PRIVY_APP_ID,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        chain_type: 'ethereum',
+        owner: { user_id: user.id }
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
 
-      if (!walletRes.ok) {
-        const err = await walletRes.text();
-        console.error('Privy wallet failed:', walletRes.status, err);
-        return res.status(walletRes.status).json({ error: 'Wallet creation failed: ' + err });
-      }
-
-      const newWallet = await walletRes.json();
-      return res.status(200).json({
-        userId: user.id,
-        walletAddress: newWallet.address,
-        walletId: newWallet.id
-      });
+    if (!walletRes.ok) {
+      const err = await walletRes.text();
+      console.error('Privy wallet failed:', walletRes.status, err);
+      return res.status(walletRes.status).json({ error: 'Wallet creation failed: ' + err });
     }
+
+    const wallet = await walletRes.json();
 
     return res.status(200).json({
       userId: user.id,
