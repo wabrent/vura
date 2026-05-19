@@ -542,26 +542,61 @@ function disconnectWallet() {
 
 async function connectPrivy() {
     try {
-        showWalletConnecting('Creating your wallet...');
+        showWalletConnecting('Opening Privy...');
         
-        const res = await fetch('/api/privy', { method: 'POST' });
-        const data = await res.json().catch(() => ({ error: 'Invalid response' }));
-        
-        if (!res.ok) {
-            throw new Error(data.error || 'API error ' + res.status);
+        // Wait for Privy SDK to load
+        if (typeof window.Privy === 'undefined') {
+            await new Promise((resolve, reject) => {
+                let attempts = 0;
+                const check = setInterval(() => {
+                    attempts++;
+                    if (typeof window.Privy !== 'undefined') { clearInterval(check); resolve(); }
+                    if (attempts > 50) { clearInterval(check); reject(new Error('Privy SDK not loaded')); }
+                }, 200);
+            });
         }
         
-        if (!data.walletAddress) {
-            throw new Error('No wallet address returned');
+        // Initialize Privy (idempotent)
+        if (!window._privyInstance) {
+            window._privyInstance = new window.Privy({
+                appId: 'cmpcnahqh001m0ci59bk1lokk',
+                config: {
+                    loginMethods: ['email', 'wallet'],
+                    embeddedWallets: {
+                        ethereum: { createOnLogin: 'users-without-wallets' }
+                    },
+                    appearance: { theme: 'dark' }
+                }
+            });
         }
         
-        privyUserId = data.userId;
-        walletAddress = data.walletAddress;
+        const privy = window._privyInstance;
         
-        localStorage.setItem('vura_privy_user', data.userId);
-        localStorage.setItem('vura_wallet_addr', data.walletAddress);
+        // Login
+        await privy.login();
         
-        onWalletConnected(data.walletAddress);
+        // Get user after auth
+        const user = privy.user;
+        if (!user || !user.id) {
+            throw new Error('Login failed — no user returned');
+        }
+        
+        // Get wallet
+        const wallets = user.wallets || [];
+        const embeddedWallet = wallets.find(w => w.chainType === 'ethereum');
+        const address = embeddedWallet?.address || user.wallet?.address;
+        
+        if (!address) {
+            throw new Error('No wallet found — try again');
+        }
+        
+        privyUserId = user.id;
+        walletAddress = address;
+        
+        localStorage.setItem('vura_privy_user', user.id);
+        localStorage.setItem('vura_wallet_addr', address);
+        
+        onWalletConnected(address);
     } catch (e) {
         document.getElementById('wallet-options').classList.remove('hidden');
         document.getElementById('wallet-connecting').classList.add('hidden');
