@@ -44,10 +44,31 @@ export default async function handler(req, res) {
     }
 
     const user = await userRes.json();
-    const wallet = user.wallets?.[0];
-
+    
+    // Try to get wallet from response; if not, create separately
+    let wallet = user.wallets?.[0];
+    
     if (!wallet?.address) {
-      return res.status(500).json({ error: 'No wallet in user response' });
+      const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': PRIVY_AUTH,
+          'privy-app-id': PRIVY_APP_ID,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          chain_type: 'ethereum',
+          owner: { user_id: user.id }
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!walletRes.ok) {
+        const err = await walletRes.text();
+        return res.status(walletRes.status).json({ error: err.substring(0, 200) });
+      }
+
+      wallet = await walletRes.json();
     }
 
     return res.status(200).json({
