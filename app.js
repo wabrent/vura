@@ -19,6 +19,10 @@ let appState = {
     telegramConfig: { token: '', chatId: '' }
 };
 
+// ── WALLET / PRIVY ───────────────────────────────────────────────────────────
+let walletAddress = null;
+let privyUserId = null;
+
 // ── PROFILE / WALLET-ID ─────────────────────────────────────────────────────
 function profileKey(base) {
     const id = privyUserId || walletAddress || (localStorage.getItem('vura_privy_user') || localStorage.getItem('vura_wallet_addr') || '');
@@ -507,13 +511,11 @@ function calcPnl() {
     roiEl.className = 'pnl-result-val ' + (roi >= 0 ? 'accent' : 'red');
 }
 
-// ── WALLET / PRIVY ───────────────────────────────────────────────────────────
-let walletAddress = null;
-let privyUserId = null;
-
 function disconnectWallet() {
     walletAddress = null;
+    privyUserId = null;
     localStorage.removeItem('vura_wallet_addr');
+    localStorage.removeItem('vura_privy_user');
     const btn = document.getElementById('wallet-btn');
     btn.textContent = 'Connect';
     btn.classList.remove('wallet-connected');
