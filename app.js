@@ -15,7 +15,8 @@ let appState = {
     loading: true, error: false,
     watchlist: new Set(JSON.parse(localStorage.getItem('vura_watchlist') || '[]')),
     alerts: JSON.parse(localStorage.getItem('vura_alerts') || '[]'),
-    selectedMarket: null, modalChart: null, currentTf: '24H', whaleEvents: []
+    selectedMarket: null, modalChart: null, currentTf: '24H', whaleEvents: [],
+    telegramConfig: JSON.parse(localStorage.getItem('vura_telegram') || 'null') || { token: '', chatId: '' }
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -74,7 +75,7 @@ function setupCardClicks() {
 }
 
 function setupKeyboard() {
-    const tabs = ['all','crypto','politics','sports','arbitrage','watchlist','whale','alerts'];
+    const tabs = ['all','crypto','politics','sports','arbitrage','watchlist','whale','alerts','correlation'];
     document.addEventListener('keydown', (e) => {
         const tag = document.activeElement.tagName;
             if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
@@ -86,7 +87,7 @@ function setupKeyboard() {
         if (e.key === 'w' || e.key === 'W') { if (appState.selectedMarket) { toggleWatchlist(appState.selectedMarket.id); } return; }
         if (e.key === 'a' || e.key === 'A') { if (appState.selectedMarket) { openAlertFromModal(); } return; }
         const n = parseInt(e.key);
-        if (n >= 1 && n <= 8 && tabs[n-1]) switchTab(tabs[n-1]);
+        if (n >= 1 && n <= 9 && tabs[n-1]) switchTab(tabs[n-1]);
     });
 }
 
@@ -153,7 +154,8 @@ function processEvent(event) {
     const activityScore = Math.abs(change24h) * 100;
     const alpha = Math.min(5 + volumeScore + spreadScore + activityScore, 10).toFixed(1);
     const spread = Math.abs(yesPrice + noPrice - 1);
-    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0, context, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1) };
+    const smartScore = computeSmartScore(volume, change24h, yesPrice);
+    return { id: event.id, question: event.title || 'Unknown', slug: event.slug || '', category, alpha: parseFloat(alpha), volume: parseFloat(volume) || 0, volDisplay: formatVol(volume), yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0, context, clobTokenIds: mainMarket.clobTokenIds, yesTokenId: getTokenId(mainMarket.clobTokenIds, 0), noTokenId: getTokenId(mainMarket.clobTokenIds, 1), smartScore };
 }
 
 function formatVol(v) {
@@ -170,13 +172,23 @@ function getTokenId(clobTokenIds, idx) {
     } catch { return null; }
 }
 
+function computeSmartScore(volume, change24h, yesPrice) {
+    // Volume-weighted momentum: positive change + high volume = bullish
+    // Negative change + high volume = bearish
+    const volWeight = Math.min(Math.log10(Math.max(volume, 1)) / 7, 1); // 0-1
+    const change = change24h * 100; // percentage points
+    const score = change * volWeight * 2;
+    return Math.max(-5, Math.min(5, score));
+}
+
 function renderAll() {
-    ['market-feed','arbitrage-feed','watchlist-feed','whale-feed','alerts-feed'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['market-feed','arbitrage-feed','watchlist-feed','whale-feed','alerts-feed','correlation-feed'].forEach(id => document.getElementById(id).classList.add('hidden'));
     switch (appState.activeTab) {
         case 'arbitrage': document.getElementById('arbitrage-feed').classList.remove('hidden'); renderArbitrage(); break;
         case 'watchlist': document.getElementById('watchlist-feed').classList.remove('hidden'); renderWatchlist(); break;
         case 'whale':     document.getElementById('whale-feed').classList.remove('hidden'); renderWhale(); break;
         case 'alerts':    document.getElementById('alerts-feed').classList.remove('hidden'); renderAlerts(); break;
+        case 'correlation': document.getElementById('correlation-feed').classList.remove('hidden'); renderCorrelations(); break;
         default:          document.getElementById('market-feed').classList.remove('hidden'); renderMarkets(); break;
     }
 }
@@ -201,15 +213,30 @@ function buildCard(m, i) {
     const chgClass = m.change24h > 0 ? 'change-up' : m.change24h < 0 ? 'change-down' : '';
     const chgSign = m.change24h > 0 ? '+' : '';
     const chgStr = Math.abs(m.change24h * 100) > 0.01 ? `<span class="card-change ${chgClass}">${chgSign}${(m.change24h*100).toFixed(1)}% 24h</span>` : '';
+    // Smart money badge
+    let smartBadge = '';
+    if (m.smartScore >= 1.5) smartBadge = '<span class="smart-badge smart-bullish">BULL</span>';
+    else if (m.smartScore <= -1.5) smartBadge = '<span class="smart-badge smart-bearish">BEAR</span>';
     const bidAsk = m.bestBid !== null && m.bestAsk !== null ? 
         `<span class="card-bidask">Bid ${Math.round(m.bestBid*100)}c · Ask ${Math.round(m.bestAsk*100)}c</span>` : '';
+    // Order book mini bars
+    let obBars = '';
+    if (m.bestBid !== null && m.bestAsk !== null) {
+        const bidPct = Math.min(m.bestBid * 100, 99);
+        const askPct = Math.min(m.bestAsk * 100, 99);
+        obBars = `<div class="card-ob">
+            <div class="ob-row"><span class="ob-label">B</span><div class="ob-bar-wrap"><div class="ob-bar ob-bar-bid" style="width:${bidPct}%"></div></div><span class="ob-price">${Math.round(m.bestBid*100)}c</span></div>
+            <div class="ob-row"><span class="ob-label">A</span><div class="ob-bar-wrap"><div class="ob-bar ob-bar-ask" style="width:${askPct}%"></div></div><span class="ob-price">${Math.round(m.bestAsk*100)}c</span></div>
+        </div>`;
+    }
     const sparkData = generateSparkData(m.yesPrice, 20);
     const sparkSvg = buildSparkline(sparkData, 80, 28);
     return `<div class="market-card" style="animation-delay:${delay}ms" data-id="${m.id}" data-slug="${m.slug}">
         <div class="card-left">
-            <span class="card-category">${m.category.toUpperCase()}</span>
+            <span class="card-category">${m.category.toUpperCase()}${smartBadge}</span>
             <span class="card-title">${m.question}</span>
-            <span class="card-meta">Vol $${m.volDisplay} · Alpha ${m.alpha}${spreadBadge ? ' · ' + spreadBadge : ''}${bidAsk ? '<br>' + bidAsk : ''}</span>
+            <span class="card-meta">Vol $${m.volDisplay} · Alpha ${m.alpha}${spreadBadge ? ' · ' + spreadBadge : ''}</span>
+            ${obBars}
         </div>
         <div class="card-center">${sparkSvg}</div>
         <div class="card-right">
@@ -374,6 +401,7 @@ function openAlertFromModal() {
     const m = appState.selectedMarket; if (!m) return;
     document.getElementById('alert-mkt-name').textContent = m.question.substring(0, 60) + (m.question.length > 60 ? '...' : '');
     document.getElementById('alert-price-val').value = Math.round(m.yesPrice * 100);
+    loadTelegramConfig();
     document.getElementById('alert-modal').classList.remove('hidden');
 }
 
@@ -414,6 +442,7 @@ function tickAlerts() {
         if ((a.dir === 'above' && price >= a.val || a.dir === 'below' && price <= a.val) && !a.triggered) {
             a.triggered = true; changed = true;
             showToast('Alert: ' + a.question.substring(0, 30) + '...');
+            sendTelegramAlert(a.question, price, a.dir);
         }
     });
     if (changed) { localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts)); if (appState.activeTab === 'alerts') renderAlerts(); }
@@ -790,4 +819,190 @@ function renderArbitrage() {
             <div class="arb-right"><span class="arb-gap">${a.gap}</span><span class="arb-label">${a.platform === 'MARKET' ? 'Volume' : a.platform === 'SPREAD' ? 'Gap' : 'Diff'}</span></div>
         </div>`
     }).join('')
+}
+
+// ── CSV EXPORT ──────────────────────────────────────────────────────────────
+function exportCSV() {
+    let ms = [...appState.allMarkets];
+    if (appState.activeTab !== 'all' && !['arbitrage','watchlist','whale','alerts','correlation'].includes(appState.activeTab)) {
+        ms = ms.filter(m => m.category === appState.activeTab);
+    }
+    if (appState.searchQuery) ms = ms.filter(m => m.question.toLowerCase().includes(appState.searchQuery));
+    if (appState.activeTab === 'watchlist') ms = ms.filter(m => appState.watchlist.has(String(m.id)));
+    
+    if (ms.length === 0) { showToast('No markets to export'); return; }
+    
+    const headers = ['id','question','category','yesPrice(c)','noPrice(c)','volume','alpha','spread%','change24h%','smartScore','bestBid(c)','bestAsk(c)'];
+    const rows = ms.map(m => [
+        m.id, `"${m.question.replace(/"/g,'""')}"`, m.category,
+        Math.round(m.yesPrice*100), Math.round(m.noPrice*100),
+        m.volume, m.alpha, (m.spread*100).toFixed(2),
+        (m.change24h*100).toFixed(2), m.smartScore.toFixed(2),
+        m.bestBid !== null ? Math.round(m.bestBid*100) : '', m.bestAsk !== null ? Math.round(m.bestAsk*100) : ''
+    ].join(','));
+    
+    const csv = headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'vura_markets_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+    showToast('Exported ' + ms.length + ' markets');
+}
+
+// ── CORRELATION MATRIX ─────────────────────────────────────────────────────
+function computeCorrelations() {
+    const pairs = [];
+    const markets = appState.allMarkets.filter(m => m.volume > 1000);
+    if (markets.length < 2) return pairs;
+    
+    // Extract keywords for each market
+    const tokenized = markets.map(m => ({
+        market: m,
+        words: new Set(m.question.toLowerCase().split(/\W+/).filter(w => w.length > 3))
+    }));
+    
+    for (let i = 0; i < tokenized.length; i++) {
+        for (let j = i + 1; j < tokenized.length; j++) {
+            const a = tokenized[i], b = tokenized[j];
+            const intersection = [...a.words].filter(w => b.words.has(w));
+            const union = new Set([...a.words, ...b.words]);
+            const jaccard = intersection.length / union.size;
+            
+            // Boost score if categories match and price movements align
+            let boost = 0;
+            if (a.market.category === b.market.category) boost += 0.1;
+            if (Math.sign(a.market.change24h) === Math.sign(b.market.change24h) && Math.abs(a.market.change24h) > 0.01) boost += 0.08;
+            
+            const score = jaccard + boost;
+            if (score > 0.1) {
+                pairs.push({
+                    marketA: a.market, marketB: b.market,
+                    score: Math.min(score, 1),
+                    keywords: intersection.slice(0, 3)
+                });
+            }
+        }
+    }
+    
+    pairs.sort((a, b) => b.score - a.score);
+    return pairs.slice(0, 20);
+}
+
+function renderCorrelations() {
+    const container = document.getElementById('correlation-feed');
+    if (!container) return;
+    
+    const pairs = computeCorrelations();
+    if (pairs.length === 0) {
+        container.innerHTML = '<div class="content-state"><p>Loading correlations... Need markets with sufficient volume.</p></div>';
+        return;
+    }
+    
+    const strongCount = pairs.filter(p => p.score > 0.4).length;
+    const crossCategory = new Set(pairs.filter(p => p.marketA.category !== p.marketB.category).map(p => p.marketA.category + '-' + p.marketB.category)).size;
+    
+    container.innerHTML = `
+    <div class="corr-stats">
+        <div class="corr-stat"><span class="corr-stat-label">TOTAL PAIRS</span><span class="corr-stat-val">${pairs.length}</span></div>
+        <div class="corr-stat"><span class="corr-stat-label">STRONG (40%+)</span><span class="corr-stat-val accent">${strongCount}</span></div>
+        <div class="corr-stat"><span class="corr-stat-label">CROSS-CATEGORY</span><span class="corr-stat-val" style="color:#3b82f6">${crossCategory}</span></div>
+    </div>
+    <div class="corr-grid">
+        ${pairs.map(p => {
+            const scorePct = Math.round(p.score * 100);
+            const scoreColor = scorePct >= 50 ? 'var(--accent)' : scorePct >= 25 ? '#f59e0b' : 'var(--text-3)';
+            return `<div class="corr-pair" onclick="event.stopPropagation();openModal('${p.marketA.id}')">
+                <div class="corr-score-wrap">
+                    <div class="corr-score-bar"><div class="corr-score-fill" style="width:${scorePct}%;background:${scoreColor}"></div></div>
+                    <span class="corr-score-val">${scorePct}%</span>
+                </div>
+                <div class="corr-markets">
+                    <span class="corr-mkt-a">${p.marketA.question}</span>
+                    <span class="corr-mkt-b" style="opacity:0.65">↔ ${p.marketB.question}</span>
+                    <div class="corr-keywords">${p.keywords.map(k => `<span class="corr-kw">${k}</span>`).join('')}</div>
+                </div>
+                <span style="font-size:0.6rem;color:var(--text-3);flex-shrink:0">${p.marketA.category} · ${p.marketB.category}</span>
+            </div>`;
+        }).join('')}
+    </div>`;
+}
+
+// ── SHARE MARKET CARD ──────────────────────────────────────────────────────
+function shareMarketCard() {
+    const m = appState.selectedMarket;
+    if (!m) return;
+    
+    const price = Math.round(m.yesPrice * 100);
+    const changeStr = m.change24h > 0 ? '+' + (m.change24h*100).toFixed(1) + '%' : (m.change24h*100).toFixed(1) + '%';
+    const smartLabel = m.smartScore >= 1.5 ? 'BULLISH' : m.smartScore <= -1.5 ? 'BEARISH' : '';
+    
+    const text = [
+        `📊 ${m.question}`,
+        `💰 YES: ${price}c | Vol: $${m.volDisplay}`,
+        `📈 24h: ${changeStr} | Alpha: ${m.alpha}`,
+        smartLabel ? `🔮 Signal: ${smartLabel}` : '',
+        `🔗 https://polymarket.com/event/${m.slug}`,
+        ``,
+        `via VURA Terminal`
+    ].filter(Boolean).join('\n');
+    
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Market card copied to clipboard');
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Market card copied');
+    });
+}
+
+// ── TELEGRAM ────────────────────────────────────────────────────────────────
+function saveTelegramConfig() {
+    const token = document.getElementById('tg-token').value.trim();
+    const chatId = document.getElementById('tg-chat-id').value.trim();
+    
+    if (!token || !chatId) {
+        showToast('Enter both Bot Token and Chat ID');
+        return;
+    }
+    
+    appState.telegramConfig = { token, chatId };
+    localStorage.setItem('vura_telegram', JSON.stringify(appState.telegramConfig));
+    showToast('Telegram config saved');
+}
+
+function loadTelegramConfig() {
+    const tokenEl = document.getElementById('tg-token');
+    const chatIdEl = document.getElementById('tg-chat-id');
+    if (tokenEl && chatIdEl && appState.telegramConfig.token) {
+        tokenEl.value = appState.telegramConfig.token;
+        chatIdEl.value = appState.telegramConfig.chatId;
+    }
+}
+
+async function sendTelegramAlert(question, price, direction) {
+    const { token, chatId } = appState.telegramConfig;
+    if (!token || !chatId) return;
+    
+    const emoji = direction === 'above' ? '🔺' : '🔻';
+    const msg = `${emoji} *VURA Alert*\n\n*${question}*\nPrice is now ${direction} ${price}c\n\n[View on Polymarket](https://polymarket.com)`;
+    
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: msg,
+                parse_mode: 'Markdown'
+            })
+        });
+    } catch (e) {
+        console.warn('Telegram send failed:', e.message);
+    }
 }
