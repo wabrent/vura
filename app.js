@@ -13,15 +13,49 @@ let appState = {
     markets: [], allMarkets: [], arbitrageOpportunities: [],
     activeTab: 'all', searchQuery: '', sortBy: 'volume',
     loading: true, error: false,
-    watchlist: new Set(JSON.parse(localStorage.getItem('vura_watchlist') || '[]')),
-    alerts: JSON.parse(localStorage.getItem('vura_alerts') || '[]'),
+    watchlist: new Set(),
+    alerts: [],
     selectedMarket: null, modalChart: null, currentTf: '24H', whaleEvents: [],
-    telegramConfig: JSON.parse(localStorage.getItem('vura_telegram') || 'null') || { token: '', chatId: '' }
+    telegramConfig: { token: '', chatId: '' }
 };
+
+// ── PROFILE / WALLET-ID ─────────────────────────────────────────────────────
+function profileKey(base) {
+    const id = privyUserId || walletAddress || (localStorage.getItem('vura_privy_user') || localStorage.getItem('vura_wallet_addr') || '');
+    if (!id) return `vura_${base}`;
+    const short = id.length > 10 ? id.slice(0, 6) + id.slice(-4) : id;
+    return `vura_${base}_${short}`;
+}
+
+function loadProfile() {
+    appState.watchlist = new Set(JSON.parse(localStorage.getItem(profileKey('watchlist')) || '[]'));
+    appState.alerts = JSON.parse(localStorage.getItem(profileKey('alerts')) || '[]');
+    appState.telegramConfig = JSON.parse(localStorage.getItem(profileKey('telegram')) || 'null') || { token: '', chatId: '' };
+}
+
+function saveWatchlist() { localStorage.setItem(profileKey('watchlist'), JSON.stringify([...appState.watchlist])); }
+function saveAlerts() { localStorage.setItem(profileKey('alerts'), JSON.stringify(appState.alerts)); }
+function saveTelegramConfigStore() { localStorage.setItem(profileKey('telegram'), JSON.stringify(appState.telegramConfig)); }
+
+loadProfile();
 
 window.addEventListener('DOMContentLoaded', () => {
     setupTabs(); setupSearch(); setupSort(); setupCardClicks();
     setupKeyboard(); setupPnlCalc(); generateWhaleData();
+    // Restore wallet/profile
+    const savedPrivyUser = localStorage.getItem('vura_privy_user');
+    const savedAddr = localStorage.getItem('vura_wallet_addr');
+    if (savedPrivyUser || savedAddr) {
+        if (savedPrivyUser) privyUserId = savedPrivyUser;
+        if (savedAddr) walletAddress = savedAddr;
+        const displayAddr = savedAddr || savedPrivyUser;
+        const short = displayAddr.slice(0, 6) + '...' + displayAddr.slice(-4);
+        const btn = document.getElementById('wallet-btn');
+        btn.textContent = short;
+        btn.classList.add('wallet-connected');
+        btn.onclick = disconnectWallet;
+        loadProfile();
+    }
     fetchData();
     setInterval(fetchData, CONFIG.REFRESH);
     setInterval(runArbitrageScan, 45000);
@@ -266,7 +300,7 @@ function buildSparkline(data, w, h) {
 function toggleWatchlist(id) {
     id = String(id);
     if (appState.watchlist.has(id)) appState.watchlist.delete(id); else appState.watchlist.add(id);
-    localStorage.setItem('vura_watchlist', JSON.stringify([...appState.watchlist]));
+    saveWatchlist();
     updateBadges(); renderAll();
     if (appState.selectedMarket && String(appState.selectedMarket.id) === id) updateModalWlBtn();
 }
@@ -414,7 +448,7 @@ function saveAlert() {
     const val = parseInt(document.getElementById('alert-price-val').value);
     if (!val || val < 1 || val > 99) return;
     appState.alerts.push({ id: Date.now(), marketId: m.id, question: m.question, dir, val, triggered: false });
-    localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts));
+    saveAlerts();
     closeAlertModal(); updateBadges();
     if (appState.activeTab === 'alerts') renderAlerts();
     showToast('Alert set: ' + m.question.substring(0, 30) + '...');
@@ -432,7 +466,7 @@ function renderAlerts() {
     }).join('')}</div>`;
 }
 
-function deleteAlert(id) { appState.alerts = appState.alerts.filter(a => a.id !== id); localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts)); updateBadges(); renderAlerts(); }
+function deleteAlert(id) { appState.alerts = appState.alerts.filter(a => a.id !== id); saveAlerts(); updateBadges(); renderAlerts(); }
 
 function tickAlerts() {
     let changed = false;
@@ -445,7 +479,7 @@ function tickAlerts() {
             sendTelegramAlert(a.question, price, a.dir);
         }
     });
-    if (changed) { localStorage.setItem('vura_alerts', JSON.stringify(appState.alerts)); if (appState.activeTab === 'alerts') renderAlerts(); }
+    if (changed) { saveAlerts(); if (appState.activeTab === 'alerts') renderAlerts(); }
 }
 
 // ── PNL ─────────────────────────────────────────────────────────────────────
@@ -473,8 +507,67 @@ function calcPnl() {
     roiEl.className = 'pnl-result-val ' + (roi >= 0 ? 'accent' : 'red');
 }
 
-// ── WALLET ───────────────────────────────────────────────────────────────────
+// ── WALLET / PRIVY ───────────────────────────────────────────────────────────
 let walletAddress = null;
+let privyUserId = null;
+
+function disconnectWallet() {
+    walletAddress = null;
+    localStorage.removeItem('vura_wallet_addr');
+    const btn = document.getElementById('wallet-btn');
+    btn.textContent = 'Connect';
+    btn.classList.remove('wallet-connected');
+    btn.onclick = connectWallet;
+    loadProfile();
+    updateBadges();
+    renderAll();
+    showToast('Disconnected');
+}
+function disconnectWallet() {
+    walletAddress = null;
+    privyUserId = null;
+    localStorage.removeItem('vura_wallet_addr');
+    localStorage.removeItem('vura_privy_user');
+    const btn = document.getElementById('wallet-btn');
+    btn.textContent = 'Connect';
+    btn.classList.remove('wallet-connected');
+    btn.onclick = connectWallet;
+    loadProfile();
+    updateBadges();
+    renderAll();
+    showToast('Disconnected');
+}
+
+async function connectPrivy() {
+    try {
+        showWalletConnecting('Creating embedded wallet via Privy...');
+        
+        const res = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'privy_create' })
+        });
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(err.error || 'Privy API error');
+        }
+        
+        const data = await res.json();
+        
+        privyUserId = data.userId;
+        walletAddress = data.walletAddress;
+        
+        localStorage.setItem('vura_privy_user', data.userId);
+        localStorage.setItem('vura_wallet_addr', data.walletAddress);
+        
+        onWalletConnected(data.walletAddress);
+    } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
+        showToast('Privy setup failed: ' + e.message);
+    }
+}
 
 function connectWallet() {
     // Show wallet selector modal instead of auto-connecting
@@ -511,12 +604,19 @@ async function switchToPolygon(provider) {
 
 function onWalletConnected(address) {
     walletAddress = address;
+    localStorage.setItem('vura_wallet_addr', address);
     const short = address.slice(0, 6) + '...' + address.slice(-4);
     const btn = document.getElementById('wallet-btn');
     btn.textContent = short;
     btn.classList.add('wallet-connected');
+    btn.onclick = disconnectWallet;
     closeWalletModal();
-    showToast('Connected: ' + short);
+    // Reload profile with wallet-scoped keys
+    loadProfile();
+    updateBadges();
+    if (appState.activeTab === 'alerts') renderAlerts();
+    if (appState.activeTab === 'watchlist') renderWatchlist();
+    showToast('Profile: ' + short);
 }
 
 async function connectMetaMask() {
@@ -972,7 +1072,7 @@ function saveTelegramConfig() {
     }
     
     appState.telegramConfig = { token, chatId };
-    localStorage.setItem('vura_telegram', JSON.stringify(appState.telegramConfig));
+    saveTelegramConfigStore();
     showToast('Telegram config saved');
 }
 

@@ -1,4 +1,4 @@
-// Vercel Serverless: CORS proxy + Polymarket Builder auth
+// Vercel Serverless: CORS proxy + Polymarket Builder auth + Privy auth
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,8 +12,100 @@ export default async function handler(req, res) {
   const SECRET = process.env.POLYMARKET_SECRET;
   const PASSPHRASE = process.env.POLYMARKET_PASSPHRASE;
 
+  // === Privy Credentials ===
+  const PRIVY_APP_ID = process.env.PRIVY_APP_ID || 'cmpcnahqh001m0ci59bk1lokk';
+  const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
+  const PRIVY_AUTH = 'Basic ' + Buffer.from(PRIVY_APP_ID + ':' + PRIVY_APP_SECRET).toString('base64');
+  const PRIVY_BASE = 'https://api.privy.io/v1';
+
   const { url } = req.query;
   const { action, tokenId, side, price, size } = req.body || {};
+
+  // === Privy: Create user + embedded wallet ===
+  if (action === 'privy_create' && req.method === 'POST') {
+    try {
+      // 1. Create anonymous user
+      const userRes = await fetch(`${PRIVY_BASE}/users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': PRIVY_AUTH,
+          'privy-app-id': PRIVY_APP_ID,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ linked_accounts: [] }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!userRes.ok) {
+        const err = await userRes.text();
+        return res.status(userRes.status).json({ error: 'Privy user creation failed: ' + err });
+      }
+
+      const user = await userRes.json();
+      const userId = user.id;
+
+      // 2. Create embedded Ethereum wallet
+      const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': PRIVY_AUTH,
+          'privy-app-id': PRIVY_APP_ID,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: userId, chain_type: 'ethereum' }),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      if (!walletRes.ok) {
+        const err = await walletRes.text();
+        return res.status(walletRes.status).json({ error: 'Wallet creation failed: ' + err });
+      }
+
+      const wallet = await walletRes.json();
+
+      return res.status(200).json({
+        userId: userId,
+        walletAddress: wallet.address,
+        walletId: wallet.id
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // === Privy: Get user by ID (restore profile) ===
+  if (action === 'privy_restore' && req.method === 'POST') {
+    try {
+      const { userId } = req.body || {};
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+      const userRes = await fetch(`${PRIVY_BASE}/users/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': PRIVY_AUTH,
+          'privy-app-id': PRIVY_APP_ID,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (!userRes.ok) {
+        const err = await userRes.text();
+        return res.status(userRes.status).json({ error: 'User not found: ' + err });
+      }
+
+      const user = await userRes.json();
+      const wallet = user.wallets?.[0];
+
+      return res.status(200).json({
+        userId: user.id,
+        walletAddress: wallet?.address || null,
+        walletId: wallet?.id || null
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   // === Order Placement (POST) ===
   if (action === 'trade' && req.method === 'POST') {
