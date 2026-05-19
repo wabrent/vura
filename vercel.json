@@ -2,11 +2,13 @@
   "version": 2,
   "builds": [
     { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "api/privy.js", "use": "@vercel/node" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/api/privy", "dest": "/api/privy.js" },
     { "src": "/api/proxy", "dest": "/api/index.js" },
     { "src": "/", "dest": "/index.html" },
     { "src": "/(.*)", "dest": "/$1" }

@@ -544,9 +544,7 @@ async function connectPrivy() {
     try {
         showWalletConnecting('Creating your wallet...');
         
-        const res = await fetch('/api/proxy?action=privy_create', {
-            method: 'POST'
-        });
+        const res = await fetch('/api/privy', { method: 'POST' });
         
         const data = await res.json();
         
