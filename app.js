@@ -542,39 +542,35 @@ function disconnectWallet() {
 
 async function connectPrivy() {
     try {
-        showWalletConnecting('Opening Privy...');
-        closeWalletModal();
-        
-        // Wait for Privy SDK
-        let privy;
-        if (window.Privy) {
-            privy = new window.Privy({
-                appId: 'cmpcnahqh001m0ci59bk1lokk'
-            });
-        } else {
-            throw new Error('Privy SDK not loaded — try refreshing');
+        // Already connected? Just show wallet
+        if (privyUserId && walletAddress) {
+            onWalletConnected(walletAddress);
+            return;
         }
         
-        // Listen for login
-        privy.on('login', (user) => {
-            const address = user.wallet?.address || user.wallets?.[0]?.address;
-            if (address) {
-                privyUserId = user.id;
-                walletAddress = address;
-                localStorage.setItem('vura_privy_user', user.id);
-                localStorage.setItem('vura_wallet_addr', address);
-                onWalletConnected(address);
-            } else {
-                showToast('No wallet found — try again');
-            }
-        });
+        showWalletConnecting('Creating your wallet...');
         
-        privy.on('error', (err) => {
-            showToast('Privy error: ' + (err.message || 'auth failed'));
-        });
+        const res = await fetch('/api/privy', { method: 'POST' });
+        const data = await res.json().catch(() => ({ error: 'Invalid response' }));
         
-        await privy.login();
+        if (!res.ok) {
+            throw new Error(data.error || 'HTTP ' + res.status);
+        }
+        
+        if (!data.walletAddress) {
+            throw new Error('No wallet address');
+        }
+        
+        privyUserId = data.userId;
+        walletAddress = data.walletAddress;
+        
+        localStorage.setItem('vura_privy_user', data.userId);
+        localStorage.setItem('vura_wallet_addr', data.walletAddress);
+        
+        onWalletConnected(data.walletAddress);
     } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
         showToast(e.message || 'Connection failed');
     }
 }
