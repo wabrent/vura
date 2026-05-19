@@ -19,7 +19,14 @@ export default async function handler(req, res) {
   const PRIVY_BASE = 'https://api.privy.io/v1';
 
   try {
-    // Create user — try without linked_accounts first
+    // Create user + embedded wallet in one call
+    const body = {
+      linked_accounts: [
+        { type: 'email', address: 'u' + Date.now() + '@vura.ink' }
+      ],
+      wallets: [{ chain_type: 'ethereum' }]
+    };
+    
     const userRes = await fetch(`${PRIVY_BASE}/users`, {
       method: 'POST',
       headers: {
@@ -27,40 +34,21 @@ export default async function handler(req, res) {
         'privy-app-id': PRIVY_APP_ID,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000)
     });
 
     if (!userRes.ok) {
       const err = await userRes.text();
-      console.error('Privy user failed:', userRes.status, err);
-      return res.status(userRes.status).json({ error: 'User creation failed: ' + err });
+      return res.status(userRes.status).json({ error: err.substring(0, 200) });
     }
 
     const user = await userRes.json();
+    const wallet = user.wallets?.[0];
 
-    // Create embedded wallet
-    const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
-      method: 'POST',
-      headers: {
-        'Authorization': PRIVY_AUTH,
-        'privy-app-id': PRIVY_APP_ID,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        chain_type: 'ethereum',
-        owner: { user_id: user.id }
-      }),
-      signal: AbortSignal.timeout(15000)
-    });
-
-    if (!walletRes.ok) {
-      const err = await walletRes.text();
-      console.error('Privy wallet failed:', walletRes.status, err);
-      return res.status(walletRes.status).json({ error: 'Wallet creation failed: ' + err });
+    if (!wallet?.address) {
+      return res.status(500).json({ error: 'No wallet in user response' });
     }
-
-    const wallet = await walletRes.json();
 
     return res.status(200).json({
       userId: user.id,
