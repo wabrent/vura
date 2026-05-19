@@ -545,12 +545,29 @@ async function connectPrivy() {
         showWalletConnecting('Creating your wallet...');
         
         const res = await fetch('/api/privy', { method: 'POST' });
-        
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: 'Invalid response' }));
         
         if (!res.ok) {
             throw new Error(data.error || 'API error ' + res.status);
         }
+        
+        if (!data.walletAddress) {
+            throw new Error('No wallet address returned');
+        }
+        
+        privyUserId = data.userId;
+        walletAddress = data.walletAddress;
+        
+        localStorage.setItem('vura_privy_user', data.userId);
+        localStorage.setItem('vura_wallet_addr', data.walletAddress);
+        
+        onWalletConnected(data.walletAddress);
+    } catch (e) {
+        document.getElementById('wallet-options').classList.remove('hidden');
+        document.getElementById('wallet-connecting').classList.add('hidden');
+        showToast('Error: ' + (e.message || 'Connection failed'));
+    }
+}
         
         if (!data.walletAddress) {
             throw new Error('No wallet address returned');
