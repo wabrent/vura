@@ -15,14 +15,17 @@ export default async function handler(req, res) {
   // === Privy Credentials ===
   const PRIVY_APP_ID = process.env.PRIVY_APP_ID || 'cmpcnahqh001m0ci59bk1lokk';
   const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET;
-  const PRIVY_AUTH = 'Basic ' + Buffer.from(PRIVY_APP_ID + ':' + PRIVY_APP_SECRET).toString('base64');
   const PRIVY_BASE = 'https://api.privy.io/v1';
+  const PRIVY_AUTH = PRIVY_APP_SECRET ? 'Basic ' + Buffer.from(PRIVY_APP_ID + ':' + PRIVY_APP_SECRET).toString('base64') : '';
 
-  const { url } = req.query;
-  const { action, tokenId, side, price, size } = req.body || {};
+  const { url, action } = req.query;
+  const body = req.body || {};
 
   // === Privy: Create user + embedded wallet ===
   if (action === 'privy_create' && req.method === 'POST') {
+    if (!PRIVY_APP_SECRET) {
+      return res.status(500).json({ error: 'PRIVY_APP_SECRET not configured in Vercel env vars' });
+    }
     try {
       // 1. Create anonymous user
       const userRes = await fetch(`${PRIVY_BASE}/users`, {
@@ -38,11 +41,11 @@ export default async function handler(req, res) {
 
       if (!userRes.ok) {
         const err = await userRes.text();
+        console.error('Privy create user failed:', userRes.status, err);
         return res.status(userRes.status).json({ error: 'Privy user creation failed: ' + err });
       }
 
       const user = await userRes.json();
-      const userId = user.id;
 
       // 2. Create embedded Ethereum wallet
       const walletRes = await fetch(`${PRIVY_BASE}/wallets`, {
@@ -52,23 +55,25 @@ export default async function handler(req, res) {
           'privy-app-id': PRIVY_APP_ID,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ user_id: userId, chain_type: 'ethereum' }),
+        body: JSON.stringify({ user_id: user.id, chain_type: 'ethereum' }),
         signal: AbortSignal.timeout(15000)
       });
 
       if (!walletRes.ok) {
         const err = await walletRes.text();
+        console.error('Privy create wallet failed:', walletRes.status, err);
         return res.status(walletRes.status).json({ error: 'Wallet creation failed: ' + err });
       }
 
       const wallet = await walletRes.json();
 
       return res.status(200).json({
-        userId: userId,
+        userId: user.id,
         walletAddress: wallet.address,
         walletId: wallet.id
       });
     } catch (e) {
+      console.error('Privy handler error:', e);
       return res.status(500).json({ error: e.message });
     }
   }
@@ -109,6 +114,7 @@ export default async function handler(req, res) {
 
   // === Order Placement (POST) ===
   if (action === 'trade' && req.method === 'POST') {
+    const { tokenId, side, price, size } = req.body || {};
     try {
       const clobRes = await fetch('https://clob.polymarket.com/order', {
         method: 'POST',
