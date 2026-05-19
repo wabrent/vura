@@ -172,6 +172,8 @@ main { max-width: 72rem; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 .modal-wl-btn:hover { border-color: #d97706; color: #d97706; }
 .modal-wl-btn.wl-active { border-color: #d97706; color: #d97706; }
 .modal-alert-btn:hover { border-color: var(--accent); color: var(--accent); }
+.modal-share-btn { padding: 0.35rem 0.75rem; font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.05em; background: var(--bg-2); border: 1px solid var(--border-md); color: var(--text); cursor: pointer; transition: all 0.15s; }
+.modal-share-btn:hover { border-color: #3b82f6; color: #3b82f6; }
 .modal-trade-btn { margin-left: auto; }
 .alert-mkt-name { font-size: 0.8rem; font-weight: 500; line-height: 1.3; }
 
@@ -306,4 +308,71 @@ body.dark,
     .search-input { width: 120px !important; }
     main { padding: 0.5rem !important; }
     .kbd-bar { display: none !important; }
+}
+
+/* ── CSV BUTTON ──────────────────────────────────────────────────────────── */
+.csv-btn {
+    padding: 0.3rem 0.6rem;
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--accent); cursor: pointer; transition: all 0.15s;
+}
+.csv-btn:hover { border-color: var(--accent); background: rgba(5,150,105,0.05); }
+
+/* ── ORDER BOOK BARS ─────────────────────────────────────────────────────── */
+.card-ob { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; width: 100%; }
+.ob-row { display: flex; align-items: center; gap: 6px; font-size: 0.55rem; }
+.ob-label { width: 20px; color: var(--text-3); text-align: right; flex-shrink: 0; }
+.ob-bar-wrap { flex: 1; height: 4px; background: var(--border); position: relative; }
+.ob-bar { height: 100%; position: absolute; transition: width 0.4s ease; }
+.ob-bar-bid { background: var(--accent); right: 0; }
+.ob-bar-ask { background: var(--red); left: 0; }
+.ob-price { width: 30px; color: var(--text-2); text-align: left; flex-shrink: 0; }
+
+/* ── SMART MONEY ─────────────────────────────────────────────────────────── */
+.smart-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    margin-left: 4px;
+}
+.smart-bullish { background: rgba(5,150,105,0.1); color: var(--accent); }
+.smart-bearish { background: rgba(220,38,38,0.1); color: var(--red); }
+.smart-neutral { background: rgba(115,115,115,0.1); color: var(--text-3); }
+
+/* ── CORRELATION MATRIX ──────────────────────────────────────────────────── */
+.corr-stats { display: flex; gap: 1px; background: var(--border-md); margin-bottom: 1.5rem; }
+.corr-stat { flex: 1; background: var(--bg-2); padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.corr-stat-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.corr-stat-val { font-size: 1.25rem; font-weight: 500; }
+.corr-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+.corr-pair { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: var(--bg-2); border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+.corr-pair:hover { border-color: var(--text); transform: translateY(-1px); }
+.corr-score-wrap { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; width: 80px; }
+.corr-score-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.corr-score-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
+.corr-score-val { font-size: 0.65rem; font-weight: 500; color: var(--text-2); width: 28px; text-align: right; }
+.corr-markets { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.corr-mkt-a, .corr-mkt-b { font-size: 0.75rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.corr-keywords { display: flex; gap: 3px; flex-wrap: wrap; }
+.corr-kw { font-size: 0.5rem; padding: 1px 4px; background: var(--bg); border: 1px solid var(--border); color: var(--text-3); border-radius: 2px; }
+
+/* ── TELEGRAM SECTION ────────────────────────────────────────────────────── */
+.telegram-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.telegram-header {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
 }

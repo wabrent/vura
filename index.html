@@ -19,6 +19,7 @@
         <div class="nav-links">
             <a href="/" onclick="event.preventDefault();switchTab('all');window.scrollTo(0,0)" class="nav-link-active">Terminal</a>
             <a href="#" onclick="event.preventDefault();switchTab('arbitrage')">Arbitrage</a>
+            <a href="#" onclick="event.preventDefault();switchTab('correlation')">Correlations</a>
         </div>
         <div class="nav-status">
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
@@ -55,6 +56,7 @@
         <button class="tab-btn" data-tab="watchlist">Watchlist <span id="watchlist-count" class="tab-badge"></span></button>
         <button class="tab-btn" data-tab="whale">Signals</button>
         <button class="tab-btn" data-tab="alerts">Alerts <span id="alert-count" class="tab-badge"></span></button>
+        <button class="tab-btn" data-tab="correlation">Correlations</button>
     </div>
     <div class="tabs-meta">
         <input id="search-input" type="text" placeholder="/ search markets..." class="search-input">
@@ -64,13 +66,14 @@
             <option value="price">Price</option>
             <option value="category">Category</option>
         </select>
+        <button id="csv-export-btn" class="csv-btn" onclick="exportCSV()" title="Export to CSV">CSV ↓</button>
         <span id="market-count">— markets</span>
         <span id="global-vol" class="stat-vol">—</span>
     </div>
 </div>
 
 <div class="kbd-bar">
-    <span><kbd>1-8</kbd> switch tabs</span>
+    <span><kbd>1-9</kbd> switch tabs</span>
     <span><kbd>/</kbd> search</span>
     <span><kbd>W</kbd> watchlist toggle</span>
     <span><kbd>A</kbd> set alert</span>
@@ -85,6 +88,7 @@
     <div id="watchlist-feed" class="hidden"></div>
     <div id="whale-feed" class="hidden"></div>
     <div id="alerts-feed" class="hidden"></div>
+    <div id="correlation-feed" class="hidden"></div>
 </main>
 
 <!-- P&L MODAL -->
@@ -128,6 +132,7 @@
             <div class="modal-actions">
                 <button class="modal-wl-btn" id="modal-wl-btn" onclick="toggleWatchlistModal()">★ Watchlist</button>
                 <button class="modal-alert-btn" onclick="openAlertFromModal()">Alert</button>
+                <button class="modal-share-btn" onclick="shareMarketCard()" title="Copy to clipboard">Share</button>
                 <a class="btn-trade modal-trade-btn" id="modal-trade-link" href="#" target="_blank" onclick="event.stopPropagation()">Trade ↗</a>
             </div>
         </div>
@@ -147,6 +152,14 @@
                 <div class="pnl-field"><label class="pnl-label">PRICE (c)</label><input type="number" id="alert-price-val" class="pnl-input" value="75" min="1" max="99"></div>
             </div>
             <button class="btn-retry" style="width:100%;margin-top:1rem;" onclick="saveAlert()">Set Alert</button>
+            <div class="telegram-section">
+                <div class="telegram-header">TELEGRAM NOTIFICATIONS</div>
+                <div class="pnl-row">
+                    <div class="pnl-field"><label class="pnl-label">BOT TOKEN</label><input type="password" id="tg-token" class="pnl-input" placeholder="123:abc..."></div>
+                    <div class="pnl-field"><label class="pnl-label">CHAT ID</label><input type="text" id="tg-chat-id" class="pnl-input" placeholder="-100..."></div>
+                </div>
+                <button class="btn-retry" style="width:100%;margin-top:0.5rem;background:var(--accent);" onclick="saveTelegramConfig()">Save Telegram</button>
+            </div>
         </div>
     </div>
 </div>
