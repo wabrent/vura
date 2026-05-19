@@ -568,24 +568,6 @@ async function connectPrivy() {
         showToast('Error: ' + (e.message || 'Connection failed'));
     }
 }
-        
-        if (!data.walletAddress) {
-            throw new Error('No wallet address returned');
-        }
-        
-        privyUserId = data.userId;
-        walletAddress = data.walletAddress;
-        
-        localStorage.setItem('vura_privy_user', data.userId);
-        localStorage.setItem('vura_wallet_addr', data.walletAddress);
-        
-        onWalletConnected(data.walletAddress);
-    } catch (e) {
-        document.getElementById('wallet-options').classList.remove('hidden');
-        document.getElementById('wallet-connecting').classList.add('hidden');
-        showToast('Error: ' + (e.message || 'Connection failed'));
-    }
-}
 
 function connectWallet() {
     // Show wallet selector modal instead of auto-connecting
