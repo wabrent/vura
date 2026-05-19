@@ -540,7 +540,7 @@ function disconnectWallet() {
 
 async function connectPrivy() {
     try {
-        showWalletConnecting('Creating embedded wallet via Privy...');
+        showWalletConnecting('Creating your wallet...');
         
         const res = await fetch('/api/proxy', {
             method: 'POST',
@@ -548,12 +548,15 @@ async function connectPrivy() {
             body: JSON.stringify({ action: 'privy_create' })
         });
         
+        const data = await res.json();
+        
         if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-            throw new Error(err.error || 'Privy API error');
+            throw new Error(data.error || 'API error ' + res.status);
         }
         
-        const data = await res.json();
+        if (!data.walletAddress) {
+            throw new Error('No wallet address returned');
+        }
         
         privyUserId = data.userId;
         walletAddress = data.walletAddress;
@@ -565,7 +568,7 @@ async function connectPrivy() {
     } catch (e) {
         document.getElementById('wallet-options').classList.remove('hidden');
         document.getElementById('wallet-connecting').classList.add('hidden');
-        showToast('Privy setup failed: ' + e.message);
+        showToast('Error: ' + (e.message || 'Connection failed'));
     }
 }
 
@@ -589,19 +592,6 @@ function showWalletConnecting(text) {
     document.getElementById('wallet-connecting-text').textContent = text;
 }
 
-async function switchToPolygon(provider) {
-    try {
-        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
-    } catch (e) {
-        if (e.code === 4902) {
-            await provider.request({
-                method: 'wallet_addEthereumChain',
-                params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com'], blockExplorerUrls: ['https://polygonscan.com'] }]
-            });
-        }
-    }
-}
-
 function onWalletConnected(address) {
     walletAddress = address;
     localStorage.setItem('vura_wallet_addr', address);
@@ -619,141 +609,7 @@ function onWalletConnected(address) {
     showToast('Profile: ' + short);
 }
 
-async function connectMetaMask() {
-    // Find MetaMask specifically (not Coinbase or others injected as window.ethereum)
-    const provider = window.ethereum?.providers?.find(p => p.isMetaMask && !p.isCoinbaseWallet)
-        || (window.ethereum?.isMetaMask && !window.ethereum?.isCoinbaseWallet ? window.ethereum : null);
-
-    if (!provider) {
-        window.open('https://metamask.io/download/', '_blank');
-        showToast('MetaMask not found — install it first');
-        return;
-    }
-    try {
-        showWalletConnecting('Opening MetaMask...');
-        const accounts = await provider.request({ method: 'eth_requestAccounts' });
-        if (!accounts.length) throw new Error('No accounts');
-        await switchToPolygon(provider);
-        onWalletConnected(accounts[0]);
-    } catch (e) {
-        document.getElementById('wallet-options').classList.remove('hidden');
-        document.getElementById('wallet-connecting').classList.add('hidden');
-        showToast(e.code === 4001 ? 'Rejected by user' : 'MetaMask connection failed');
-    }
-}
-
-async function connectCoinbase() {
-    const provider = window.ethereum?.providers?.find(p => p.isCoinbaseWallet)
-        || (window.ethereum?.isCoinbaseWallet ? window.ethereum : null);
-
-    if (!provider) {
-        window.open('https://www.coinbase.com/wallet/downloads', '_blank');
-        showToast('Coinbase Wallet not found — install it first');
-        return;
-    }
-    try {
-        showWalletConnecting('Opening Coinbase Wallet...');
-        const accounts = await provider.request({ method: 'eth_requestAccounts' });
-        if (!accounts.length) throw new Error('No accounts');
-        await switchToPolygon(provider);
-        onWalletConnected(accounts[0]);
-    } catch (e) {
-        document.getElementById('wallet-options').classList.remove('hidden');
-        document.getElementById('wallet-connecting').classList.add('hidden');
-        showToast(e.code === 4001 ? 'Rejected by user' : 'Coinbase Wallet connection failed');
-    }
-}
-
-async function connectRabby() {
-    const provider = window.ethereum?.providers?.find(p => p.isRabby)
-        || (window.ethereum?.isRabby ? window.ethereum : null)
-        || window.rabby
-        || null;
-
-    if (!provider) {
-        window.open('https://rabby.io/', '_blank');
-        showToast('Rabby not found — install it first');
-        return;
-    }
-    try {
-        showWalletConnecting('Opening Rabby...');
-        const accounts = await provider.request({ method: 'eth_requestAccounts' });
-        if (!accounts.length) throw new Error('No accounts');
-        await switchToPolygon(provider);
-        onWalletConnected(accounts[0]);
-    } catch (e) {
-        document.getElementById('wallet-options').classList.remove('hidden');
-        document.getElementById('wallet-connecting').classList.add('hidden');
-        showToast(e.code === 4001 ? 'Rejected by user' : 'Rabby connection failed');
-    }
-}
-
-async function connectWalletConnect() {
-    // WalletConnect requires their SDK; redirect to Polymarket which has it built in
-    showToast('Use WalletConnect on Polymarket directly');
-    setTimeout(() => window.open('https://polymarket.com', '_blank'), 600);
-    closeWalletModal();
-}
-
-function openTradeModal(slug) {
-    const m = appState.allMarkets.find(m => m.slug === slug);
-    if (!m) return;
-    document.getElementById('trade-mkt-name').textContent = m.question.substring(0, 50);
-    document.getElementById('trade-bid').textContent = Math.round(m.yesPrice * 100) + 'c';
-    document.getElementById('trade-ask').textContent = Math.round((1 - m.yesPrice) * 100) + 'c';
-    document.getElementById('trade-price').value = Math.round(m.yesPrice * 100);
-    document.getElementById('trade-amount').value = 10;
-    document.getElementById('trade-status').textContent = '';
-    document.getElementById('trade-modal').classList.remove('hidden');
-    document.body.classList.add('modal-open');
-    updateTradeEstimate();
-}
-
-function closeTradeModal() {
-    document.getElementById('trade-modal').classList.add('hidden');
-    document.body.classList.remove('modal-open');
-}
-
-function handleTradeOverlayClick(e) {
-    if (e.target.id === 'trade-modal') closeTradeModal();
-}
-
-function updateTradePrice() {
-    const m = findTradeMarket();
-    if (!m) return;
-    const outcome = document.getElementById('trade-outcome').value;
-    const price = outcome === 'YES' ? Math.round(m.yesPrice * 100) : Math.round(m.noPrice * 100);
-    document.getElementById('trade-price').value = price;
-    updateTradeEstimate();
-}
-
-function findTradeMarket() {
-    const nameEl = document.getElementById('trade-mkt-name');
-    if (!nameEl) return null;
-    return appState.allMarkets.find(m => m.question.substring(0, 50) === nameEl.textContent);
-}
-
-function updateTradeEstimate() {
-    const price = parseFloat(document.getElementById('trade-price').value) || 0;
-    const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
-    if (price > 0 && amount > 0) {
-        const shares = (amount / (price / 100)).toFixed(2);
-        document.getElementById('trade-shares').textContent = shares;
-        document.getElementById('trade-total').textContent = '$' + amount.toFixed(2);
-    }
-}
-
-function submitTrade() {
-    const statusEl = document.getElementById('trade-status');
-    const m = findTradeMarket();
-    if (!m) return;
-    statusEl.textContent = 'Opening Polymarket...';
-    statusEl.style.color = 'var(--accent)';
-    window.open('https://polymarket.com/event/' + m.slug, '_blank');
-    closeTradeModal();
-}
-
-function quickTrade(slug) {
+async function quickTrade(slug) {
     openTradeModal(slug);
 }
 
