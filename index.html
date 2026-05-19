@@ -23,7 +23,7 @@
         </div>
         <div class="nav-status">
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◐</button>
-            <button class="wallet-btn" disabled style="opacity:0.5;cursor:default">Coming Soon</button>
+            <button id="wallet-btn" class="wallet-btn" onclick="connectWallet()">Connect</button>
             <span class="live-dot"></span>
             <span id="nav-gas">Live</span>
         </div>
@@ -237,6 +237,14 @@
         </div>
         <div class="modal-body" style="padding:1.25rem;">
             <div id="wallet-options">
+                <button class="wallet-option" onclick="connectPrivy()">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#6C47FF"/><path d="M10 16c0-1.1.9-2 2-2h3v2h-3v4h-2v-4zm12 0c0 1.1-.9 2-2 2h-3v-2h3v-4h2v4z" fill="white"/></svg>
+                    <div class="wallet-option-info">
+                        <span class="wallet-option-name">Privy</span>
+                        <span class="wallet-option-desc">Embedded wallet — no extensions</span>
+                    </div>
+                    <span class="wallet-option-arrow">→</span>
+                </button>
                 <button class="wallet-option" onclick="connectMetaMask()">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" width="32" height="32" alt="">
                     <div class="wallet-option-info">
