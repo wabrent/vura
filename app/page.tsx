@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { usePrivy } from '@privy-io/react-auth';
 import type { Market, ArbitrageOp, Alert, WhaleEvent, CorrelationPair } from '@/app/lib/types';
 
 const CONFIG = {
@@ -55,7 +55,6 @@ const WHALE_NAMES = ['0x3f...a12', '0x8b...c44', '0x1d...f88', '0xaa...901', '0x
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
-  const { wallets } = useWallets();
 
   const [markets, setMarkets] = useState<Market[]>([]);
   const [activeTab, setActiveTab] = useState('all');
@@ -502,7 +501,9 @@ export default function Home() {
               <button className="privy-btn" disabled style={{ opacity: 0.5 }}>Loading...</button>
             ) : authenticated ? (
               <>
-                <span style={{ fontSize: '0.6rem', color: 'var(--accent)' }}>{user?.email?.address || user?.wallet?.address?.slice(0, 6) + '...' || 'User'}</span>
+                <span style={{ fontSize: '0.6rem', color: 'var(--accent)' }}>
+                  {user?.email?.address || user?.google?.email || (user?.id ? user.id.slice(0, 6) + '...' : 'User')}
+                </span>
                 <span className="live-dot" />
                 <span>Live</span>
                 <button className="privy-btn logout" onClick={logout}>Exit</button>
