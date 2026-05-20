@@ -92,18 +92,22 @@ export default function Home() {
 
   const profilePrefix = user?.id ? user.id.slice(0, 10) : 'default';
 
-  // Load saved data
+  // Load saved data — reset on user change
   useEffect(() => {
-    const wl = localStorage.getItem(`vura_wl_${profilePrefix}`);
-    const al = localStorage.getItem(`vura_al_${profilePrefix}`);
-    const tg = localStorage.getItem(`vura_tg_${profilePrefix}`);
-    if (wl) setWatchlist(new Set(JSON.parse(wl)));
-    if (al) setAlerts(JSON.parse(al));
-    if (tg) {
-      const t = JSON.parse(tg);
-      setTelegramToken(t.token || '');
-      setTelegramChatId(t.chatId || '');
+    if (!user?.id) {
+      setWatchlist(new Set());
+      setAlerts([]);
+      setTelegramToken('');
+      setTelegramChatId('');
+      return;
     }
+    const prefix = user.id.slice(0, 10);
+    const wl = localStorage.getItem(`vura_wl_${prefix}`);
+    const al = localStorage.getItem(`vura_al_${prefix}`);
+    const tg = localStorage.getItem(`vura_tg_${prefix}`);
+    setWatchlist(new Set(wl ? JSON.parse(wl) : []));
+    setAlerts(al ? JSON.parse(al) : []);
+    if (tg) { const t = JSON.parse(tg); setTelegramToken(t.token || ''); setTelegramChatId(t.chatId || ''); }
   }, [user?.id]);
 
   // Save profile data
