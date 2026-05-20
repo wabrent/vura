@@ -16,14 +16,6 @@ export interface Market {
   smartScore: number;
 }
 
-export interface ArbitrageOp {
-  market: Market;
-  platform: string;
-  gap: string;
-  priceA: number;
-  priceB: number;
-}
-
 export interface Alert {
   id: number;
   marketId: string;
@@ -31,17 +23,6 @@ export interface Alert {
   dir: 'above' | 'below';
   val: number;
   triggered: boolean;
-}
-
-export interface WhaleEvent {
-  time: Date;
-  addr: string;
-  market: string;
-  slug: string;
-  side: string;
-  amount: number;
-  isNew: boolean;
-  signalType: 'volume' | 'change' | 'spread';
 }
 
 export interface CorrelationPair {
