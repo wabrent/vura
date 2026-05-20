@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
-import type { Market, ArbitrageOp, Alert, WhaleEvent, CorrelationPair } from '@/app/lib/types';
+import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=40',
@@ -81,8 +81,6 @@ export default function Home() {
   // Profile
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [arbitrage, setArbitrage] = useState<ArbitrageOp[]>([]);
-  const [whaleEvents, setWhaleEvents] = useState<WhaleEvent[]>([]);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
 
@@ -376,19 +374,21 @@ export default function Home() {
     }
 
     if (activeTab === 'arbitrage') {
-      if (arbitrage.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No arbitrage signals. Scanning internal spreads...</div>;
-      return arbitrage.map((a, i) => (
-        <div key={i} className="arb-card" style={{ animationDelay: `${i * 50}ms` }}
-          onClick={() => window.open(`https://polymarket.com/event/${a.market.slug}`, '_blank')}>
+      // Compute internal spreads on the fly
+      const arbList = markets.filter(m => m.spread > 0.005).sort((a, b) => b.spread - a.spread).slice(0, 15);
+      if (arbList.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No arbitrage signals. Scanning internal spreads...</div>;
+      return arbList.map((a, i) => (
+        <div key={a.id} className="arb-card" style={{ animationDelay: `${i * 50}ms` }}
+          onClick={() => window.open(`https://polymarket.com/event/${a.slug}`, '_blank')}>
           <div style={{ flex: '0 0 38%' }}>
-            <span className="arb-platform">{a.platform}</span>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem' }}>{a.market.question.substring(0, 45)}</div>
+            <span className="arb-platform">SPREAD</span>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem' }}>{a.question.substring(0, 45)}</div>
           </div>
           <div style={{ flex: 1, fontSize: '0.7rem' }}>
-            <span>{Math.round(a.priceA * 100)}c → {Math.round(a.priceB * 100)}c</span>
+            <span>{Math.round(a.yesPrice * 100)}c ↔ {Math.round(a.noPrice * 100)}c</span>
           </div>
           <div style={{ flex: '0 0 20%', textAlign: 'right' }}>
-            <span style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>{a.gap}</span>
+            <span style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>{(a.spread * 100).toFixed(2)}%</span>
           </div>
         </div>
       ));
