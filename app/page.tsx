@@ -88,36 +88,36 @@ export default function Home() {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [alertMarket, setAlertMarket] = useState<Market | null>(null);
 
-  const profilePrefix = user?.id ? user.id.slice(0, 10) : 'default';
+  const profileKey = user?.email?.address || user?.google?.email || user?.id?.slice(0, 10) || 'default';
 
   // Load saved data — reset on user change
   useEffect(() => {
-    if (!user?.id) {
+    if (!user?.email?.address && !user?.google?.email && !user?.id) {
       setWatchlist(new Set());
       setAlerts([]);
       setTelegramToken('');
       setTelegramChatId('');
       return;
     }
-    const prefix = user.id.slice(0, 10);
-    const wl = localStorage.getItem(`vura_wl_${prefix}`);
-    const al = localStorage.getItem(`vura_al_${prefix}`);
-    const tg = localStorage.getItem(`vura_tg_${prefix}`);
+    const pk = user?.email?.address || user?.google?.email || user?.id?.slice(0, 10) || 'default';
+    const wl = localStorage.getItem(`vura_wl_${pk}`);
+    const al = localStorage.getItem(`vura_al_${pk}`);
+    const tg = localStorage.getItem(`vura_tg_${pk}`);
     setWatchlist(new Set(wl ? JSON.parse(wl) : []));
     setAlerts(al ? JSON.parse(al) : []);
     if (tg) { const t = JSON.parse(tg); setTelegramToken(t.token || ''); setTelegramChatId(t.chatId || ''); }
-  }, [user?.id]);
+  }, [user?.email?.address, user?.google?.email, user?.id]);
 
   // Save profile data
   const saveWatchlist = useCallback((wl: Set<string>) => {
-    localStorage.setItem(`vura_wl_${profilePrefix}`, JSON.stringify([...wl]));
+    localStorage.setItem(`vura_wl_${profileKey}`, JSON.stringify([...wl]));
     setWatchlist(new Set(wl));
-  }, [profilePrefix]);
+  }, [profileKey]);
 
   const saveAlerts = useCallback((al: Alert[]) => {
-    localStorage.setItem(`vura_al_${profilePrefix}`, JSON.stringify(al));
+    localStorage.setItem(`vura_al_${profileKey}`, JSON.stringify(al));
     setAlerts([...al]);
-  }, [profilePrefix]);
+  }, [profileKey]);
 
   // Fetch markets
   const fetchMarkets = useCallback(async () => {
@@ -220,12 +220,12 @@ export default function Home() {
           }
           return a;
         });
-        if (changed) localStorage.setItem(`vura_al_${profilePrefix}`, JSON.stringify(updated));
+        if (changed) localStorage.setItem(`vura_al_${profileKey}`, JSON.stringify(updated));
         return updated;
       });
     }, 10000);
     return () => clearInterval(interval);
-  }, [markets, telegramToken, telegramChatId, profilePrefix]);
+  }, [markets, telegramToken, telegramChatId, profileKey]);
 
   // ── Derived data ────────────────────────────────────────────────────────
   const filteredMarkets = markets.filter(m => {
@@ -662,7 +662,7 @@ export default function Home() {
                 </div>
                 <button className="btn-retry" style={{ width: '100%', background: 'var(--accent)' }}
                   onClick={() => {
-                    localStorage.setItem(`vura_tg_${profilePrefix}`, JSON.stringify({ token: telegramToken, chatId: telegramChatId }));
+                    localStorage.setItem(`vura_tg_${profileKey}`, JSON.stringify({ token: telegramToken, chatId: telegramChatId }));
                     const t = document.getElementById('vura-toast');
                     if (t) { t.textContent = 'Telegram saved'; t.className = 'toast toast-show'; setTimeout(() => t.className = 'toast', 3500); }
                   }}>Save Telegram</button>
