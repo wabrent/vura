@@ -8,7 +8,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@farcaster/mini-app-solana": "^2.0.0",
     "@headlessui/react": "^2.0.0",
     "@privy-io/react-auth": "latest",
     "@react-aria/focus": "^3.18.0",
