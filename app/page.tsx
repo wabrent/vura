@@ -62,6 +62,22 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('volume');
   const [loading, setLoading] = useState(true);
+  const [dark, setDark] = useState(true);
+
+  // Theme
+  useEffect(() => {
+    const saved = localStorage.getItem('vura_theme');
+    if (saved === 'light') { setDark(false); document.body.classList.remove('dark'); }
+    else { document.body.classList.add('dark'); }
+  }, []);
+  const toggleTheme = () => {
+    setDark(prev => {
+      const next = !prev;
+      document.body.classList.toggle('dark', next);
+      localStorage.setItem('vura_theme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
 
   // Profile
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
@@ -481,6 +497,7 @@ export default function Home() {
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
           </div>
           <div className="nav-status">
+            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">◐</button>
             {!ready ? (
               <button className="privy-btn" disabled style={{ opacity: 0.5 }}>Loading...</button>
             ) : authenticated ? (
