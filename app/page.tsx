@@ -6,7 +6,7 @@ import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
 
 const CONFIG = {
-  API: 'https://gamma-api.polymarket.com/events?closed=false&limit=40',
+  API: 'https://gamma-api.polymarket.com/events?closed=false&limit=200&active=true',
   REFRESH: 30000
 };
 
@@ -165,9 +165,15 @@ export default function Home() {
           yesTokenId, noTokenId
         };
       });
-      setMarkets(ms);
+      // Filter out resolved/closed markets (yesPrice at extremes)
+      const active = ms.filter((m: Market) => {
+        const yp = m.yesPrice;
+        if (yp <= 0.005 || yp >= 0.995) return false;
+        return true;
+      });
+      setMarkets(active);
       // Fetch price history for top markets (real data)
-      const top = [...ms].sort((a: Market, b: Market) => b.volume - a.volume).slice(0, 15);
+      const top = [...active].sort((a: Market, b: Market) => b.volume - a.volume).slice(0, 15);
       const histMap = new Map(priceHistoryRef.current);
       const endTs = Math.floor(Date.now() / 1000);
       const startTs = endTs - 86400;
