@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useWallets } from '@privy-io/react-auth';
+import { useWallets, usePrivy } from '@privy-io/react-auth';
 import type { Market } from '@/app/lib/types';
 
 const CTF_EXCHANGE = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
@@ -18,6 +18,7 @@ export default function TradeModal({
   onShare: () => void;
 }) {
   const { wallets } = useWallets();
+  const { user } = usePrivy();
   const [side, setSide] = useState('BUY');
   const [outcome, setOutcome] = useState('YES');
   const [price, setPrice] = useState(Math.round(market.yesPrice * 100));
@@ -27,14 +28,17 @@ export default function TradeModal({
 
   const shares = price > 0 ? (amount / (price / 100)).toFixed(2) : '0';
   const anyWallet = wallets[0];
+  const walletAddress = anyWallet?.address || user?.wallet?.address;
 
   const placeOrder = async () => {
-    if (!anyWallet) { setStatus('Create wallet first'); return; }
+    const maker = walletAddress;
+    if (!maker) { setStatus('No wallet connected'); return; }
+    const wallet = anyWallet;
+    if (!wallet) { setStatus('Reload page and try again'); return; }
     setTrading(true); setStatus('Signing...');
 
     try {
-      const provider = await anyWallet.getEthereumProvider();
-      const maker = anyWallet.address;
+      const provider = await wallet.getEthereumProvider();
       const now = Math.floor(Date.now() / 1000);
       const priceNum = price / 100;
       const sizeNum = parseFloat(shares);
@@ -190,13 +194,11 @@ export default function TradeModal({
                 <div className="pnl-input" style={{ display: 'flex', alignItems: 'center' }}>${amount}</div>
               </div>
             </div>
-            {!anyWallet ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>No wallet — log out and back in</div>
-              </div>
+            {!walletAddress ? (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'center' }}>Connect wallet to trade</div>
             ) : (
               <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
-                onClick={placeOrder} disabled={trading}>
+                onClick={placeOrder} disabled={trading || !walletAddress}>
                 {trading ? status : `${side} ${outcome} @ ${price}c | $${amount}`}
               </button>
             )}
