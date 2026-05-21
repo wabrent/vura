@@ -33,7 +33,7 @@ function buildSparkSvg(history: { t: number; p: number }[] | null, currentPrice:
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   const color = prices[prices.length - 1] >= prices[0] ? '#059669' : '#dc2626';
-  return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" opacity="0.8"/>`;
+  return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" opacity="0.8" class="spark-animate"/>`;
 }
 
 function getCategory(title: string): string {
@@ -321,7 +321,13 @@ export default function Home() {
   };
 
   const renderContent = () => {
-    if (loading) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>Loading markets...</div>;
+    if (loading) return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {[1,2,3,4,5].map(i => (
+          <div key={i} className="skeleton" style={{ height: '4rem', animationDelay: `${i * 0.1}s` }} />
+        ))}
+      </div>
+    );
 
     if (activeTab === 'watchlist') {
       if (watchlistMarkets.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets in watchlist. Click ★ to add.</div>;
@@ -575,7 +581,7 @@ export default function Home() {
         <span><kbd>Esc</kbd> close</span>
       </div>
 
-      <main>{renderContent()}</main>
+      <main key={activeTab} className="animate-slide-up">{renderContent()}</main>
 
       {/* ── P&L + TRADE MODAL ── */}
       {selectedMarket && (
