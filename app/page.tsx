@@ -567,7 +567,6 @@ export default function Home() {
       {selectedMarket && (
         <TradeModal
           market={selectedMarket}
-          authenticated={authenticated}
           watchlist={watchlist}
           onClose={() => setSelectedMarket(null)}
           onWatchlistToggle={() => {

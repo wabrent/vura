@@ -4,11 +4,10 @@ import { useState } from 'react';
 import type { Market } from '@/app/lib/types';
 
 export default function TradeModal({
-  market, authenticated, watchlist, onClose,
+  market, watchlist, onClose,
   onWatchlistToggle, onAlert, onShare
 }: {
   market: Market;
-  authenticated: boolean;
   watchlist: Set<string>;
   onClose: () => void;
   onWatchlistToggle: () => void;
@@ -19,31 +18,11 @@ export default function TradeModal({
   const [outcome, setOutcome] = useState('YES');
   const [price, setPrice] = useState(Math.round(market.yesPrice * 100));
   const [amount, setAmount] = useState(10);
-  const [trading, setTrading] = useState(false);
-  const [msg, setMsg] = useState('');
 
   const shares = price > 0 ? (amount / (price / 100)).toFixed(2) : '0';
 
-  const placeOrder = async () => {
-    if (!authenticated) { setMsg('Connect first'); return; }
-    setTrading(true); setMsg('');
-    try {
-      const tokenId = outcome === 'YES' ? market.yesTokenId : market.noTokenId;
-      const res = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'trade',
-          tokenId, side, price: price / 100, size: parseFloat(shares)
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Order failed');
-      setMsg('Order placed!');
-      setTimeout(() => { setMsg(''); onClose(); }, 1500);
-    } catch (e: any) {
-      setMsg(e.message || 'Error');
-    } finally { setTrading(false); }
+  const placeOrder = () => {
+    window.open(`https://polymarket.com/event/${market.slug}`, '_blank');
   };
 
   const pnlStake = 100, pnlExit = 90;
@@ -105,15 +84,10 @@ export default function TradeModal({
                 <div className="pnl-input" style={{ display: 'flex', alignItems: 'center' }}>${amount}</div>
               </div>
             </div>
-            {!authenticated ? (
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'center' }}>Connect to trade</div>
-            ) : (
-              <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
-                onClick={placeOrder} disabled={trading}>
-                {trading ? 'Placing...' : `${side} ${outcome} @ ${price}c | $${amount}`}
-              </button>
-            )}
-            {msg && <div style={{ fontSize: '0.65rem', textAlign: 'center', color: msg.includes('placed') ? 'var(--accent)' : 'var(--red)' }}>{msg}</div>}
+            <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
+              onClick={placeOrder}>
+              Trade on Polymarket — {side} {outcome} @ {price}c | ${amount}
+            </button>
           </div>
 
           <div className="pnl-result">
