@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useWallets } from '@privy-io/react-auth';
 import type { Market } from '@/app/lib/types';
+
+const CTF_EXCHANGE = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
 
 export default function TradeModal({
   market, watchlist, onClose,
@@ -14,15 +17,119 @@ export default function TradeModal({
   onAlert: () => void;
   onShare: () => void;
 }) {
+  const { wallets } = useWallets();
   const [side, setSide] = useState('BUY');
   const [outcome, setOutcome] = useState('YES');
   const [price, setPrice] = useState(Math.round(market.yesPrice * 100));
   const [amount, setAmount] = useState(10);
+  const [status, setStatus] = useState('');
+  const [trading, setTrading] = useState(false);
 
   const shares = price > 0 ? (amount / (price / 100)).toFixed(2) : '0';
+  const embeddedWallet = wallets.find((w: any) => w.walletClientType === 'privy');
 
-  const placeOrder = () => {
-    window.open(`https://polymarket.com/event/${market.slug}`, '_blank');
+  const placeOrder = async () => {
+    if (!embeddedWallet) { setStatus('Sign in first'); return; }
+    setTrading(true); setStatus('Signing...');
+
+    try {
+      const provider = await embeddedWallet.getEthereumProvider();
+      const accounts = await provider.request({ method: 'eth_requestAccounts' });
+      const maker = accounts[0];
+      const now = Math.floor(Date.now() / 1000);
+      const priceNum = price / 100;
+      const sizeNum = parseFloat(shares);
+
+      const domain = {
+        name: 'CTF Exchange',
+        version: '1',
+        chainId: 137,
+        verifyingContract: CTF_EXCHANGE
+      };
+
+      const message = {
+        salt: String(Math.floor(Math.random() * 1e12)),
+        maker,
+        signer: maker,
+        taker: '0x0000000000000000000000000000000000000000',
+        tokenId: String(outcome === 'YES' ? market.yesTokenId : market.noTokenId),
+        makerAmount: String(Math.floor(priceNum * 1e6 * sizeNum)),
+        takerAmount: String(Math.floor((1 - priceNum) * 1e6 * sizeNum)),
+        expiration: String(now + 3600),
+        nonce: '0',
+        feeRateBps: '0',
+        side: side === 'BUY' ? '0' : '1',
+        signatureType: '0'
+      };
+
+      const eip712 = {
+        types: {
+          EIP712Domain: [
+            { name: 'name', type: 'string' },
+            { name: 'version', type: 'string' },
+            { name: 'chainId', type: 'uint256' },
+            { name: 'verifyingContract', type: 'address' }
+          ],
+          Order: [
+            { name: 'salt', type: 'uint256' },
+            { name: 'maker', type: 'address' },
+            { name: 'signer', type: 'address' },
+            { name: 'taker', type: 'address' },
+            { name: 'tokenId', type: 'uint256' },
+            { name: 'makerAmount', type: 'uint256' },
+            { name: 'takerAmount', type: 'uint256' },
+            { name: 'expiration', type: 'uint256' },
+            { name: 'nonce', type: 'uint256' },
+            { name: 'feeRateBps', type: 'uint256' },
+            { name: 'side', type: 'uint8' },
+            { name: 'signatureType', type: 'uint8' }
+          ]
+        },
+        domain,
+        primaryType: 'Order' as const,
+        message
+      };
+
+      setStatus('Check wallet...');
+
+      const signature = await provider.request({
+        method: 'eth_signTypedData_v4',
+        params: [maker, JSON.stringify(eip712)]
+      });
+
+      setStatus('Submitting...');
+
+      const res = await fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit',
+          signedOrder: {
+            salt: Number(message.salt),
+            maker: message.maker,
+            signer: message.signer,
+            taker: message.taker,
+            tokenId: message.tokenId,
+            makerAmount: Number(message.makerAmount),
+            takerAmount: Number(message.takerAmount),
+            expiration: Number(message.expiration),
+            nonce: Number(message.nonce),
+            feeRateBps: Number(message.feeRateBps),
+            side: message.side,
+            signatureType: Number(message.signatureType),
+            signature
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      
+      setStatus('Order placed!');
+      setTimeout(() => { setStatus(''); onClose(); }, 1500);
+    } catch (e: any) {
+      setStatus(e.message || 'Error');
+    } finally { setTrading(false); }
   };
 
   const pnlStake = 100, pnlExit = 90;
@@ -84,10 +191,15 @@ export default function TradeModal({
                 <div className="pnl-input" style={{ display: 'flex', alignItems: 'center' }}>${amount}</div>
               </div>
             </div>
-            <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
-              onClick={placeOrder}>
-              Trade on Polymarket — {side} {outcome} @ {price}c | ${amount}
-            </button>
+            {!embeddedWallet ? (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'center' }}>Sign in & create wallet to trade</div>
+            ) : (
+              <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
+                onClick={placeOrder} disabled={trading}>
+                {trading ? status : `${side} ${outcome} @ ${price}c | $${amount}`}
+              </button>
+            )}
+            {status && !trading && <div style={{ fontSize: '0.65rem', textAlign: 'center', color: status.includes('placed') ? 'var(--accent)' : 'var(--red)' }}>{status}</div>}
           </div>
 
           <div className="pnl-result">
