@@ -162,7 +162,8 @@ export default function Home() {
           yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0,
           context: event.eventMetadata?.context_description || '',
           smartScore: computeSmartScore(volume, change24h),
-          yesTokenId, noTokenId
+          yesTokenId, noTokenId,
+          image: event.image || null
         };
       });
       // Filter out resolved/closed markets (yesPrice at extremes)
@@ -294,6 +295,7 @@ export default function Home() {
     return (
       <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
         onClick={() => setSelectedMarket(m)}>
+        {m.image && <img src={m.image} alt="" style={{ width: 56, height: 56, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
         <div className="card-left">
           <span className="card-category">{m.category.toUpperCase()}{smartBadge}</span>
           <span className="card-title">{m.question}</span>

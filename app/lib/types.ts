@@ -16,6 +16,7 @@ export interface Market {
   smartScore: number;
   yesTokenId: string | null;
   noTokenId: string | null;
+  image: string | null;
 }
 
 export interface Alert {
