@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
@@ -23,23 +23,16 @@ function computeSmartScore(volume: number, change24h: number): number {
   return Math.max(-5, Math.min(5, change * volWeight * 2));
 }
 
-function generateSparkData(basePrice: number, points: number): number[] {
-  const arr = [basePrice];
-  for (let i = 1; i < points; i++) {
-    const prev = arr[arr.length - 1];
-    arr.push(Math.max(0.02, Math.min(0.98, prev + (Math.random() - 0.49) * 0.03)));
-  }
-  return arr;
-}
-
-function buildSparkSvg(data: number[], w: number, h: number): string {
-  const min = Math.min(...data), max = Math.max(...data), range = max - min || 0.01;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
+function buildSparkSvg(history: { t: number; p: number }[] | null, currentPrice: number, w: number, h: number): string {
+  if (!history || history.length < 2) return '';
+  const prices = history.map(d => d.p);
+  const min = Math.min(...prices), max = Math.max(...prices), range = max - min || 0.01;
+  const pts = prices.map((v, i) => {
+    const x = (i / (prices.length - 1)) * w;
     const y = h - ((v - min) / range) * (h - 4) - 2;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
-  const color = data[data.length - 1] >= data[0] ? '#059669' : '#dc2626';
+  const color = prices[prices.length - 1] >= prices[0] ? '#059669' : '#dc2626';
   return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" opacity="0.8"/>`;
 }
 
@@ -58,6 +51,9 @@ export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
 
   const [markets, setMarkets] = useState<Market[]>([]);
+  const [priceHistory, setPriceHistory] = useState<Map<string, { t: number; p: number }[]>>(new Map());
+  const priceHistoryRef = useRef(priceHistory);
+  priceHistoryRef.current = priceHistory;
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('volume');
@@ -170,6 +166,24 @@ export default function Home() {
         };
       });
       setMarkets(ms);
+      // Fetch price history for top markets (real data)
+      const top = [...ms].sort((a: Market, b: Market) => b.volume - a.volume).slice(0, 15);
+      const histMap = new Map(priceHistoryRef.current);
+      const endTs = Math.floor(Date.now() / 1000);
+      const startTs = endTs - 86400;
+      let updated = false;
+      for (const m of top) {
+        if (!m.yesTokenId || histMap.has(m.yesTokenId)) continue;
+        try {
+          const url = `https://clob.polymarket.com/prices-history?market=${m.yesTokenId}&interval=1h&startTs=${startTs}&endTs=${endTs}`;
+          const hRes = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
+          if (hRes.ok) {
+            const hData = await hRes.json();
+            if (hData.history) { histMap.set(m.yesTokenId, hData.history); updated = true; }
+          }
+        } catch {}
+      }
+      if (updated) setPriceHistory(new Map(histMap));
       setLoading(false);
     } catch {
       setLoading(false);
@@ -268,8 +282,8 @@ export default function Home() {
     if (m.smartScore >= 1.5) smartBadge = <span className="smart-badge smart-bullish">BULL</span>;
     else if (m.smartScore <= -1.5) smartBadge = <span className="smart-badge smart-bearish">BEAR</span>;
 
-    const sparkData = generateSparkData(m.yesPrice, 20);
-    const sparkSvg = buildSparkSvg(sparkData, 80, 28);
+    const history = m.yesTokenId ? priceHistory.get(m.yesTokenId) || null : null;
+    const sparkSvg = buildSparkSvg(history, m.yesPrice, 80, 28);
 
     return (
       <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
@@ -286,7 +300,7 @@ export default function Home() {
           )}
         </div>
         <div className="card-center">
-          <svg width="80" height="28" dangerouslySetInnerHTML={{ __html: sparkSvg }} />
+          {sparkSvg && <svg width="80" height="28" dangerouslySetInnerHTML={{ __html: sparkSvg }} />}
         </div>
         <div className="card-right">
           <span className="card-price">{price}c</span>
