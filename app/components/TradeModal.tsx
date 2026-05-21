@@ -26,16 +26,15 @@ export default function TradeModal({
   const [trading, setTrading] = useState(false);
 
   const shares = price > 0 ? (amount / (price / 100)).toFixed(2) : '0';
-  const embeddedWallet = wallets.find((w: any) => w.walletClientType === 'privy');
+  const anyWallet = wallets[0];
 
   const placeOrder = async () => {
-    if (!embeddedWallet) { setStatus('Sign in first'); return; }
+    if (!anyWallet) { setStatus('Create wallet first'); return; }
     setTrading(true); setStatus('Signing...');
 
     try {
-      const provider = await embeddedWallet.getEthereumProvider();
-      const accounts = await provider.request({ method: 'eth_requestAccounts' });
-      const maker = accounts[0];
+      const provider = await anyWallet.getEthereumProvider();
+      const maker = anyWallet.address;
       const now = Math.floor(Date.now() / 1000);
       const priceNum = price / 100;
       const sizeNum = parseFloat(shares);
@@ -191,8 +190,10 @@ export default function TradeModal({
                 <div className="pnl-input" style={{ display: 'flex', alignItems: 'center' }}>${amount}</div>
               </div>
             </div>
-            {!embeddedWallet ? (
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'center' }}>Sign in & create wallet to trade</div>
+            {!anyWallet ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>No wallet — log out and back in</div>
+              </div>
             ) : (
               <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
                 onClick={placeOrder} disabled={trading}>
