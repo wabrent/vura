@@ -14,6 +14,8 @@ export interface Market {
   change24h: number;
   context: string;
   smartScore: number;
+  yesTokenId: string | null;
+  noTokenId: string | null;
 }
 
 export interface Alert {
