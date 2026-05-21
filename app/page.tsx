@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
+import TradeModal from '@/app/components/TradeModal';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=40',
@@ -467,20 +468,6 @@ export default function Home() {
     });
   };
 
-  const pnlCalc = () => {
-    if (!selectedMarket) return { shares: '—', payout: '—', pnl: '—', roi: '—' };
-    const stake = 100;
-    const side = 'yes';
-    const exitCents = 90;
-    const entry = selectedMarket.yesPrice;
-    const exit = exitCents / 100;
-    const shares = stake / entry;
-    const payout = shares * exit;
-    const pnl = payout - stake;
-    const roi = (pnl / stake * 100).toFixed(1);
-    return { shares: shares.toFixed(2), payout: '$' + payout.toFixed(2), pnl: (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2), roi: (Number(roi) >= 0 ? '+' : '') + roi + '%' };
-  };
-
   // ── UI ──────────────────────────────────────────────────────────────────
   const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation'];
   const wlCount = watchlist.size;
@@ -569,50 +556,22 @@ export default function Home() {
 
       <main>{renderContent()}</main>
 
-      {/* ── P&L MODAL ── */}
+      {/* ── P&L + TRADE MODAL ── */}
       {selectedMarket && (
-        <div className="modal-overlay" onClick={e => { if ((e.target as HTMLElement).className === 'modal-overlay') setSelectedMarket(null); }}>
-          <div className="modal">
-            <div className="modal-header">
-              <span className="modal-title">{selectedMarket.question}</span>
-              <button className="modal-close" onClick={() => setSelectedMarket(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="modal-prices">
-                <div className="modal-price-block"><span className="modal-price-label">YES</span><span className="modal-price-val accent">{Math.round(selectedMarket.yesPrice * 100)}c</span></div>
-                <div className="modal-price-block"><span className="modal-price-label">NO</span><span className="modal-price-val red">{Math.round(selectedMarket.noPrice * 100)}c</span></div>
-                <div className="modal-price-block"><span className="modal-price-label">VOLUME</span><span className="modal-price-val">${selectedMarket.volDisplay}</span></div>
-                <div className="modal-price-block"><span className="modal-price-label">ALPHA</span><span className="modal-price-val">{selectedMarket.alpha}</span></div>
-              </div>
-              <div className="pnl-result">
-                {(() => { const pnl = pnlCalc(); return (
-                  <>
-                    <div className="pnl-result-row"><span className="pnl-result-label">SHARES</span><span className="pnl-result-val">{pnl.shares}</span></div>
-                    <div className="pnl-result-row"><span className="pnl-result-label">PAYOUT</span><span className="pnl-result-val">{pnl.payout}</span></div>
-                    <div className="pnl-result-row"><span className="pnl-result-label">P&L</span><span className="pnl-result-val accent">{pnl.pnl}</span></div>
-                    <div className="pnl-result-row"><span className="pnl-result-label">ROI</span><span className="pnl-result-val">{pnl.roi}</span></div>
-                  </>
-                ); })()}
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button className="btn-trade"
-                  onClick={() => {
-                    const next = new Set(watchlist);
-                    if (next.has(String(selectedMarket.id))) next.delete(String(selectedMarket.id));
-                    else next.add(String(selectedMarket.id));
-                    saveWatchlist(next);
-                  }}>
-                  {watchlist.has(String(selectedMarket.id)) ? '★ Remove' : '★ Watchlist'}
-                </button>
-                <button className="btn-trade" style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }}
-                  onClick={() => setAlertMarket(selectedMarket)}>Alert</button>
-                <button className="btn-trade" style={{ background: '#3b82f6', borderColor: '#3b82f6' }}
-                  onClick={shareMarket}>Share</button>
-                <a className="btn-trade" href={`https://polymarket.com/event/${selectedMarket.slug}`} target="_blank">Trade ↗</a>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TradeModal
+          market={selectedMarket}
+          authenticated={authenticated}
+          watchlist={watchlist}
+          onClose={() => setSelectedMarket(null)}
+          onWatchlistToggle={() => {
+            const next = new Set(watchlist);
+            if (next.has(String(selectedMarket.id))) next.delete(String(selectedMarket.id));
+            else next.add(String(selectedMarket.id));
+            saveWatchlist(next);
+          }}
+          onAlert={() => setAlertMarket(selectedMarket)}
+          onShare={shareMarket}
+        />
       )}
 
       {/* ── ALERT MODAL ── */}
