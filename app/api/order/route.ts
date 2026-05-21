@@ -1,48 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
-
-function signL2(secret: string, ts: string, method: string, path: string, body: string): string {
-  return createHmac('sha256', secret).update(ts + method + path + body).digest('base64');
-}
+import { ClobClient, Side } from '@polymarket/clob-client-v2';
+import { Wallet } from 'ethers';
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { action, signedOrder, tokenId, side, price, size, maker } = body;
+  const { action, tokenId, side, price, size, signedOrder } = body;
 
-  // Submit signed order to CLOB
-  if (action === 'submit' && signedOrder) {
-    const apiKey = process.env.POLYMARKET_API_KEY || '';
-    const secret = process.env.POLYMARKET_SECRET || '';
-    const passphrase = process.env.POLYMARKET_PASSPHRASE || '';
-    const address = '0xe0f676f5d6436f20885a8bea365384029b36f74e';
+  const apiKey = process.env.POLYMARKET_API_KEY || '';
+  const secret = process.env.POLYMARKET_SECRET || '';
+  const passphrase = process.env.POLYMARKET_PASSPHRASE || '';
 
+  // Step 1: Build order data for client signing
+  if (action === 'build') {
     try {
-      const ts = String(Math.floor(Date.now() / 1000));
-      const method = 'POST';
-      const path = '/order';
-      const orderBody = JSON.stringify(signedOrder);
-      const sig = signL2(secret, ts, method, path, orderBody);
-
-      const clobRes = await fetch('https://clob.polymarket.com/order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'POLY_ADDRESS': address,
-          'POLY_SIGNATURE': sig,
-          'POLY_TIMESTAMP': ts,
-          'POLY_API_KEY': apiKey,
-          'POLY_PASSPHRASE': passphrase,
-        },
-        body: orderBody,
+      const wallet = Wallet.createRandom();
+      const client = new ClobClient({
+        host: 'https://clob.polymarket.com',
+        chain: 137,
+        signer: wallet as any,
+        creds: { key: apiKey, secret, passphrase },
+        signatureType: 0,
+        funderAddress: wallet.address,
       });
 
-      if (!clobRes.ok) {
-        const err = await clobRes.text();
-        return NextResponse.json({ error: err }, { status: clobRes.status });
-      }
+      const built = await client.createOrder({
+        tokenID: tokenId,
+        price: Number(price),
+        size: Number(size),
+        side: side === 'BUY' ? Side.BUY : Side.SELL,
+      }) as any;
 
-      const data = await clobRes.json();
-      return NextResponse.json(data);
+      // Extract order message for EIP-712 signing
+      const order = built?.order || built;
+      
+      return NextResponse.json({
+        order: {
+          salt: order.salt?.toString(),
+          maker: order.maker,
+          signer: order.signer || order.maker,
+          taker: order.taker || '0x0000000000000000000000000000000000000000',
+          tokenId: order.tokenId?.toString?.(),
+          makerAmount: order.makerAmount?.toString?.(),
+          takerAmount: order.takerAmount?.toString?.(),
+          expiration: order.expiration?.toString?.(),
+          nonce: order.nonce?.toString?.() || '0',
+          feeRateBps: order.feeRateBps?.toString?.() || '0',
+          side: order.side?.toString?.() || (side === 'BUY' ? '0' : '1'),
+          signatureType: order.signatureType?.toString?.() || '0'
+        }
+      });
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  // Step 2: Submit signed order
+  if (action === 'submit' && signedOrder) {
+    try {
+      const wallet = Wallet.createRandom();
+      const client = new ClobClient({
+        host: 'https://clob.polymarket.com',
+        chain: 137,
+        signer: wallet as any,
+        creds: { key: apiKey, secret, passphrase },
+        signatureType: 0,
+        funderAddress: signedOrder.maker,
+      });
+
+      const res = await client.postOrder(signedOrder);
+      return NextResponse.json(res);
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 500 });
     }

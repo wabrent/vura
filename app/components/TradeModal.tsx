@@ -34,37 +34,31 @@ export default function TradeModal({
     const maker = walletAddress;
     if (!maker) { setStatus('No wallet connected'); return; }
     const wallet = anyWallet;
-    if (!wallet) { setStatus('Reload page and try again'); return; }
-    setTrading(true); setStatus('Signing...');
+    if (!wallet) { setStatus('Reload and try again'); return; }
+
+    setTrading(true); setStatus('Building order...');
 
     try {
+      const tokenId = outcome === 'YES' ? market.yesTokenId : market.noTokenId;
+      if (!tokenId) { setStatus('Token ID not found'); setTrading(false); return; }
+
+      // Step 1: Get order data from server
+      const buildRes = await fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'build',
+          tokenId, side, price: price / 100, size: parseFloat(shares)
+        })
+      });
+      const buildData = await buildRes.json();
+      if (!buildRes.ok) throw new Error(buildData.error || 'Build failed');
+
+      const orderData = buildData.order;
+      setStatus('Signing...');
+
+      // Step 2: Sign with wallet
       const provider = await wallet.getEthereumProvider();
-      const now = Math.floor(Date.now() / 1000);
-      const priceNum = price / 100;
-      const sizeNum = parseFloat(shares);
-
-      const domain = {
-        name: 'CTF Exchange',
-        version: '1',
-        chainId: 137,
-        verifyingContract: CTF_EXCHANGE
-      };
-
-      const message = {
-        salt: String(Math.floor(Math.random() * 1e12)),
-        maker,
-        signer: maker,
-        taker: '0x0000000000000000000000000000000000000000',
-        tokenId: String(outcome === 'YES' ? market.yesTokenId : market.noTokenId),
-        makerAmount: String(Math.floor(priceNum * 1e6 * sizeNum)),
-        takerAmount: String(Math.floor((1 - priceNum) * 1e6 * sizeNum)),
-        expiration: String(now + 3600),
-        nonce: '0',
-        feeRateBps: '0',
-        side: side === 'BUY' ? '0' : '1',
-        signatureType: '0'
-      };
-
       const eip712 = {
         types: {
           EIP712Domain: [
@@ -88,12 +82,28 @@ export default function TradeModal({
             { name: 'signatureType', type: 'uint8' }
           ]
         },
-        domain,
+        domain: {
+          name: 'CTF Exchange',
+          version: '1',
+          chainId: 137,
+          verifyingContract: CTF_EXCHANGE
+        },
         primaryType: 'Order' as const,
-        message
+        message: {
+          salt: orderData.salt,
+          maker: orderData.maker || maker,
+          signer: orderData.signer || maker,
+          taker: orderData.taker || '0x0000000000000000000000000000000000000000',
+          tokenId: orderData.tokenId,
+          makerAmount: orderData.makerAmount,
+          takerAmount: orderData.takerAmount,
+          expiration: orderData.expiration,
+          nonce: orderData.nonce,
+          feeRateBps: orderData.feeRateBps,
+          side: orderData.side,
+          signatureType: orderData.signatureType
+        }
       };
-
-      setStatus('Check wallet...');
 
       const signature = await provider.request({
         method: 'eth_signTypedData_v4',
@@ -102,32 +112,27 @@ export default function TradeModal({
 
       setStatus('Submitting...');
 
-      const res = await fetch('/api/order', {
+      // Step 3: Submit signed order
+      const submitRes = await fetch('/api/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'submit',
           signedOrder: {
-            salt: Number(message.salt),
-            maker: message.maker,
-            signer: message.signer,
-            taker: message.taker,
-            tokenId: message.tokenId,
-            makerAmount: Number(message.makerAmount),
-            takerAmount: Number(message.takerAmount),
-            expiration: Number(message.expiration),
-            nonce: Number(message.nonce),
-            feeRateBps: Number(message.feeRateBps),
-            side: message.side,
-            signatureType: Number(message.signatureType),
-            signature
+            ...eip712.message,
+            signature,
+            maker: eip712.message.maker,
+            signer: eip712.message.signer,
+            side: side,
+            price: price / 100,
+            size: parseFloat(shares),
+            tokenId: eip712.message.tokenId
           }
         })
       });
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) throw new Error(submitData.error || 'Submit failed');
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      
       setStatus('Order placed!');
       setTimeout(() => { setStatus(''); onClose(); }, 1500);
     } catch (e: any) {
@@ -198,11 +203,10 @@ export default function TradeModal({
               <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', textAlign: 'center' }}>Connect wallet to trade</div>
             ) : (
               <button className="btn-retry" style={{ width: '100%', background: side === 'BUY' ? 'var(--accent)' : 'var(--red)' }}
-                onClick={placeOrder} disabled={trading || !walletAddress}>
+                onClick={placeOrder} disabled={trading}>
                 {trading ? status : `${side} ${outcome} @ ${price}c | $${amount}`}
               </button>
             )}
-            {status && !trading && <div style={{ fontSize: '0.65rem', textAlign: 'center', color: status.includes('placed') ? 'var(--accent)' : 'var(--red)' }}>{status}</div>}
           </div>
 
           <div className="pnl-result">
