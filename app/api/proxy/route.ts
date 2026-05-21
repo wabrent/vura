@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
           'POLY_API_KEY': process.env.POLYMARKET_API_KEY || '',
           'POLY_SECRET': process.env.POLYMARKET_SECRET || '',
           'POLY_PASSPHRASE': process.env.POLYMARKET_PASSPHRASE || '',
+          'User-Agent': 'VURA/2.0',
+          'Origin': 'https://vura.ink',
         },
         body: JSON.stringify({ tokenID: tokenId, side, price, size }),
         signal: AbortSignal.timeout(15000),

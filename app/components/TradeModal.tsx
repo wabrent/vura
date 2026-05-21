@@ -28,12 +28,13 @@ export default function TradeModal({
     if (!authenticated) { setMsg('Connect first'); return; }
     setTrading(true); setMsg('');
     try {
+      const tokenId = outcome === 'YES' ? market.yesTokenId : market.noTokenId;
       const res = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'trade',
-          side, price: price / 100, size: parseFloat(shares)
+          tokenId, side, price: price / 100, size: parseFloat(shares)
         })
       });
       const data = await res.json();

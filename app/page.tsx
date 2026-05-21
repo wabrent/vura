@@ -153,13 +153,20 @@ export default function Home() {
         const actScore = Math.abs(change24h) * 100;
         const alpha = Math.min(5 + volScore + spreadScore + actScore, 10);
         const spread = Math.abs(yesPrice + noPrice - 1);
+        let yesTokenId: string | null = null;
+        let noTokenId: string | null = null;
+        try {
+          const ids = main.clobTokenIds ? (typeof main.clobTokenIds === 'string' ? JSON.parse(main.clobTokenIds) : main.clobTokenIds) : null;
+          if (ids) { yesTokenId = ids[0] || null; noTokenId = ids[1] || null; }
+        } catch {}
         return {
           id: event.id, question: event.title || 'Unknown', slug: event.slug || '',
           category: getCategory(event.title || ''), alpha: parseFloat(alpha.toFixed(1)),
           volume: parseFloat(volume) || 0, volDisplay: formatVol(volume),
           yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0,
           context: event.eventMetadata?.context_description || '',
-          smartScore: computeSmartScore(volume, change24h)
+          smartScore: computeSmartScore(volume, change24h),
+          yesTokenId, noTokenId
         };
       });
       setMarkets(ms);
