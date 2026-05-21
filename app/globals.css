@@ -28,6 +28,13 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.5rem; background: var(--
 .theme-toggle:hover { border-color: var(--text); color: var(--text); }
 .live-dot { width: 5px; height: 5px; background: var(--accent); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes priceFlash { 0% { background: rgba(5,150,105,0.1); } 100% { background: transparent; } }
+@keyframes priceFlashRed { 0% { background: rgba(220,38,38,0.1); } 100% { background: transparent; } }
+@keyframes sparkDraw { from { stroke-dashoffset: 1000; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes tabSlide { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
 .hero { max-width: 72rem; margin: 0 auto; padding: 4rem 2rem 2.5rem; margin-bottom: 3rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; }
 .hero-left { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -57,9 +64,11 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.5rem; background: var(--
 main { max-width: 72rem; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 .hidden { display: none !important; }
 
-.market-card { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; margin-bottom: 0.5rem; background: var(--bg-2); border: 1px solid var(--border); transition: all 0.2s; animation: cardIn 0.35s ease-out backwards; cursor: pointer; }
-@keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.market-card:hover { border-color: var(--text); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.07); }
+.market-card { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; margin-bottom: 0.5rem; background: var(--bg-2); border: 1px solid var(--border); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); animation: cardIn 0.4s ease-out backwards; cursor: pointer; position: relative; overflow: hidden; }
+.market-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(5,150,105,0.03), transparent); transform: translateX(-100%); transition: transform 0.6s; }
+.market-card:hover::after { transform: translateX(100%); }
+@keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.market-card:hover { border-color: var(--text); transform: translateY(-2px) scale(1.002); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 .card-left { flex: 0 0 38%; display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .card-title { font-family: var(--display); font-size: 1rem; font-weight: 500; letter-spacing: 0.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-meta { font-size: 0.6rem; color: var(--text-3); letter-spacing: 0.04em; }
@@ -126,7 +135,17 @@ footer { max-width: 72rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 
 /* CSV */
 .csv-btn { padding: 0.3rem 0.6rem; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase; background: var(--bg-2); border: 1px solid var(--border); color: var(--accent); cursor: pointer; transition: all 0.15s; }
-.csv-btn:hover { border-color: var(--accent); }
+.csv-btn:hover { border-color: var(--accent); background: rgba(5,150,105,0.05); }
+
+/* SHIMMER LOADING */
+.skeleton { background: linear-gradient(90deg, var(--bg-2) 25%, var(--border) 50%, var(--bg-2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 2px; }
+
+/* ANIMATED CONTENT */
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+.animate-tab { animation: tabSlide 0.25s ease-out; }
+.price-flash { animation: priceFlash 0.6s ease-out; }
+.price-flash-red { animation: priceFlashRed 0.6s ease-out; }
+.spark-animate { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: sparkDraw 1.2s ease-out forwards; }
 
 /* ORDER BOOK */
 .card-ob { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; width: 100%; }
