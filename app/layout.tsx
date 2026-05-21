@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             appearance: { theme: 'dark', accentColor: '#059669' },
             loginMethods: ['email', 'wallet', 'google'],
             embeddedWallets: {
-              ethereum: { createOnLogin: 'off' as const }
+              ethereum: { createOnLogin: 'users-without-wallets' as const }
             }
           }}
         >
