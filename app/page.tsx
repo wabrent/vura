@@ -6,8 +6,8 @@ import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
 
 const CONFIG = {
-  API: 'https://gamma-api.polymarket.com/events?closed=false&limit=200&active=true',
-  REFRESH: 30000
+  API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
+  REFRESH: 60000
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,9 +130,9 @@ export default function Home() {
       }
       if (!data) return;
       const events = Array.isArray(data) ? data : (data.data || data.events || []);
-      const ms: Market[] = events.map((event: any) => {
-        const mkts = event.markets || [];
-        const main = mkts.find((m: any) => m.active && !m.closed) || mkts[0] || {};
+      const ms: Market[] = events.flatMap((event: any) => {
+        const mkts = (event.markets || []).filter((m: any) => m.active && !m.closed);
+        return mkts.map((main: any, idx: number) => {
         let yesPrice = 0.5, noPrice = 0.5, bestBid: number | null = null, bestAsk: number | null = null;
         try {
           if (main.outcomePrices) {
@@ -157,7 +157,7 @@ export default function Home() {
           if (ids) { yesTokenId = ids[0] || null; noTokenId = ids[1] || null; }
         } catch {}
         return {
-          id: event.id, question: event.title || 'Unknown', slug: event.slug || '',
+          id: main.conditionId || main.id || (event.id + '_' + idx), question: main.question || event.title || 'Unknown', slug: event.slug || '',
           category: getCategory(event.title || ''), alpha: parseFloat(alpha.toFixed(1)),
           volume: parseFloat(volume) || 0, volDisplay: formatVol(volume),
           yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0,
@@ -166,11 +166,11 @@ export default function Home() {
           yesTokenId, noTokenId,
           image: event.image || null
         };
+        });
       });
-      // Filter out resolved/closed markets (yesPrice at extremes)
+      // Filter out fully resolved markets only
       const active = ms.filter((m: Market) => {
-        const yp = m.yesPrice;
-        if (yp <= 0.005 || yp >= 0.995) return false;
+        if ((m.yesPrice <= 0.001 || m.yesPrice >= 0.999) && m.volume < 1000) return false;
         return true;
       });
       setMarkets(active);
