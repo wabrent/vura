@@ -147,14 +147,6 @@ footer { max-width: 72rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .price-flash-red { animation: priceFlashRed 0.6s ease-out; }
 .spark-animate { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: sparkDraw 1.2s ease-out forwards; }
 
-/* ORDER BOOK */
-.card-ob { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; width: 100%; }
-.ob-row { display: flex; align-items: center; gap: 6px; font-size: 0.55rem; }
-.ob-bar-wrap { flex: 1; height: 4px; background: var(--border); position: relative; }
-.ob-bar { height: 100%; position: absolute; transition: width 0.4s ease; }
-.ob-bar-bid { background: var(--accent); right: 0; }
-.ob-bar-ask { background: var(--red); left: 0; }
-
 /* SMART */
 .smart-badge { display: inline-block; padding: 1px 5px; font-size: 0.55rem; font-weight: 600; letter-spacing: 0.05em; border-radius: 2px; margin-left: 4px; }
 .smart-bullish { background: rgba(5,150,105,0.1); color: var(--accent); }

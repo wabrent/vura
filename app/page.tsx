@@ -300,12 +300,6 @@ export default function Home() {
           <span className="card-category">{m.category.toUpperCase()}{smartBadge}</span>
           <span className="card-title">{m.question}</span>
           <span className="card-meta">Vol ${m.volDisplay} · Alpha {m.alpha}{spreadBadge ? ' · ' : ''}{spreadBadge}</span>
-          {m.bestBid !== null && m.bestAsk !== null && (
-            <div className="card-ob">
-              <div className="ob-row"><span>B</span><div className="ob-bar-wrap"><div className="ob-bar ob-bar-bid" style={{ width: `${Math.round(m.bestBid * 100)}%` }} /></div><span>{Math.round(m.bestBid * 100)}c</span></div>
-              <div className="ob-row"><span>A</span><div className="ob-bar-wrap"><div className="ob-bar ob-bar-ask" style={{ width: `${Math.round(m.bestAsk * 100)}%` }} /></div><span>{Math.round(m.bestAsk * 100)}c</span></div>
-            </div>
-          )}
         </div>
         <div className="card-center">
           {sparkSvg && <svg width="80" height="28" dangerouslySetInnerHTML={{ __html: sparkSvg }} />}
