@@ -219,7 +219,7 @@ export default function Home() {
 
   // Keyboard
   useEffect(() => {
-    const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation'];
+  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats'];
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
@@ -414,6 +414,28 @@ export default function Home() {
             ))}
           </div>
         </>
+      );
+    }
+
+    if (activeTab === 'stats') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="corr-stats">
+            <div className="corr-stat"><span className="corr-stat-label">TOTAL MARKETS</span><span className="corr-stat-val">{markets.length}</span></div>
+            <div className="corr-stat"><span className="corr-stat-label">24H VOLUME</span><span className="corr-stat-val accent">${formatVol(totalVol)}</span></div>
+            <div className="corr-stat"><span className="corr-stat-label">BUILDER RANK</span><span className="corr-stat-val" style={{ color: '#6C47FF' }}>VURA</span></div>
+          </div>
+          <iframe
+            src="https://dune.com/embeds/6210266?theme=dark"
+            style={{ width: '100%', height: '450px', border: '1px solid var(--border)', borderRadius: 4 }}
+            title="Builders Leaderboard"
+          />
+          <iframe
+            src="https://dune.com/embeds/6545441?theme=dark"
+            style={{ width: '100%', height: '400px', border: '1px solid var(--border)', borderRadius: 4 }}
+            title="Dune Stats"
+          />
+        </div>
       );
     }
 
