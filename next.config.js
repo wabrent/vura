@@ -23,6 +23,15 @@ const nextConfig = {
         ]
       }
     ];
+  },
+  async rewrites() {
+    return [
+      { source: '/stats', destination: '/?tab=stats' },
+      { source: '/arbitrage', destination: '/?tab=arbitrage' },
+      { source: '/correlation', destination: '/?tab=correlation' },
+      { source: '/whale', destination: '/?tab=whale' },
+      { source: '/alerts', destination: '/?tab=alerts' },
+    ];
   }
 };
 
