@@ -574,6 +574,7 @@ export default function Home() {
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('all'); }} className={activeTab === 'all' ? 'nav-link-active' : ''}>Terminal</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
+            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
           </div>
           <div className="nav-status">
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">◐</button>
