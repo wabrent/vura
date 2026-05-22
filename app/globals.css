@@ -47,7 +47,7 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.5rem; background: var(--
 .hero-contact a { color: var(--accent); text-decoration: none; }
 
 .tabs-bar { max-width: 72rem; margin: 0 auto; padding: 0 2rem; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 1px solid var(--border-md); flex-wrap: wrap; gap: 0.5rem; }
-.tabs-inner { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+.tabs-inner { display: flex; gap: 1rem; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
 .tab-btn { font-family: var(--display); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); background: none; border: none; padding: 0.5rem 0; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.3rem; }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.tab-active { color: var(--text); border-bottom-color: var(--text); }
