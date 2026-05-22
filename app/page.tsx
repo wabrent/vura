@@ -418,23 +418,47 @@ export default function Home() {
     }
 
     if (activeTab === 'stats') {
+      const topByVol = [...markets].sort((a, b) => b.volume - a.volume).slice(0, 5);
+      const topMovers = [...markets].sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 5);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="corr-stats">
             <div className="corr-stat"><span className="corr-stat-label">TOTAL MARKETS</span><span className="corr-stat-val">{markets.length}</span></div>
             <div className="corr-stat"><span className="corr-stat-label">24H VOLUME</span><span className="corr-stat-val accent">${formatVol(totalVol)}</span></div>
-            <div className="corr-stat"><span className="corr-stat-label">BUILDER RANK</span><span className="corr-stat-val" style={{ color: '#6C47FF' }}>VURA</span></div>
+            <div className="corr-stat"><span className="corr-stat-label">BUILDER CODE</span><span className="corr-stat-val" style={{ color: '#6C47FF' }}>VURA</span></div>
           </div>
-          <iframe
-            src="https://dune.com/embeds/6210266?theme=dark"
-            style={{ width: '100%', height: '450px', border: '1px solid var(--border)', borderRadius: 4 }}
-            title="Builders Leaderboard"
-          />
-          <iframe
-            src="https://dune.com/embeds/6545441?theme=dark"
-            style={{ width: '100%', height: '400px', border: '1px solid var(--border)', borderRadius: 4 }}
-            title="Dune Stats"
-          />
+          <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Top by Volume</div>
+          {topByVol.map((m, i) => (
+            <div key={m.id} className="market-card" onClick={() => setSelectedMarket(m)} style={{ animationDelay: `${i * 30}ms` }}>
+              {m.image && <img src={m.image} alt="" style={{ width: 40, height: 40, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />}
+              <div className="card-left">
+                <span className="card-title">{m.question}</span>
+                <span className="card-meta">{m.category.toUpperCase()} · ${m.volDisplay}</span>
+              </div>
+              <div className="card-right">
+                <span className="card-price">{Math.round(m.yesPrice * 100)}c</span>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-3)', textTransform: 'uppercase', marginTop: '1rem' }}>Top Movers 24h</div>
+          {topMovers.map((m, i) => (
+            <div key={m.id + '_m'} className="market-card" onClick={() => setSelectedMarket(m)} style={{ animationDelay: `${i * 30}ms` }}>
+              <div className="card-left">
+                <span className="card-title">{m.question}</span>
+                <span className={`card-change ${m.change24h > 0 ? 'change-up' : 'change-down'}`}>
+                  {m.change24h > 0 ? '+' : ''}{(m.change24h * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="card-right">
+                <span className="card-price">{Math.round(m.yesPrice * 100)}c</span>
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: '1rem' }}>
+            <a href="https://dune.com/queries/6210266" target="_blank" style={{ fontSize: '0.65rem', color: 'var(--accent)' }}>
+              View Builders Leaderboard on Dune ↗
+            </a>
+          </div>
         </div>
       );
     }
