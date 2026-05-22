@@ -51,14 +51,14 @@ export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
 
   const [markets, setMarkets] = useState<Market[]>([]);
-  const [priceHistory, setPriceHistory] = useState<Map<string, { t: number; p: number }[]>>(new Map());
-  const priceHistoryRef = useRef(priceHistory);
-  priceHistoryRef.current = priceHistory;
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('volume');
   const [loading, setLoading] = useState(true);
   const [dark, setDark] = useState(true);
+  const [priceHistory, setPriceHistory] = useState<Map<string, { t: number; p: number }[]>>(new Map());
+  const priceHistoryRef = useRef(priceHistory);
+  priceHistoryRef.current = priceHistory;
 
   // Theme
   useEffect(() => {
@@ -218,7 +218,24 @@ export default function Home() {
     }).catch(() => {});
   }, [(user as any)?.twitter?.accessToken]);
 
-  // Keyboard
+  // URL-based tab routing
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const tab = p.get('tab');
+    if (tab && tab !== activeTab) setActiveTab(tab);
+  }, []);
+
+  const switchTab = (tab: string) => {
+    setActiveTab(tab);
+  };
+
+  // Sync URL with active tab
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeTab !== 'all') url.searchParams.set('tab', activeTab);
+    else url.searchParams.delete('tab');
+    window.history.replaceState({}, '', url.toString());
+  }, [activeTab]);
   useEffect(() => {
   const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats'];
     const handler = (e: KeyboardEvent) => {
