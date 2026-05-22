@@ -80,6 +80,7 @@ export default function Home() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [tweetCount, setTweetCount] = useState<{ total: number; pm: number } | null>(null);
 
   // Modal
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
@@ -202,6 +203,19 @@ export default function Home() {
     const interval = setInterval(fetchMarkets, CONFIG.REFRESH);
     return () => clearInterval(interval);
   }, [fetchMarkets]);
+
+  // Tweet counter for Twitter users
+  useEffect(() => {
+    const twitterAccount = (user as any)?.twitter;
+    if (!twitterAccount?.accessToken) return;
+    fetch('/api/twitter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: twitterAccount.accessToken })
+    }).then(r => r.json()).then(d => {
+      if (d.polymarketTweets !== undefined) setTweetCount(d);
+    }).catch(() => {});
+  }, [(user as any)?.twitter?.accessToken]);
 
   // Keyboard
   useEffect(() => {
@@ -522,8 +536,13 @@ export default function Home() {
             ) : authenticated ? (
               <>
                 <span style={{ fontSize: '0.6rem', color: 'var(--accent)' }}>
-                  {user?.email?.address || user?.google?.email || (user?.id ? user.id.slice(0, 6) + '...' : 'User')}
+                  {user?.email?.address || user?.google?.email || user?.twitter?.username || (user?.id ? user.id.slice(0, 6) + '...' : 'User')}
                 </span>
+                {tweetCount && (
+                  <span style={{ fontSize: '0.55rem', color: '#1d9bf0', background: 'rgba(29,155,240,0.1)', padding: '1px 5px', borderRadius: 2 }}>
+                    {tweetCount.pm} PM tweets
+                  </span>
+                )}
                 <span className="live-dot" />
                 <span>Live</span>
                 <button className="privy-btn logout" onClick={logout}>Exit</button>
