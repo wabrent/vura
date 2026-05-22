@@ -456,8 +456,26 @@ export default function Home() {
             </div>
           ))}
           <div style={{ marginTop: '1rem' }}>
-            <a href="https://dune.com/queries/6210266" target="_blank" style={{ fontSize: '0.65rem', color: 'var(--accent)' }}>
-              View Builders Leaderboard on Dune ↗
+            <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Maker Rebates</div>
+            <div className="corr-stats">
+              <div className="corr-stat">
+                <span className="corr-stat-label">MAKER REBATE</span>
+                <span className="corr-stat-val accent">0.1%</span>
+              </div>
+              <div className="corr-stat">
+                <span className="corr-stat-label">DAILY MAKERS</span>
+                <span className="corr-stat-val">~7.5k</span>
+              </div>
+              <div className="corr-stat">
+                <span className="corr-stat-label">EST. VOLUME</span>
+                <span className="corr-stat-val">$50M+</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.5rem' }}>
+              Earn 0.1% on every filled limit order. Active makers earn $50-500/day.
+            </div>
+            <a href="https://dune.com/polymarket/polymarket-defi-maker-rebates" target="_blank" style={{ fontSize: '0.65rem', color: 'var(--accent)', display: 'block', marginTop: '0.75rem' }}>
+              View full Maker Rebates on Dune ↗
             </a>
           </div>
         </div>
