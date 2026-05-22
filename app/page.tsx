@@ -168,9 +168,10 @@ export default function Home() {
         };
         });
       });
-      // Filter out fully resolved markets only
+      // Filter out dead/resolved markets
       const active = ms.filter((m: Market) => {
-        if ((m.yesPrice <= 0.001 || m.yesPrice >= 0.999) && m.volume < 1000) return false;
+        if (m.yesPrice <= 0.02 && Math.abs(m.change24h) < 0.001) return false;
+        if (m.yesPrice >= 0.98 && Math.abs(m.change24h) < 0.001) return false;
         return true;
       });
       setMarkets(active);
