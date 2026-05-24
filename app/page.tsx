@@ -75,12 +75,21 @@ export default function Home() {
     });
   };
 
-  // Profile
-  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+  // Profile — multiple watchlists
+  const [watchlists, setWatchlists] = useState<Map<string, string[]>>(new Map([['Default', []]]));
+  const [activeWl, setActiveWl] = useState('Default');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [tweetCount, setTweetCount] = useState<{ total: number; pm: number } | null>(null);
+  const [showScreener, setShowScreener] = useState(false);
+  const [screenerPriceMin, setScreenerPriceMin] = useState(0);
+  const [screenerPriceMax, setScreenerPriceMax] = useState(100);
+  const [screenerVolMin, setScreenerVolMin] = useState(0);
+  const [screenerChangeMin, setScreenerChangeMin] = useState(0);
+
+  // Active watchlist as Set for easy lookup
+  const watchlist = new Set(watchlists.get(activeWl) || []);
 
   // Modal
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
@@ -88,10 +97,11 @@ export default function Home() {
 
   const profileKey = user?.email?.address || user?.google?.email || user?.id?.slice(0, 10) || 'default';
 
-  // Load saved data — reset on user change
+  // Load saved data
   useEffect(() => {
     if (!user?.email?.address && !user?.google?.email && !user?.id) {
-      setWatchlist(new Set());
+      setWatchlists(new Map([['Default', []]]));
+      setActiveWl('Default');
       setAlerts([]);
       setTelegramToken('');
       setTelegramChatId('');
@@ -101,21 +111,59 @@ export default function Home() {
     const wl = localStorage.getItem(`vura_wl_${pk}`);
     const al = localStorage.getItem(`vura_al_${pk}`);
     const tg = localStorage.getItem(`vura_tg_${pk}`);
-    setWatchlist(new Set(wl ? JSON.parse(wl) : []));
+    if (wl) {
+      const parsed = JSON.parse(wl);
+      // Backward compat: if old format (array), wrap in Default
+      const map = Array.isArray(parsed) 
+        ? new Map<string, string[]>([['Default', parsed]])
+        : new Map<string, string[]>(Object.entries(parsed) as [string, string[]][]);
+      if (!map.has('Default')) map.set('Default', []);
+      setWatchlists(map);
+    } else {
+      setWatchlists(new Map([['Default', []]]));
+    }
     setAlerts(al ? JSON.parse(al) : []);
     if (tg) { const t = JSON.parse(tg); setTelegramToken(t.token || ''); setTelegramChatId(t.chatId || ''); }
   }, [user?.email?.address, user?.google?.email, user?.id]);
 
   // Save profile data
-  const saveWatchlist = useCallback((wl: Set<string>) => {
-    localStorage.setItem(`vura_wl_${profileKey}`, JSON.stringify([...wl]));
-    setWatchlist(new Set(wl));
-  }, [profileKey]);
+  const saveWatchlists = useCallback((wls: Map<string, string[]>) => {
+    const pk = user?.email?.address || user?.google?.email || user?.id?.slice(0, 10) || 'default';
+    localStorage.setItem(`vura_wl_${pk}`, JSON.stringify(Object.fromEntries(wls)));
+    setWatchlists(new Map(wls));
+  }, [user?.email?.address, user?.google?.email, user?.id]);
+
+  const toggleWatchlist = (marketId: string) => {
+    const next = new Map(watchlists);
+    const list = [...(next.get(activeWl) || [])];
+    const idx = list.indexOf(marketId);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(marketId);
+    next.set(activeWl, list);
+    saveWatchlists(next);
+  };
+
+  const createWatchlist = (name: string) => {
+    if (!name || watchlists.has(name)) return;
+    const next = new Map(watchlists);
+    next.set(name, []);
+    saveWatchlists(next);
+    setActiveWl(name);
+  };
 
   const saveAlerts = useCallback((al: Alert[]) => {
-    localStorage.setItem(`vura_al_${profileKey}`, JSON.stringify(al));
+    const pk = user?.email?.address || user?.google?.email || user?.id?.slice(0, 10) || 'default';
+    localStorage.setItem(`vura_al_${pk}`, JSON.stringify(al));
     setAlerts([...al]);
-  }, [profileKey]);
+  }, [user?.email?.address, user?.google?.email, user?.id]);
+
+  const deleteWatchlist = (name: string) => {
+    if (name === 'Default') return;
+    const next = new Map(watchlists);
+    next.delete(name);
+    saveWatchlists(next);
+    setActiveWl('Default');
+  };
 
   // Fetch markets
   const fetchMarkets = useCallback(async () => {
@@ -341,12 +389,7 @@ export default function Home() {
           {chgStr}
           <div className="card-actions" onClick={e => e.stopPropagation()}>
             <button className={`star-btn ${inWl ? 'starred' : ''}`}
-              onClick={() => {
-                const next = new Set(watchlist);
-                if (next.has(String(m.id))) next.delete(String(m.id));
-                else next.add(String(m.id));
-                saveWatchlist(next);
-              }}>★</button>
+              onClick={() => toggleWatchlist(String(m.id))}>★</button>
             <a className="btn-trade" href={`https://polymarket.com/event/${m.slug}`} target="_blank">Trade</a>
           </div>
         </div>
@@ -693,12 +736,7 @@ export default function Home() {
           market={selectedMarket}
           watchlist={watchlist}
           onClose={() => setSelectedMarket(null)}
-          onWatchlistToggle={() => {
-            const next = new Set(watchlist);
-            if (next.has(String(selectedMarket.id))) next.delete(String(selectedMarket.id));
-            else next.add(String(selectedMarket.id));
-            saveWatchlist(next);
-          }}
+          onWatchlistToggle={() => toggleWatchlist(String(selectedMarket.id))}
           onAlert={() => setAlertMarket(selectedMarket)}
           onShare={shareMarket}
         />
