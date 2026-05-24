@@ -342,6 +342,13 @@ export default function Home() {
       if (m.category !== activeTab) return false;
     }
     if (searchQuery && !m.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    // Screener filters
+    if (showScreener) {
+      const priceC = Math.round(m.yesPrice * 100);
+      if (priceC < screenerPriceMin || priceC > screenerPriceMax) return false;
+      if (screenerVolMin > 0 && m.volume < screenerVolMin) return false;
+      if (screenerChangeMin > 0 && Math.abs(m.change24h * 100) < screenerChangeMin) return false;
+    }
     return true;
   }).sort((a, b) => {
     switch (sortBy) {
@@ -407,8 +414,26 @@ export default function Home() {
     );
 
     if (activeTab === 'watchlist') {
-      if (watchlistMarkets.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets in watchlist. Click ★ to add.</div>;
-      return watchlistMarkets.map((m, i) => renderMarketCard(m, i));
+      const wlNames = [...watchlists.keys()];
+      return (
+        <div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <select className="sort-select" value={activeWl} onChange={e => setActiveWl(e.target.value)} style={{ fontSize: '0.7rem' }}>
+              {wlNames.map(n => <option key={n} value={n}>{n} ({watchlists.get(n)?.length || 0})</option>)}
+            </select>
+            <button className="csv-btn" onClick={() => { const name = prompt('Watchlist name:'); if (name) createWatchlist(name); }} style={{ fontSize: '0.6rem' }}>+ New</button>
+            {activeWl !== 'Default' && <button className="csv-btn" onClick={() => { if (confirm('Delete ' + activeWl + '?')) deleteWatchlist(activeWl); }} style={{ fontSize: '0.6rem', color: 'var(--red)' }}>Delete</button>}
+            <button className="csv-btn" onClick={() => {
+              const ids = watchlists.get(activeWl) || [];
+              const url = window.location.origin + '/?tab=watchlist&share=' + ids.join(',');
+              navigator.clipboard.writeText(url).then(() => showToastMsg('Link copied!'));
+            }} style={{ fontSize: '0.6rem' }}>Copy Link</button>
+          </div>
+          {watchlistMarkets.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets in this watchlist. Click ★ to add.</div>
+          ) : watchlistMarkets.map((m, i) => renderMarketCard(m, i))}
+        </div>
+      );
     }
 
     if (activeTab === 'alerts') {
@@ -599,6 +624,11 @@ export default function Home() {
     return filteredMarkets.map((m, i) => renderMarketCard(m, i));
   };
 
+  const showToastMsg = (text: string) => {
+    const t = document.getElementById('vura-toast');
+    if (t) { t.textContent = text; t.className = 'toast toast-show'; setTimeout(() => t.className = 'toast', 3500); }
+  };
+
   const exportCSV = () => {
     let ms = filteredMarkets;
     if (activeTab === 'watchlist') ms = watchlistMarkets;
@@ -709,6 +739,7 @@ export default function Home() {
         </div>
         <div className="tabs-meta">
           <button className="csv-btn" onClick={exportCSV}>CSV ↓</button>
+          <button className="csv-btn" onClick={() => setShowScreener(!showScreener)} style={{ color: showScreener ? 'var(--accent)' : 'var(--text-3)' }}>Filter</button>
           <input id="search-input" className="search-input" type="text" placeholder="/ search markets..."
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
@@ -727,6 +758,30 @@ export default function Home() {
         <span><kbd>/</kbd> search</span>
         <span><kbd>Esc</kbd> close</span>
       </div>
+
+      {showScreener && (
+        <div style={{ maxWidth: '72rem', margin: '0 auto', padding: '0.5rem 2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--border)', fontSize: '0.6rem' }}>
+          <div className="pnl-field" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.3rem' }}>
+            <span className="pnl-label">Price</span>
+            <input type="number" className="pnl-input" value={screenerPriceMin} onChange={e => setScreenerPriceMin(Number(e.target.value))} style={{ width: '50px' }} min={0} max={100} />
+            <span>-</span>
+            <input type="number" className="pnl-input" value={screenerPriceMax} onChange={e => setScreenerPriceMax(Number(e.target.value))} style={{ width: '50px' }} min={0} max={100} />
+            <span>c</span>
+          </div>
+          <div className="pnl-field" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.3rem' }}>
+            <span className="pnl-label">Vol ≥</span>
+            <input type="number" className="pnl-input" value={screenerVolMin} onChange={e => setScreenerVolMin(Number(e.target.value))} style={{ width: '60px' }} min={0} />
+            <span>$</span>
+          </div>
+          <div className="pnl-field" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.3rem' }}>
+            <span className="pnl-label">24h Δ ≥</span>
+            <input type="number" className="pnl-input" value={screenerChangeMin} onChange={e => setScreenerChangeMin(Number(e.target.value))} style={{ width: '50px' }} min={0} />
+            <span>%</span>
+          </div>
+          <button className="csv-btn" onClick={() => { setScreenerPriceMin(0); setScreenerPriceMax(100); setScreenerVolMin(0); setScreenerChangeMin(0); }}>Reset</button>
+          <span style={{ color: 'var(--text-3)' }}>{filteredMarkets.length} results</span>
+        </div>
+      )}
 
       <main key={activeTab} className="animate-slide-up">{renderContent()}</main>
 
