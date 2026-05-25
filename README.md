@@ -1,95 +1,66 @@
-# VURA | PREDICTION ENGINE
+# VURA | Prediction Terminal
 
-Vura is a high-precision, minimalist interface for Polymarket, built via the Polymarket Builder Program. It leverages the CLOB (Central Limit Order Book) to provide a professional-grade trading environment focused on data clarity and execution speed.
+Minimalist analytics terminal for Polymarket. Real-time market data, Alpha scoring, Smart Money signals, arbitrage detection, and multi-watchlist management.
 
-## VISION
+## Stack
 
-To transform raw prediction market data into actionable intelligence through a "Data-Heavy Minimalist" interface. Vura removes the noise of traditional betting platforms, offering a terminal-like experience for quantitative traders.
+- **Next.js 14** (App Router)
+- **React 18** + TypeScript
+- **Privy SDK** — Google, Twitter, Email, Wallet auth
+- **Polymarket CLOB SDK** — order book data
+- **CSS** — custom dark/light theme, no Tailwind
+- **Vercel** — serverless deployment (Dublin region)
 
-## KEY FEATURES
+## Features
 
-- **CLOB Integration:** Direct routing to Polymarket's Central Limit Order Book using the builderCode for volume attribution.
-- **Gasless Execution:** Integrated with Polymarket's Relayer for seamless, non-custodial trading.
-- **Quantitative UI:** A Swiss-style minimalist dashboard featuring micro-sparklines for instant trend recognition.
-- **Smart Attribution:** Every trade processed through Vura supports the ecosystem via the official Builder Program.
+- **Alpha Scoring** — volume-weighted composite 0-10
+- **Smart Money BULL/BEAR** — volume-weighted momentum
+- **Correlation Matrix** — Jaccard similarity across markets
+- **Arbitrage Detection** — internal spread gaps
+- **Multiple Watchlists** — create, name, share via link
+- **Advanced Screener** — filter by price, volume, 24h change
+- **Price Alerts** — Telegram webhook support
+- **P&L Calculator** — built into every market card
+- **CSV Export** — any filtered view
+- **Real Price History** — CLOB /prices-history sparklines
+- **Stats Tab** — volume, top movers, maker rebates
+- **Keyboard Shortcuts** — 1-9 tabs, / search, Esc close
 
-## TECHNICAL STACK
+## Getting Started
 
-- **Framework:** Next.js 14+ (App Router)
-- **Styling:** Tailwind CSS (Brutalist/Minimalist config)
-- **State Management:** Wagmi / Viem
-- **Polymarket Integration:** Polymarket CLOB SDK (TypeScript)
-- **Animations:** Framer Motion (Linear, high-frequency transitions)
-
-## BRAND ASSETS (CSS CONFIG)
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      fontFamily: {
-        mono: ['JetBrains Mono', 'monospace'],
-        sans: ['Inter', 'sans-serif'],
-        display: ['Saira Extra Condensed', 'sans-serif'],
-      },
-      colors: {
-        background: '#000000', // Dark Mode
-        foreground: '#ffffff',
-        accent: '#39FF14', // Neon Green for growth metrics
-        border: '#333333',
-      },
-      letterSpacing: {
-        tighter: '-0.05em',
-      }
-    },
-  },
-}
+```bash
+npm install --legacy-peer-deps
+npm run dev
 ```
 
-## REPOSITORY STRUCTURE
+## Environment Variables
+
+Create `.env.local`:
 
 ```
-vura/
-├── index.html      # Terminal UI
-├── app.js        # Core logic (real-time data)
-├── styles.css    # Minimalist styling
-├── api/
-│   └── proxy.js  # Serverless CORS proxy
-└── vercel.json  # Vercel config
+NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
+PRIVY_APP_SECRET=your_privy_app_secret
+POLYMARKET_API_KEY=your_builder_api_key
+POLYMARKET_SECRET=your_builder_secret
+POLYMARKET_PASSPHRASE=your_builder_passphrase
 ```
 
-## GETTING STARTED
+## Repository Structure
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/wabrent/vura.git
-   ```
+```
+app/
+├── layout.tsx              # PrivyProvider, auth config
+├── page.tsx                # Main terminal (all tabs, state, logic)
+├── globals.css             # Styling
+├── icon.svg                # Favicon
+├── lib/types.ts            # TypeScript types
+├── components/
+│   └── TradeModal.tsx      # Trade form + P&L calculator
+└── api/
+    ├── proxy/route.ts      # CORS proxy + CLOB endpoint
+    └── twitter/route.ts    # Polymarket tweet counter
+```
 
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Configure Environment**
-   Create a `.env` file with your `BUILDER_CODE` and `API_KEY` from the Polymarket Builder Profile.
-
-## ARCHITECTURE
-
-Vura uses the [Polymarket CLOB SDK](https://docs.polymarket.com/) to interact with the order book.
-
-- **Connect:** Privy/Magic Link integration for Safe Wallets.
-- **Analyze:** Custom hooks for fetching real-time market probability shifts.
-- **Execute:** Builder-attributed order placement.
-
-## LICENSE
+## License
 
 MIT
-
----
-
-**VURA: THE PREDICTION ENGINE.**
-
-VURA: Minimalist Liquidity Interfaces for Polymarket.
-
-VURA: Trade the future with Swiss precision.
