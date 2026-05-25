@@ -82,6 +82,8 @@ export default function Home() {
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [tweetCount, setTweetCount] = useState<{ total: number; pm: number } | null>(null);
+  const [aiData, setAiData] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [showScreener, setShowScreener] = useState(false);
   const [screenerPriceMin, setScreenerPriceMin] = useState(0);
   const [screenerPriceMax, setScreenerPriceMax] = useState(100);
@@ -285,7 +287,7 @@ export default function Home() {
     window.history.replaceState({}, '', url.toString());
   }, [activeTab]);
   useEffect(() => {
-  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats'];
+  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats', 'ai'];
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
@@ -567,6 +569,70 @@ export default function Home() {
       );
     }
 
+    if (activeTab === 'ai') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase' }}>AI Market Analysis</div>
+            {!aiData && !aiLoading && (
+              <button className="csv-btn" onClick={async () => {
+                setAiLoading(true);
+                try {
+                  const mks = markets.map(m => ({ q: m.question, c: Math.round(m.yesPrice*100), v: m.volume, ch: (m.change24h*100).toFixed(1), al: m.alpha }));
+                  const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markets: mks }) });
+                  const data = await res.json();
+                  setAiData(data);
+                } catch {}
+                setAiLoading(false);
+              }}>{aiLoading ? 'Analyzing...' : 'Run Analysis'}</button>
+            )}
+            {aiData && <button className="csv-btn" onClick={() => { setAiData(null); }} style={{ color: 'var(--text-3)' }}>Reset</button>}
+          </div>
+          {aiLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: '3rem', animationDelay: `${i*0.1}s` }} />)}
+            </div>
+          )}
+          {aiData && (
+            <>
+              {aiData.summary && (
+                <div style={{ padding: '1rem', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.8rem', lineHeight: 1.6 }}>{aiData.summary}</div>
+              )}
+              {aiData.signals?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--text-3)', marginBottom: '0.5rem' }}>SIGNALS</div>
+                  {aiData.signals.map((s: any, i: number) => (
+                    <div key={i} className="market-card" style={{ animationDelay: `${i*30}ms`, borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : s.direction === 'bearish' ? 'var(--red)' : 'var(--text-3)'}` }}>
+                      <div className="card-left">
+                        <span className="card-title">{s.market}</span>
+                        <span className="card-meta">{s.reason}</span>
+                      </div>
+                      <div className="card-right">
+                        <span style={{ fontSize: '0.7rem', color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)', textTransform: 'uppercase', fontWeight: 600 }}>{s.direction} {s.confidence}%</span>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{s.action?.toUpperCase()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {aiData.anomaly && (
+                <div style={{ padding: '0.75rem', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.7rem' }}>
+                  <span style={{ color: '#f59e0b', fontWeight: 600 }}>⚠ Anomaly: </span>{aiData.anomaly}
+                </div>
+              )}
+              {aiData.hotTopics?.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {aiData.hotTopics.map((t: string, i: number) => (
+                    <span key={i} style={{ padding: '0.2rem 0.6rem', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.65rem', borderRadius: 2 }}>{t}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
     if (activeTab === 'arbitrage') {
       // Compute internal spreads on the fly
       const arbList = markets.filter(m => m.spread > 0.005).sort((a, b) => b.spread - a.spread).slice(0, 15);
@@ -684,6 +750,7 @@ export default function Home() {
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
+            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('ai'); }} className={activeTab === 'ai' ? 'nav-link-active' : ''}>AI</a>
           </div>
           <div className="nav-status">
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">◐</button>
