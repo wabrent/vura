@@ -286,6 +286,26 @@ export default function Home() {
     else url.searchParams.delete('tab');
     window.history.replaceState({}, '', url.toString());
   }, [activeTab]);
+
+  // Auto-fetch AI on first market load
+  const aiFetched = useRef(false);
+  useEffect(() => {
+    if (markets.length < 10 || aiFetched.current || aiLoading) return;
+    aiFetched.current = true;
+    setAiLoading(true);
+    const mks = markets.slice(0, 15).map(m => ({
+      q: m.question, c: Math.round(m.yesPrice*100), v: m.volume,
+      ch: (m.change24h*100).toFixed(1), al: m.alpha
+    }));
+    fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markets: mks })
+    }).then(r => r.json()).then(d => {
+      if (!d.error) setAiData(d);
+    }).catch(() => {}).finally(() => setAiLoading(false));
+  }, [markets.length]);
+
   useEffect(() => {
   const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats', 'ai'];
     const handler = (e: KeyboardEvent) => {
@@ -784,12 +804,37 @@ export default function Home() {
           <div className="hero-badge">ANALYTICS</div>
         </div>
         <div className="hero-right">
-          <p>Track Polymarket order books, volume flows, and cross-platform price discrepancies. Built for traders who need speed.</p>
-          <div className="hero-divider" />
-          <div className="hero-contact">
-            <span>Powered by Polymarket CLOB</span>
-            <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
-          </div>
+          {aiData?.signals ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.55rem', letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase' }}>AI Signals · Live</div>
+              {aiData.signals.slice(0, 3).map((s: any, i: number) => (
+                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i*0.15}s`, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)'}` }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)' }}>{s.direction === 'bullish' ? '▲' : '▼'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
+                    <div style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{s.reason} · {s.confidence}% confidence</div>
+                  </div>
+                  <span style={{ fontSize: '0.6rem', padding: '2px 6px', background: s.action === 'buy' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
+                </div>
+              ))}
+              {aiData.hotTopics?.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {aiData.hotTopics.map((t: string, i: number) => (
+                    <span key={i} style={{ padding: '1px 6px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.5rem', borderRadius: 2, color: 'var(--text-2)' }}>{t}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <p>Track Polymarket order books, volume flows, and cross-platform price discrepancies. Built for traders who need speed.</p>
+              <div className="hero-divider" />
+              <div className="hero-contact">
+                <span>Powered by Polymarket CLOB</span>
+                <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
