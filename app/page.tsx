@@ -806,21 +806,26 @@ export default function Home() {
         <div className="hero-right">
           {aiData?.signals ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.55rem', letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase' }}>AI Signals · Live</div>
+              <div style={{ fontSize: '0.6rem', letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase', fontWeight: 600 }}>▼ AI SIGNALS · LIVE</div>
               {aiData.signals.slice(0, 3).map((s: any, i: number) => (
-                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i*0.15}s`, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)'}` }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)' }}>{s.direction === 'bullish' ? '▲' : '▼'}</span>
+                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i*0.15}s`, display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.6rem 0.8rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)'}` }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)' }}>{s.direction === 'bullish' ? '▲' : '▼'}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
-                    <div style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{s.reason} · {s.confidence}% confidence</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
+                    <div style={{ fontSize: '0.55rem', color: 'var(--text-3)', marginTop: 1 }}>{s.reason} · {s.confidence}% confidence</div>
                   </div>
-                  <span style={{ fontSize: '0.6rem', padding: '2px 6px', background: s.action === 'buy' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
+                  <span style={{ fontSize: '0.6rem', padding: '2px 8px', background: s.action === 'buy' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
                 </div>
               ))}
+              {aiData.summary && (
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-2)', lineHeight: 1.5, fontStyle: 'italic', marginTop: '0.25rem' }}>
+                  {aiData.summary}
+                </div>
+              )}
               {aiData.hotTopics?.length > 0 && (
                 <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
                   {aiData.hotTopics.map((t: string, i: number) => (
-                    <span key={i} style={{ padding: '1px 6px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.5rem', borderRadius: 2, color: 'var(--text-2)' }}>{t}</span>
+                    <span key={i} style={{ padding: '1px 6px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.5rem', borderRadius: 3, color: 'var(--text-2)', letterSpacing: '0.03em' }}>{t}</span>
                   ))}
                 </div>
               )}
