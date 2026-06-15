@@ -1,7 +1,10 @@
 'use client';
 
 import { PrivyProvider } from '@privy-io/react-auth';
+import dynamic from 'next/dynamic';
 import './globals.css';
+
+const HermesChat = dynamic(() => import('@/app/components/HermesChat'), { ssr: false });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         >
           {children}
+          <HermesChat />
         </PrivyProvider>
       </body>
     </html>
