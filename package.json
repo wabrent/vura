@@ -16,6 +16,7 @@
     "ethers": "^6.16.0",
     "viem": "^2.0.0",
     "@stripe/crypto": "^1.0.0",
+    "@stripe/stripe-js": "^5.0.0",
     "@abstract-foundation/agw-client": "^1.0.0",
     "@farcaster/mini-app-solana": "^1.0.0",
     "@solana-program/memo": "^0.8.0",
