@@ -194,6 +194,7 @@ export default function Home() {
           if (main.bestAsk !== undefined) bestAsk = parseFloat(main.bestAsk);
         } catch {}
         const volume = main.volumeNum || main.volume || event.volume24hr || 0;
+        const vol24h = main.volume24hr || main.volume1wk || volume;
         const change24h = main.oneDayPriceChange || 0;
         const volScore = Math.min(volume / 500000, 3);
         const spreadScore = Math.abs(yesPrice + noPrice - 1) * 500;
@@ -210,6 +211,7 @@ export default function Home() {
           id: main.conditionId || main.id || (event.id + '_' + idx), question: main.question || event.title || 'Unknown', slug: event.slug || '',
           category: getCategory(event.title || ''), alpha: parseFloat(alpha.toFixed(1)),
           volume: parseFloat(volume) || 0, volDisplay: formatVol(volume),
+          vol24h: parseFloat(vol24h) || 0,
           yesPrice, noPrice, bestBid, bestAsk, spread, change24h: parseFloat(change24h) || 0,
           context: event.eventMetadata?.context_description || '',
           smartScore: computeSmartScore(volume, change24h),
@@ -224,9 +226,17 @@ export default function Home() {
         if (m.yesPrice >= 0.98 && Math.abs(m.change24h) < 0.001) return false;
         return true;
       });
-      setMarkets(active);
+      // De-duplicate by id and keep a stable, activity-sorted order
+      const seen = new Set<string>();
+      const deduped = active.filter((m: Market) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+      deduped.sort((a: Market, b: Market) => b.vol24h - a.vol24h);
+      setMarkets(deduped);
       // Fetch price history for top markets (real data)
-      const top = [...active].sort((a: Market, b: Market) => b.volume - a.volume).slice(0, 15);
+      const top = [...active].sort((a: Market, b: Market) => b.vol24h - a.vol24h).slice(0, 15);
       const histMap = new Map(priceHistoryRef.current);
       const endTs = Math.floor(Date.now() / 1000);
       const startTs = endTs - 86400;
@@ -293,7 +303,7 @@ export default function Home() {
     if (markets.length < 10 || aiFetched.current || aiLoading) return;
     aiFetched.current = true;
     setAiLoading(true);
-    const mks = markets.slice(0, 15).map(m => ({
+    const mks = [...markets].sort((a, b) => b.vol24h - a.vol24h).slice(0, 15).map(m => ({
       q: m.question, c: Math.round(m.yesPrice*100), v: m.volume,
       ch: (m.change24h*100).toFixed(1), al: m.alpha
     }));
@@ -377,11 +387,14 @@ export default function Home() {
       case 'alpha': return b.alpha - a.alpha;
       case 'price': return b.yesPrice - a.yesPrice;
       case 'category': return a.category.localeCompare(b.category);
-      default: return b.volume - a.volume;
+      case 'change': return Math.abs(b.change24h) - Math.abs(a.change24h);
+      default: return b.vol24h - a.vol24h;
     }
   });
 
-  const watchlistMarkets = markets.filter(m => watchlist.has(String(m.id)));
+  const watchlistMarkets = markets
+    .filter(m => watchlist.has(String(m.id)))
+    .sort((a, b) => b.vol24h - a.vol24h);
   const totalVol = markets.reduce((s, m) => s + m.volume, 0);
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -404,11 +417,11 @@ export default function Home() {
     return (
       <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
         onClick={() => setSelectedMarket(m)}>
-        {m.image && <img src={m.image} alt="" style={{ width: 56, height: 56, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
+        {m.image && <img src={m.image} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />}
         <div className="card-left">
           <span className="card-category">{m.category.toUpperCase()}{smartBadge}</span>
           <span className="card-title">{m.question}</span>
-          <span className="card-meta">Vol ${m.volDisplay} · Alpha {m.alpha}{spreadBadge ? ' · ' : ''}{spreadBadge}</span>
+          <span className="card-meta">Vol ${m.volDisplay} · 24h ${formatVol(m.vol24h)} · Alpha {m.alpha}{spreadBadge ? ' · ' : ''}{spreadBadge}</span>
         </div>
         <div className="card-center">
           {sparkSvg && <svg width="80" height="28" dangerouslySetInnerHTML={{ __html: sparkSvg }} />}
@@ -526,7 +539,7 @@ export default function Home() {
     }
 
     if (activeTab === 'stats') {
-      const topByVol = [...markets].sort((a, b) => b.volume - a.volume).slice(0, 5);
+      const topByVol = [...markets].sort((a, b) => b.vol24h - a.vol24h).slice(0, 5);
       const topMovers = [...markets].sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 5);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -538,7 +551,7 @@ export default function Home() {
           <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Top by Volume</div>
           {topByVol.map((m, i) => (
             <div key={m.id} className="market-card" onClick={() => setSelectedMarket(m)} style={{ animationDelay: `${i * 30}ms` }}>
-              {m.image && <img src={m.image} alt="" style={{ width: 40, height: 40, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />}
+              {m.image && <img src={m.image} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
               <div className="card-left">
                 <span className="card-title">{m.question}</span>
                 <span className="card-meta">{m.category.toUpperCase()} · ${m.volDisplay}</span>
@@ -687,7 +700,7 @@ export default function Home() {
               <div style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--accent)' }}>Live</div>
             </div>
           </div>
-          {markets.sort((a, b) => b.volume - a.volume).slice(0, 15).map((m, i) => (
+          {[...markets].sort((a, b) => b.vol24h - a.vol24h).slice(0, 15).map((m, i) => (
             <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
               onClick={() => window.open(`https://polymarket.com/event/${m.slug}`, '_blank')}>
               <div className="card-left">
@@ -860,9 +873,10 @@ export default function Home() {
           <input id="search-input" className="search-input" type="text" placeholder="/ search markets..."
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
-            <option value="volume">Volume</option>
+            <option value="volume">24h Vol</option>
             <option value="alpha">Alpha</option>
             <option value="price">Price</option>
+            <option value="change">24h Δ</option>
             <option value="category">Category</option>
           </select>
           <span>{markets.length} markets</span>

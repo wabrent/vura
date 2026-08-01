@@ -6,6 +6,7 @@ export interface Market {
   alpha: number;
   volume: number;
   volDisplay: string;
+  vol24h: number;
   yesPrice: number;
   noPrice: number;
   bestBid: number | null;
@@ -33,4 +34,17 @@ export interface CorrelationPair {
   marketB: Market;
   score: number;
   keywords: string[];
+}
+
+export interface SimulatedTrade {
+  id: string;
+  date: string;
+  marketQuestion: string;
+  side: 'BUY' | 'SELL';
+  outcome: 'YES' | 'NO';
+  entryPrice: number;
+  exitPrice: number;
+  amount: number;
+  pnl: number;
+  closed: boolean;
 }

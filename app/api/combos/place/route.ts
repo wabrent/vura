@@ -33,7 +33,7 @@ const COMBO_ORDER_TYPES = {
 const SIDE = { BUY: 0, SELL: 1 };
 const ZERO32 = '0x' + '0'.repeat(64);
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = await req.json();
     const { 
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
       ws.onmessage = async (ev) => {
         try {
-          const msg = JSON.parse(ev.data);
+          const msg = JSON.parse(String(ev.data));
           
           if (msg.type === 'auth') {
             if (!msg.success) return handleError('Combo auth failed');
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
               settled = true;
               if (timer) clearTimeout(timer);
               try { ws.close(); } catch {}
-              resolve({ txHash: msg.tx_hash, status: msg.status });
+              resolve(NextResponse.json({ txHash: msg.tx_hash, status: msg.status }));
             }
           } else if ((msg.type === 'RFQ_STATUS_UPDATE' || msg.type === 'RFQ_EXECUTION_UPDATE') &&
                      (msg.status === 'FAILED' || isExpired(msg))) {

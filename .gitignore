@@ -27,9 +27,12 @@ Thumbs.db
 # Temporary files
 *.tmp
 .cache/
+*.tsbuildinfo
 
 .env.local
 .env
 .vercel
 .agents/
 .next/
+
+.env*
