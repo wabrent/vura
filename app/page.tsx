@@ -4,6 +4,20 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
+import AgentDashboard from '@/app/components/AgentDashboard';
+import VURAAgentDashboard from '@/app/components/VURAAgentDashboard';
+import TrackRecord from '@/app/components/TrackRecord';
+import Sandbox from '@/app/components/Sandbox';
+import LandingSections from '@/app/components/LandingSections';
+import WhaleTracker from '@/app/components/WhaleTracker';
+import BondsTab from '@/app/components/BondsTab';
+import FastMarkets from '@/app/components/FastMarkets';
+import PortfolioDashboard from '@/app/components/PortfolioDashboard';
+import Leaderboard from '@/app/components/Leaderboard';
+import NewsFeed from '@/app/components/NewsFeed';
+import CalendarView from '@/app/components/CalendarView';
+import TradeSimulator from '@/app/components/TradeSimulator';
+import CopyTrading from '@/app/components/CopyTrading';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
@@ -370,7 +384,8 @@ export default function Home() {
 
   // ── Derived data ────────────────────────────────────────────────────────
   const filteredMarkets = markets.filter(m => {
-    if (activeTab !== 'all' && activeTab !== 'watchlist' && activeTab !== 'arbitrage' && activeTab !== 'whale' && activeTab !== 'alerts' && activeTab !== 'correlation') {
+    const specialTabs = ['all', 'watchlist', 'arbitrage', 'whale', 'alerts', 'correlation', 'ai', 'stats', 'bonds', 'crypto-live', 'portfolio', 'leaderboard', 'news', 'calendar', 'simulator', 'copytrading'];
+    if (!specialTabs.includes(activeTab)) {
       if (m.category !== activeTab) return false;
     }
     if (searchQuery && !m.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -447,6 +462,16 @@ export default function Home() {
         ))}
       </div>
     );
+
+    if (activeTab === 'whale') return <WhaleTracker />;
+    if (activeTab === 'bonds') return <BondsTab markets={markets} />;
+    if (activeTab === 'crypto-live') return <FastMarkets markets={markets} />;
+    if (activeTab === 'portfolio') return <PortfolioDashboard markets={markets} />;
+    if (activeTab === 'leaderboard') return <Leaderboard />;
+    if (activeTab === 'news') return <NewsFeed />;
+    if (activeTab === 'calendar') return <CalendarView markets={markets} />;
+    if (activeTab === 'simulator') return <TradeSimulator markets={markets} />;
+    if (activeTab === 'copytrading') return <CopyTrading />;
 
     if (activeTab === 'watchlist') {
       const wlNames = [...watchlists.keys()];
@@ -604,65 +629,13 @@ export default function Home() {
 
     if (activeTab === 'ai') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase' }}>AI Market Analysis</div>
-            {!aiData && !aiLoading && (
-              <button className="csv-btn" onClick={async () => {
-                setAiLoading(true);
-                try {
-                  const mks = markets.map(m => ({ q: m.question, c: Math.round(m.yesPrice*100), v: m.volume, ch: (m.change24h*100).toFixed(1), al: m.alpha }));
-                  const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markets: mks }) });
-                  const data = await res.json();
-                  setAiData(data);
-                } catch {}
-                setAiLoading(false);
-              }}>{aiLoading ? 'Analyzing...' : 'Run Analysis'}</button>
-            )}
-            {aiData && <button className="csv-btn" onClick={() => { setAiData(null); }} style={{ color: 'var(--text-3)' }}>Reset</button>}
-          </div>
-          {aiLoading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: '3rem', animationDelay: `${i*0.1}s` }} />)}
-            </div>
-          )}
-          {aiData && (
-            <>
-              {aiData.summary && (
-                <div style={{ padding: '1rem', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.8rem', lineHeight: 1.6 }}>{aiData.summary}</div>
-              )}
-              {aiData.signals?.length > 0 && (
-                <div>
-                  <div style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--text-3)', marginBottom: '0.5rem' }}>SIGNALS</div>
-                  {aiData.signals.map((s: any, i: number) => (
-                    <div key={i} className="market-card" style={{ animationDelay: `${i*30}ms`, borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : s.direction === 'bearish' ? 'var(--red)' : 'var(--text-3)'}` }}>
-                      <div className="card-left">
-                        <span className="card-title">{s.market}</span>
-                        <span className="card-meta">{s.reason}</span>
-                      </div>
-                      <div className="card-right">
-                        <span style={{ fontSize: '0.7rem', color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)', textTransform: 'uppercase', fontWeight: 600 }}>{s.direction} {s.confidence}%</span>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{s.action?.toUpperCase()}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {aiData.anomaly && (
-                <div style={{ padding: '0.75rem', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.7rem' }}>
-                  <span style={{ color: '#f59e0b', fontWeight: 600 }}>⚠ Anomaly: </span>{aiData.anomaly}
-                </div>
-              )}
-              {aiData.hotTopics?.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {aiData.hotTopics.map((t: string, i: number) => (
-                    <span key={i} style={{ padding: '0.2rem 0.6rem', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.65rem', borderRadius: 2 }}>{t}</span>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <>
+          <VURAAgentDashboard />
+          <AgentDashboard />
+          <TrackRecord />
+          <Sandbox />
+          <LandingSections />
+        </>
       );
     }
 
@@ -766,9 +739,20 @@ export default function Home() {
   };
 
   // ── UI ──────────────────────────────────────────────────────────────────
-  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation'];
+  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats', 'ai'];
   const wlCount = watchlist.size;
   const alCount = alerts.filter(a => !a.triggered).length;
+
+  const tabLabel = (tab: string) => {
+    const map: Record<string, string> = {
+      all: 'All', crypto: 'Crypto', politics: 'Politics', sports: 'Sports',
+      arbitrage: 'Arbitrage', watchlist: 'Watchlist', whale: 'Signals', alerts: 'Alerts',
+      correlation: 'Correlations', stats: 'Stats', ai: 'AI Agent',
+      bonds: 'Bonds', 'crypto-live': 'Fast', portfolio: 'Portfolio', leaderboard: 'Leaderboard',
+      news: 'News', calendar: 'Calendar', simulator: 'Simulator', copytrading: 'Copy Trading',
+    };
+    return map[tab] || tab.charAt(0).toUpperCase() + tab.slice(1);
+  };
 
   return (
     <>
@@ -780,6 +764,7 @@ export default function Home() {
           </a>
           <div className="nav-links">
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('all'); }} className={activeTab === 'all' ? 'nav-link-active' : ''}>Terminal</a>
+            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('ai'); }} className={activeTab === 'ai' ? 'nav-link-active' : ''} style={activeTab === 'ai' ? { color: '#7B61FF', fontWeight: 600 } : {}}>AI Agent</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
@@ -861,9 +846,15 @@ export default function Home() {
           {tabs.map(tab => (
             <button key={tab} className={`tab-btn ${activeTab === tab ? 'tab-active' : ''}`}
               onClick={() => setActiveTab(tab)}>
-              {tab === 'watchlist' ? 'Watchlist' : tab === 'whale' ? 'Signals' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tabLabel(tab)}
               {tab === 'watchlist' && wlCount > 0 && <span className="tab-badge">{wlCount}</span>}
               {tab === 'alerts' && alCount > 0 && <span className="tab-badge">{alCount}</span>}
+            </button>
+          ))}
+          {['bonds', 'crypto-live', 'portfolio', 'leaderboard', 'news', 'calendar', 'simulator', 'copytrading'].map(tab => (
+            <button key={tab} className={`tab-btn ${activeTab === tab ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab(tab)}>
+              {tabLabel(tab)}
             </button>
           ))}
         </div>
