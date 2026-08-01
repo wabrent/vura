@@ -18,6 +18,7 @@ import NewsFeed from '@/app/components/NewsFeed';
 import CalendarView from '@/app/components/CalendarView';
 import TradeSimulator from '@/app/components/TradeSimulator';
 import CopyTrading from '@/app/components/CopyTrading';
+import ErrorBoundary from '@/app/components/ErrorBoundary';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
@@ -919,7 +920,7 @@ export default function Home() {
         </div>
       )}
 
-      <main key={activeTab} className="animate-slide-up">{renderContent()}</main>
+      <main key={activeTab} className="animate-slide-up"><ErrorBoundary>{renderContent()}</ErrorBoundary></main>
 
       {/* ── P&L + TRADE MODAL ── */}
       {selectedMarket && (

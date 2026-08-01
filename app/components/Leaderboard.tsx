@@ -48,7 +48,7 @@ export default function Leaderboard() {
     return {
       traders: data.length,
       volume: data.reduce((s, e) => s + e.vol, 0),
-      topPnl: Math.max(...data.map(e => e.pnl)),
+      topPnl: Math.max(...(data.length ? data.map(e => e.pnl) : [0])),
     };
   }, [data]);
 
