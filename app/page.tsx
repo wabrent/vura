@@ -5,19 +5,6 @@ import { usePrivy } from '@privy-io/react-auth';
 import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
 import AgentDashboard from '@/app/components/AgentDashboard';
-import VURAAgentDashboard from '@/app/components/VURAAgentDashboard';
-import TrackRecord from '@/app/components/TrackRecord';
-import Sandbox from '@/app/components/Sandbox';
-import LandingSections from '@/app/components/LandingSections';
-import WhaleTracker from '@/app/components/WhaleTracker';
-import BondsTab from '@/app/components/BondsTab';
-import FastMarkets from '@/app/components/FastMarkets';
-import PortfolioDashboard from '@/app/components/PortfolioDashboard';
-import Leaderboard from '@/app/components/Leaderboard';
-import NewsFeed from '@/app/components/NewsFeed';
-import CalendarView from '@/app/components/CalendarView';
-import TradeSimulator from '@/app/components/TradeSimulator';
-import CopyTrading from '@/app/components/CopyTrading';
 import ErrorBoundary from '@/app/components/ErrorBoundary';
 
 const CONFIG = {
@@ -385,7 +372,7 @@ export default function Home() {
 
   // ── Derived data ────────────────────────────────────────────────────────
   const filteredMarkets = markets.filter(m => {
-    const specialTabs = ['all', 'watchlist', 'arbitrage', 'whale', 'alerts', 'correlation', 'ai', 'stats', 'bonds', 'crypto-live', 'portfolio', 'leaderboard', 'news', 'calendar', 'simulator', 'copytrading'];
+    const specialTabs = ['all', 'watchlist', 'arbitrage', 'alerts', 'correlation', 'ai', 'stats'];
     if (!specialTabs.includes(activeTab)) {
       if (m.category !== activeTab) return false;
     }
@@ -463,16 +450,6 @@ export default function Home() {
         ))}
       </div>
     );
-
-    if (activeTab === 'whale') return <WhaleTracker />;
-    if (activeTab === 'bonds') return <BondsTab markets={markets} />;
-    if (activeTab === 'crypto-live') return <FastMarkets markets={markets} />;
-    if (activeTab === 'portfolio') return <PortfolioDashboard markets={markets} />;
-    if (activeTab === 'leaderboard') return <Leaderboard />;
-    if (activeTab === 'news') return <NewsFeed />;
-    if (activeTab === 'calendar') return <CalendarView markets={markets} />;
-    if (activeTab === 'simulator') return <TradeSimulator markets={markets} />;
-    if (activeTab === 'copytrading') return <CopyTrading />;
 
     if (activeTab === 'watchlist') {
       const wlNames = [...watchlists.keys()];
@@ -630,13 +607,9 @@ export default function Home() {
 
     if (activeTab === 'ai') {
       return (
-        <>
-          <VURAAgentDashboard />
+        <ErrorBoundary>
           <AgentDashboard />
-          <TrackRecord />
-          <Sandbox />
-          <LandingSections />
-        </>
+        </ErrorBoundary>
       );
     }
 
@@ -659,38 +632,6 @@ export default function Home() {
           </div>
         </div>
       ));
-    }
-
-    if (activeTab === 'whale') {
-      return (
-        <>
-          <div style={{ display: 'flex', gap: 1, background: 'var(--border-md)', marginBottom: '1.5rem' }}>
-            <div style={{ flex: 1, background: 'var(--bg-2)', padding: '1rem' }}>
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-3)' }}>TOP VOLUME</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 500 }}>{markets.filter(m => m.volume > 100000).length} markets</div>
-            </div>
-            <div style={{ flex: 1, background: 'var(--bg-2)', padding: '1rem' }}>
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-3)' }}>SIGNALS</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--accent)' }}>Live</div>
-            </div>
-          </div>
-          {[...markets].sort((a, b) => b.vol24h - a.vol24h).slice(0, 15).map((m, i) => (
-            <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
-              onClick={() => window.open(`https://polymarket.com/event/${m.slug}`, '_blank')}>
-              <div className="card-left">
-                <span className="card-category">{m.category.toUpperCase()}</span>
-                <span className="card-title">{m.question}</span>
-              </div>
-              <div className="card-right">
-                <span style={{ fontSize: '1.2rem', color: 'var(--accent)' }}>${m.volDisplay}</span>
-                <span className={`card-change ${m.change24h > 0 ? 'change-up' : 'change-down'}`}>
-                  {m.change24h > 0 ? '+' : ''}{(m.change24h * 100).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-          ))}
-        </>
-      );
     }
 
     if (filteredMarkets.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets found.</div>;
@@ -740,17 +681,15 @@ export default function Home() {
   };
 
   // ── UI ──────────────────────────────────────────────────────────────────
-  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation', 'stats', 'ai'];
+  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'alerts', 'correlation', 'stats', 'ai'];
   const wlCount = watchlist.size;
   const alCount = alerts.filter(a => !a.triggered).length;
 
   const tabLabel = (tab: string) => {
     const map: Record<string, string> = {
       all: 'All', crypto: 'Crypto', politics: 'Politics', sports: 'Sports',
-      arbitrage: 'Arbitrage', watchlist: 'Watchlist', whale: 'Signals', alerts: 'Alerts',
+      arbitrage: 'Arbitrage', watchlist: 'Watchlist', alerts: 'Alerts',
       correlation: 'Correlations', stats: 'Stats', ai: 'AI Agent',
-      bonds: 'Bonds', 'crypto-live': 'Fast', portfolio: 'Portfolio', leaderboard: 'Leaderboard',
-      news: 'News', calendar: 'Calendar', simulator: 'Simulator', copytrading: 'Copy Trading',
     };
     return map[tab] || tab.charAt(0).toUpperCase() + tab.slice(1);
   };
@@ -769,7 +708,6 @@ export default function Home() {
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('ai'); }} className={activeTab === 'ai' ? 'nav-link-active' : ''}>AI</a>
           </div>
           <div className="nav-status">
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">◐</button>
@@ -864,12 +802,6 @@ export default function Home() {
               {tabLabel(tab)}
               {tab === 'watchlist' && wlCount > 0 && <span className="tab-badge">{wlCount}</span>}
               {tab === 'alerts' && alCount > 0 && <span className="tab-badge">{alCount}</span>}
-            </button>
-          ))}
-          {['bonds', 'crypto-live', 'portfolio', 'leaderboard', 'news', 'calendar', 'simulator', 'copytrading'].map(tab => (
-            <button key={tab} className={`tab-btn ${activeTab === tab ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab(tab)}>
-              {tabLabel(tab)}
             </button>
           ))}
         </div>
