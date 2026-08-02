@@ -9,6 +9,8 @@ npm-debug.log*
 .env
 .env.local
 .env.production
+.env.prod
+.env.vercel
 
 # IDE
 .vscode/
@@ -23,16 +25,12 @@ Thumbs.db
 # Build output (not for static sites)
 # dist/
 # build/
+.next/
+.agents/
 
 # Temporary files
 *.tmp
 .cache/
-*.tsbuildinfo
 
-.env.local
-.env
 .vercel
-.agents/
-.next/
-
-.env*
+tsconfig.tsbuildinfo
