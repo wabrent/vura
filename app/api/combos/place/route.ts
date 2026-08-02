@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pick at least 2 legs' }, { status: 400 });
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Response>((resolve, reject) => {
       let settled = false;
       let attempt = 0;
       let signing = false;
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
       ws.onmessage = async (ev) => {
         try {
-          const msg = JSON.parse(ev.data);
+          const msg = JSON.parse(ev.data as string);
           
           if (msg.type === 'auth') {
             if (!msg.success) return handleError('Combo auth failed');
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
               settled = true;
               if (timer) clearTimeout(timer);
               try { ws.close(); } catch {}
-              resolve({ txHash: msg.tx_hash, status: msg.status });
+              resolve(NextResponse.json({ txHash: msg.tx_hash, status: msg.status }));
             }
           } else if ((msg.type === 'RFQ_STATUS_UPDATE' || msg.type === 'RFQ_EXECUTION_UPDATE') &&
                      (msg.status === 'FAILED' || isExpired(msg))) {
