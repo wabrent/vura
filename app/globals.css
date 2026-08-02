@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -207,6 +207,48 @@ footer { max-width: 74rem; margin: 0 auto; padding: 0 1.75rem 3rem; margin-top: 
 
 .animate-float { animation: float 3s ease-in-out infinite; }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* ── AI HERO (dark mode) ─────────────────────────────────────────────── */
+.ai-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; background: transparent; padding: 1.25rem 1.5rem; }
+.ai-nav-inner { max-width: 74rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+.ai-nav-logo { display: flex; align-items: center; gap: 0.55rem; color: #fff; text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 1.1rem; letter-spacing: 0.04em; }
+.ai-nav-links { display: none; align-items: center; gap: 2rem; }
+@media (min-width: 768px) { .ai-nav-links { display: flex; } }
+.ai-nav-links a { display: inline-flex; align-items: center; gap: 0.3rem; color: rgba(255,255,255,0.8); text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+.ai-nav-links a:hover { color: #fff; }
+.ai-nav-right { display: flex; align-items: center; gap: 1.2rem; }
+.ai-nav-demo { display: none; color: rgba(255,255,255,0.8); text-decoration: none; font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+.ai-nav-demo:hover { color: #fff; }
+@media (min-width: 640px) { .ai-nav-demo { display: block; } }
+.ai-nav-cta { background: #fff; color: #000; border: none; border-radius: 999px; padding: 0.65rem 1.4rem; font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.ai-nav-cta:hover { opacity: 0.9; }
+
+.ai-hero { position: relative; width: 100%; min-height: 100vh; background: #000000; color: #fff; overflow: hidden; display: flex; align-items: center; }
+.ai-hero-video { position: absolute; inset: 0; }
+.ai-hero-video video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
+.ai-hero-video-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
+.ai-hero-grad-g1 { position: absolute; top: -20%; left: 20%; width: 600px; height: 600px; background: rgba(30, 58, 138, 0.2); filter: blur(120px); mix-blend-mode: screen; }
+.ai-hero-grad-g2 { position: absolute; bottom: -10%; right: 20%; width: 500px; height: 500px; background: rgba(49, 46, 129, 0.2); filter: blur(120px); mix-blend-mode: screen; }
+.ai-hero-content { position: relative; z-index: 10; max-width: 64rem; margin: 0 auto; margin-top: 5rem; padding: 0 1.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3rem; }
+.ai-hero-pre { font-family: 'Instrument Serif', serif; font-size: 1.875rem; line-height: 1.1; color: #fff; margin: 0; }
+@media (min-width: 640px) { .ai-hero-pre { font-size: 3rem; } }
+@media (min-width: 1024px) { .ai-hero-pre { font-size: 48px; } }
+.ai-hero-title { font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 3.75rem; line-height: 0.9; letter-spacing: -0.05em; margin: 0; background: linear-gradient(to bottom, #fff, #fff, #b4c0ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@media (min-width: 640px) { .ai-hero-title { font-size: 6rem; } }
+@media (min-width: 1024px) { .ai-hero-title { font-size: 136px; } }
+.ai-hero-sub { font-family: 'Instrument Sans', sans-serif; font-size: 1.125rem; line-height: 1.65; color: #fff; opacity: 0.7; max-width: 36rem; margin: 0 auto; }
+@media (min-width: 640px) { .ai-hero-sub { font-size: 20px; } }
+.ai-hero-ctas { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
+@media (min-width: 640px) { .ai-hero-ctas { flex-direction: row; } }
+.ai-cta-primary { display: flex; align-items: center; gap: 0.75rem; background: #fff; border: none; border-radius: 999px; padding: 0.5rem 0.5rem 0.5rem 1.5rem; cursor: pointer; transition: all 0.2s; }
+.ai-cta-primary:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+.ai-cta-primary span:first-child { font-family: 'Instrument Sans', sans-serif; font-size: 1.125rem; font-weight: 500; color: #0a0400; }
+.ai-cta-primary-circle { width: 40px; height: 40px; border-radius: 50%; background: #3054ff; display: flex; align-items: center; justify-content: center; color: #fff; transition: background 0.2s; flex-shrink: 0; }
+.ai-cta-primary:hover .ai-cta-primary-circle { background: #2040e0; }
+.ai-cta-secondary { display: flex; align-items: center; gap: 0.5rem; color: rgba(255,255,255,0.7); background: transparent; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-family: 'Instrument Sans', sans-serif; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.ai-cta-secondary:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.ai-cta-sec-arrow { transition: transform 0.2s; }
+.ai-cta-secondary:hover .ai-cta-sec-arrow { transform: translateX(4px); }
 
 @media (max-width: 768px) {
   .hero { flex-direction: column; padding: 2.2rem 1rem; }

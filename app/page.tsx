@@ -6,6 +6,7 @@ import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
 import AgentDashboard from '@/app/components/AgentDashboard';
 import ErrorBoundary from '@/app/components/ErrorBoundary';
+import AIHero from '@/app/components/AIHero';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
@@ -696,103 +697,7 @@ export default function Home() {
 
   return (
     <>
-      <nav>
-        <div className="nav-inner">
-          <a href="/" className="nav-logo" onClick={e => { e.preventDefault(); setActiveTab('all'); }}>
-            <span className="logo-mark">V</span>
-            <span>VURA</span>
-          </a>
-          <div className="nav-links">
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('all'); }} className={activeTab === 'all' ? 'nav-link-active' : ''}>Terminal</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('ai'); }} className={activeTab === 'ai' ? 'nav-link-active' : ''} style={activeTab === 'ai' ? { color: '#7B61FF', fontWeight: 600 } : {}}>AI Agent</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
-          </div>
-          <div className="nav-status">
-            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">◐</button>
-            {!ready ? (
-              <button className="privy-btn" disabled style={{ opacity: 0.5 }}>Loading...</button>
-            ) : authenticated ? (
-              <>
-                <span style={{ fontSize: '0.6rem', color: 'var(--accent)' }}>
-                  {user?.email?.address || user?.google?.email || user?.twitter?.username || (user?.id ? user.id.slice(0, 6) + '...' : 'User')}
-                </span>
-                {tweetCount && (
-                  <span style={{ fontSize: '0.55rem', color: '#1d9bf0', background: 'rgba(29,155,240,0.1)', padding: '1px 5px', borderRadius: 2 }}>
-                    {tweetCount.pm} PM tweets
-                  </span>
-                )}
-                <span className="live-dot" />
-                <span>Live</span>
-                <button className="privy-btn logout" onClick={logout}>Exit</button>
-              </>
-            ) : (
-              <button className="privy-btn" onClick={login}>Connect</button>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <section className="hero">
-        <div className="hero-left">
-          <div className="hero-badge">● LIVE · PREDICTION ANALYTICS</div>
-          <h2>REAL-TIME</h2>
-          <h2>PREDICTION</h2>
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Markets</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{markets.length.toLocaleString()}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>24H Volume</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--brand)' }}>${formatVol(totalVol)}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>AI Engine</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>Active</span>
-            </div>
-          </div>
-        </div>
-        <div className="hero-right">
-          {aiData?.signals ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div style={{ fontSize: '0.62rem', letterSpacing: '0.16em', color: 'var(--brand)', textTransform: 'uppercase', fontWeight: 700 }}>▼ AI SIGNALS · LIVE</div>
-              {aiData.signals.slice(0, 3).map((s: any, i: number) => (
-                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i*0.15}s`, display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.9rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)'}`, borderRadius: '12px' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)' }}>{s.direction === 'bullish' ? '▲' : '▼'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
-                    <div style={{ fontSize: '0.58rem', color: 'var(--text-3)', marginTop: 2 }}>{s.reason} · {s.confidence}% confidence</div>
-                  </div>
-                  <span style={{ fontSize: '0.6rem', padding: '3px 9px', background: s.action === 'buy' ? 'rgba(34,211,165,0.12)' : 'rgba(251,95,120,0.12)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 8, fontWeight: 700, letterSpacing: '0.04em' }}>{s.action?.toUpperCase()}</span>
-                </div>
-              ))}
-              {aiData.summary && (
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', lineHeight: 1.6, fontStyle: 'italic', marginTop: '0.25rem' }}>
-                  {aiData.summary}
-                </div>
-              )}
-              {aiData.hotTopics?.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                  {aiData.hotTopics.map((t: string, i: number) => (
-                    <span key={i} style={{ padding: '3px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.55rem', borderRadius: 999, color: 'var(--text-2)', letterSpacing: '0.04em' }}>#{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              <p>Track Polymarket order books, volume flows, and cross-platform price discrepancies. Built for traders who need speed.</p>
-              <div className="hero-divider" />
-              <div className="hero-contact">
-                <span>Powered by Polymarket CLOB</span>
-                <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
+      <AIHero />
 
       <div className="tabs-bar">
         <div className="tabs-inner">
