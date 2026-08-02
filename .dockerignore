@@ -28,8 +28,4 @@ Thumbs.db
 *.tmp
 .cache/
 
-.env.local
-.env
 .vercel
-.agents/
-.next/

@@ -1,31 +1,41 @@
 {
-  "name": "polyedge-quant",
-  "version": "4.0.0",
-  "description": "PolyEdge Quant Terminal — Real-time Polymarket analytics with Alpha Score, Arbitrage detection, and Whale Flow tracking",
-  "main": "app.js",
+  "name": "vura",
+  "version": "2.0.0",
+  "private": true,
   "scripts": {
-    "start": "node local-server.js",
-    "dev": "node local-server.js",
-    "build": "echo 'No build step required - vanilla JS'",
-    "deploy": "vercel --prod"
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start"
   },
-  "keywords": [
-    "polymarket",
-    "trading",
-    "arbitrage",
-    "crypto",
-    "prediction-market",
-    "analytics",
-    "whale-tracking"
-  ],
-  "author": "waabrent",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wabrent/polyedge.git"
+  "dependencies": {
+    "@headlessui/react": "^2.0.0",
+    "@polymarket/clob-client-v2": "^1.0.6",
+    "@polymarket/client": "^0.1.0-beta.6",
+    "@polymarket/builder-signing-sdk": "^1.0.0",
+    "@privy-io/react-auth": "latest",
+    "@react-aria/focus": "^3.18.0",
+    "@react-aria/interactions": "^3.22.0",
+    "ethers": "^6.16.0",
+    "viem": "^2.0.0",
+    "@stripe/crypto": "^1.0.0",
+    "@stripe/stripe-js": "^5.0.0",
+    "@abstract-foundation/agw-client": "^1.0.0",
+    "@farcaster/mini-app-solana": "^1.0.0",
+    "@solana-program/memo": "^0.8.0",
+    "@solana-program/system": "^0.8.0",
+    "@solana-program/token": "^0.6.0",
+    "@solana/kit": "^3.0.3",
+    "permissionless": "^0.2.47",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "twitter-api-v2": "^1.29.0"
   },
   "devDependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
   }
+}
 }

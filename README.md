@@ -1,123 +1,66 @@
-# PolyEdge Quant Terminal
+# VURA | Prediction Terminal
 
-Аналитический терминал для работы с prediction market платформой **Polymarket**.
+Minimalist analytics terminal for Polymarket. Real-time market data, Alpha scoring, Smart Money signals, arbitrage detection, and multi-watchlist management.
 
-## 🚀 Возможности
+## Stack
 
-### Реальные данные (v4.0)
-- **Alpha Score** — расчёт на основе объёма, волатильности и времени до завершения рынка
-- **Arbitrage Gap** — сравнение implied probability с реальными ценами Binance
-- **Spread** — арбитражный спред бинарных исходов (Yes + No - 1)
-- **Whale Flow** — отслеживание крупных транзакций в реальном времени
+- **Next.js 14** (App Router)
+- **React 18** + TypeScript
+- **Privy SDK** — Google, Twitter, Email, Wallet auth
+- **Polymarket CLOB SDK** — order book data
+- **CSS** — custom dark/light theme, no Tailwind
+- **Vercel** — serverless deployment (Dublin region)
 
-### Фильтрация и поиск
-- Категории: Crypto, Politics, Sports
-- Поиск по названию рынка
-- Экспорт сигналов в CSV
+## Features
 
-### Интеграции
-- **Polymarket API** — данные о рынках и сделках
-- **Binance API** — цены криптоактивов
+- **Alpha Scoring** — volume-weighted composite 0-10
+- **Smart Money BULL/BEAR** — volume-weighted momentum
+- **Correlation Matrix** — Jaccard similarity across markets
+- **Arbitrage Detection** — internal spread gaps
+- **Multiple Watchlists** — create, name, share via link
+- **Advanced Screener** — filter by price, volume, 24h change
+- **Price Alerts** — Telegram webhook support
+- **P&L Calculator** — built into every market card
+- **CSV Export** — any filtered view
+- **Real Price History** — CLOB /prices-history sparklines
+- **Stats Tab** — volume, top movers, maker rebates
+- **Keyboard Shortcuts** — 1-9 tabs, / search, Esc close
 
----
+## Getting Started
 
-## 📁 Структура проекта
+```bash
+npm install --legacy-peer-deps
+npm run dev
+```
+
+## Environment Variables
+
+Create `.env.local`:
 
 ```
-polyedge-main/
-├── index.html          # UI терминала
-├── app.js              # Основная логика (real-time данные)
-├── styles.css          # Стили (cyberpunk/trading terminal)
-├── vercel.json         # Конфиг для Vercel
-├── logo.png            # Логотип
-├── .gitignore          # Игнорируемые файлы
+NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
+PRIVY_APP_SECRET=your_privy_app_secret
+POLYMARKET_API_KEY=your_builder_api_key
+POLYMARKET_SECRET=your_builder_secret
+POLYMARKET_PASSPHRASE=your_builder_passphrase
+```
+
+## Repository Structure
+
+```
+app/
+├── layout.tsx              # PrivyProvider, auth config
+├── page.tsx                # Main terminal (all tabs, state, logic)
+├── globals.css             # Styling
+├── icon.svg                # Favicon
+├── lib/types.ts            # TypeScript types
+├── components/
+│   └── TradeModal.tsx      # Trade form + P&L calculator
 └── api/
-    └── proxy.js        # Serverless функция для CORS proxy
+    ├── proxy/route.ts      # CORS proxy + CLOB endpoint
+    └── twitter/route.ts    # Polymarket tweet counter
 ```
 
----
-
-## 🛠️ Установка и запуск
-
-### Локально (Live Server)
-```bash
-# Открой index.html в браузере или используй Live Server
-# VS Code: установи расширение "Live Server" → Right Click → Open with Live Server
-```
-
-### Деплой на Vercel
-```bash
-# 1. Установи Vercel CLI
-npm i -g vercel
-
-# 2. Задеплой
-vercel
-
-# Или подключи репозиторий на vercel.com
-```
-
----
-
-## 📊 Как работает
-
-### Alpha Score
-```
-Базовый: 5.0
-+ Объём торгов: до +2 (> $1M = +2)
-+ Волатильность: до +2 (>15% = +2)
-+ Время до завершения: до +1 (<24ч = +1)
-─────────────────────────────────────
-Максимум: 10.0
-```
-
-### Arbitrage Gap
-```
-Gap = (impliedProb × 100 - 50) - (Binance 24h change / 10)
-
-Где:
-- impliedProb = цена Yes на Polymarket
-- Положительный Gap = потенциальная арбитражная возможность
-```
-
-### Spread
-```
-Spread = |Yes Price + No Price - 1|
-
-- Spread > 0.02 (2¢) = ⚠️ ARB сигнал
-- Spread < 0.02 = ✓ (норма)
-```
-
-### Whale Flow
-```
-- Мониторит топ-5 активных рынков
-- Загружает последние сделки через Polymarket API
-- Показывает сделки ≥ $10,000
-- 🔥 WHALE = сделки ≥ $50,000
-```
-
----
-
-## ⚙️ Конфигурация
-
-В `app.js` можно настроить:
-
-```javascript
-const CONFIG = {
-    API: "https://gamma-api.polymarket.com/events?...",
-    PROXY: "/api/proxy?url=",
-    REFRESH: 12000,              // Обновление данных (мс)
-    WHALE_THRESHOLD_USD: 10000   // Порог для whale алерта
-};
-```
-
----
-
-## 📝 Лицензия
+## License
 
 MIT
-
----
-
-## 📬 Контакты
-
-Telegram: [@waabrent](https://t.me/waabrent)
