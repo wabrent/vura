@@ -55,6 +55,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('volume');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [dark, setDark] = useState(true);
   const [priceHistory, setPriceHistory] = useState<Map<string, { t: number; p: number }[]>>(new Map());
   const priceHistoryRef = useRef(priceHistory);
@@ -172,13 +173,23 @@ export default function Home() {
     try {
       const urls = [CONFIG.API, `/api/proxy?url=${encodeURIComponent(CONFIG.API)}`];
       let data = null;
+      let lastError = '';
       for (const url of urls) {
         try {
           const res = await fetch(url, { headers: { Accept: 'application/json' } });
           if (res.ok) { data = await res.json(); break; }
-        } catch {}
+          lastError = `HTTP ${res.status} from ${url.startsWith('/api') ? 'proxy' : 'direct'} fetch`;
+        } catch (e: any) {
+          lastError = e?.message || 'network error';
+        }
       }
-      if (!data) return;
+      if (!data) {
+        console.error('VURA: failed to load markets —', lastError);
+        setFetchError(lastError || 'Unknown error');
+        setLoading(false);
+        return;
+      }
+      setFetchError(null);
       const events = Array.isArray(data) ? data : (data.data || data.events || []);
       const ms: Market[] = events.flatMap((event: any) => {
         const mkts = (event.markets || []).filter((m: any) => m.active && !m.closed);
@@ -427,6 +438,15 @@ export default function Home() {
   };
 
   const renderContent = () => {
+    if (!loading && fetchError && markets.length === 0) return (
+      <div className="error-state">
+        <div className="error-state-code">SIGNAL LOST</div>
+        <p className="error-state-msg">Couldn't reach Polymarket. {fetchError}</p>
+        <p className="error-state-hint">This usually means the data source is unreachable from this region, or rate-limited. Check the browser console for details.</p>
+        <button className="btn-retry" onClick={() => { setLoading(true); setFetchError(null); fetchMarkets(); }}>Retry</button>
+      </div>
+    );
+
     if (loading) return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {[1,2,3,4,5].map(i => (

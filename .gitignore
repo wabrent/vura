@@ -33,3 +33,9 @@ Thumbs.db
 .vercel
 .agents/
 .next/
+
+.env*
+
+# Temp / artifacts
+*.tsbuildinfo
+files (3)/
