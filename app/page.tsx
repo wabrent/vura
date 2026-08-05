@@ -432,7 +432,7 @@ export default function Home() {
           <div className="card-actions" onClick={e => e.stopPropagation()}>
             <button className={`star-btn ${inWl ? 'starred' : ''}`}
               onClick={() => toggleWatchlist(String(m.id))}>★</button>
-            <a className="btn-trade" href={`https://polymarket.com/event/${m.slug}`} target="_blank">Trade</a>
+            <a className="btn-trade" href={`https://polymarket.com/event/${m.slug}?via=vura`} target="_blank">Trade</a>
           </div>
         </div>
       </div>
@@ -681,7 +681,7 @@ export default function Home() {
       if (arbList.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No arbitrage signals. Scanning internal spreads...</div>;
       return arbList.map((a, i) => (
         <div key={a.id} className="arb-card" style={{ animationDelay: `${i * 50}ms` }}
-          onClick={() => window.open(`https://polymarket.com/event/${a.slug}`, '_blank')}>
+          onClick={() => window.open(`https://polymarket.com/event/${a.slug}?via=vura`, '_blank')}>
           <div style={{ flex: '0 0 38%' }}>
             <span className="arb-platform">SPREAD</span>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1rem' }}>{a.question.substring(0, 45)}</div>
@@ -719,7 +719,7 @@ export default function Home() {
           </div>
           {markets.sort((a, b) => b.volume - a.volume).slice(0, 15).map((m, i) => (
             <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
-              onClick={() => window.open(`https://polymarket.com/event/${m.slug}`, '_blank')}>
+              onClick={() => window.open(`https://polymarket.com/event/${m.slug}?via=vura`, '_blank')}>
               <div className="card-left">
                 <span className="card-category">{m.category.toUpperCase()}</span>
                 <span className="card-title">{m.question}</span>
@@ -827,11 +827,52 @@ export default function Home() {
         </div>
       </nav>
 
+      <div className="tape">
+        <div className="tape-track">
+          {[...markets].sort((a, b) => b.volume - a.volume).slice(0, 12).map(m => {
+            const chg = m.change24h;
+            return (
+              <span key={m.id} className="tape-item" onClick={() => setSelectedMarket(m)} style={{ cursor: 'pointer' }}>
+                <span style={{ color: chg > 0 ? 'var(--accent)' : chg < 0 ? 'var(--red)' : 'var(--text-3)' }}>{chg > 0 ? '▲' : chg < 0 ? '▼' : '◆'}</span>
+                <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.question.substring(0, 40)}</span>
+                <span className="tape-price">{Math.round(m.yesPrice * 100)}c</span>
+                <span className={chg > 0 ? 'tape-up' : chg < 0 ? 'tape-down' : ''} style={{ fontSize: '0.66rem' }}>{chg > 0 ? '+' : ''}{(chg * 100).toFixed(1)}%</span>
+              </span>
+            );
+          })}
+          {[...markets].sort((a, b) => b.volume - a.volume).slice(0, 12).map(m => {
+            const chg = m.change24h;
+            return (
+              <span key={m.id + 'b'} className="tape-item" onClick={() => setSelectedMarket(m)} style={{ cursor: 'pointer' }}>
+                <span style={{ color: chg > 0 ? 'var(--accent)' : chg < 0 ? 'var(--red)' : 'var(--text-3)' }}>{chg > 0 ? '▲' : chg < 0 ? '▼' : '◆'}</span>
+                <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.question.substring(0, 40)}</span>
+                <span className="tape-price">{Math.round(m.yesPrice * 100)}c</span>
+                <span className={chg > 0 ? 'tape-up' : chg < 0 ? 'tape-down' : ''} style={{ fontSize: '0.66rem' }}>{chg > 0 ? '+' : ''}{(chg * 100).toFixed(1)}%</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
       <section className="hero">
         <div className="hero-left">
-          <h2>REAL-TIME</h2>
-          <h2>PREDICTION</h2>
-          <div className="hero-badge">ANALYTICS</div>
+          <div className="hero-badge">● LIVE · PREDICTION INTELLIGENCE</div>
+          <h2>SEE THE MARKET</h2>
+          <h2><span className="grad">BEFORE IT MOVES</span></h2>
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Markets</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{markets.length.toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>24H Volume</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>${formatVol(totalVol)}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Whale Flow</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent-2)' }}>Live</span>
+            </div>
+          </div>
         </div>
         <div className="hero-right">
           {aiData?.signals ? (
