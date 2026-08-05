@@ -237,6 +237,36 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .alert-row { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; }
 .alert-row-triggered { border-color: rgba(42, 255, 206, 0.4); background: rgba(42, 255, 206, 0.04); }
 
+/* ── STATS STRIP ─────────────────────────────────────────────────────── */
+.stats-strip { max-width: 84rem; margin: 0 auto; padding: 1rem 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.stats-cell { background: var(--bg); padding: 0.8rem 1.2rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.stats-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; color: var(--text-3); text-transform: uppercase; }
+.stats-val { font-size: 1rem; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.stats-val.accent { color: var(--accent); }
+.stats-val.cyan { color: var(--accent-2); display: flex; align-items: center; gap: 0.4rem; }
+
+/* ── MARKET TABLE ────────────────────────────────────────────────────── */
+.market-table { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.table-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: var(--bg-2); border-bottom: 1px solid var(--border); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.1em; color: var(--text-3); text-transform: uppercase; }
+.market-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; animation: cardIn 0.3s ease-out backwards; }
+.market-row:last-child { border-bottom: none; }
+.market-row:hover { background: var(--bg-2); }
+.market-row:hover .row-title { color: var(--accent-2); }
+.col-name { flex: 1 1 34%; display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.col-spark { flex: 0 0 60px; display: flex; align-items: center; }
+.col-price { flex: 0 0 70px; }
+.col-change { flex: 0 0 60px; }
+.col-vol { flex: 0 0 90px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); text-align: right; }
+.col-alpha { flex: 0 0 90px; display: flex; align-items: center; gap: 0.5rem; }
+.col-spread { flex: 0 0 70px; font-family: var(--mono); font-size: 0.68rem; text-align: right; }
+.col-actions { flex: 0 0 100px; display: flex; align-items: center; gap: 0.4rem; justify-content: flex-end; }
+.row-cat { font-size: 0.56rem; font-weight: 600; letter-spacing: 0.08em; color: var(--text-3); text-transform: uppercase; }
+.row-title { font-size: 0.78rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.12s; }
+.row-price { font-size: 0.85rem; font-weight: 700; font-family: var(--mono); }
+.row-change { font-size: 0.68rem; font-family: var(--mono); }
+.alpha-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.alpha-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 2px; }
+
 @media (max-width: 768px) {
   .hero { flex-direction: column; padding: 2.5rem 1rem; }
   .hero-left h2 { font-size: 2.4rem; }
@@ -252,4 +282,15 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
   .card-right { align-items: flex-start; }
   .modal-prices { grid-template-columns: repeat(2, 1fr); }
   .pnl-row { grid-template-columns: 1fr 1fr; }
+  .stats-strip { padding: 0.6rem 1rem; grid-template-columns: repeat(2, 1fr); }
+  .market-row { flex-wrap: wrap; gap: 0.4rem; padding: 0.7rem 0.9rem; }
+  .col-name { flex: 1 1 100%; }
+  .col-spark { display: none; }
+  .col-price { flex: 0 0 70px; }
+  .col-change { flex: 0 0 60px; }
+  .col-vol { flex: 0 0 80px; }
+  .col-alpha { flex: 0 0 80px; }
+  .col-spread { display: none; }
+  .col-actions { flex: 0 0 100px; }
+  .table-head { display: none; }
 }

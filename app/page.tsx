@@ -398,42 +398,43 @@ export default function Home() {
   const totalVol = markets.reduce((s, m) => s + m.volume, 0);
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const renderMarketCard = (m: Market, i: number) => {
+  const renderMarketRow = (m: Market, i: number) => {
     const price = Math.round(m.yesPrice * 100);
     const inWl = watchlist.has(String(m.id));
-    const spreadBadge = m.spread > 0.01 ? <span className="spread-badge">SPREAD {(m.spread * 100).toFixed(2)}%</span> : null;
     const chgClass = m.change24h > 0 ? 'change-up' : m.change24h < 0 ? 'change-down' : '';
     const chgSign = m.change24h > 0 ? '+' : '';
     const chgStr = Math.abs(m.change24h * 100) > 0.01 ? (
-      <span className={`card-change ${chgClass}`}>{chgSign}{(m.change24h * 100).toFixed(1)}% 24h</span>
-    ) : null;
+      <span className={`row-change ${chgClass}`}>{chgSign}{(m.change24h * 100).toFixed(1)}%</span>
+    ) : <span className="row-change">0.0%</span>;
     let smartBadge = null;
     if (m.smartScore >= 1.5) smartBadge = <span className="smart-badge smart-bullish">BULL</span>;
     else if (m.smartScore <= -1.5) smartBadge = <span className="smart-badge smart-bearish">BEAR</span>;
 
     const history = m.yesTokenId ? priceHistory.get(m.yesTokenId) || null : null;
-    const sparkSvg = buildSparkSvg(history, m.yesPrice, 80, 28);
+    const sparkSvg = buildSparkSvg(history, m.yesPrice, 60, 20);
 
     return (
-      <div key={m.id} className="market-card" style={{ animationDelay: `${i * 30}ms` }}
+      <div key={m.id} className="market-row" style={{ animationDelay: `${i * 15}ms` }}
         onClick={() => setSelectedMarket(m)}>
-        {m.image && <img src={m.image} alt="" style={{ width: 56, height: 56, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />}
-        <div className="card-left">
-          <span className="card-category">{m.category.toUpperCase()}{smartBadge}</span>
-          <span className="card-title">{m.question}</span>
-          <span className="card-meta">Vol ${m.volDisplay} · Alpha {m.alpha}{spreadBadge ? ' · ' : ''}{spreadBadge}</span>
+        <div className="col-name">
+          <span className="row-cat">{m.category.toUpperCase()}{smartBadge}</span>
+          <span className="row-title">{m.question}</span>
         </div>
-        <div className="card-center">
-          {sparkSvg && <svg width="80" height="28" dangerouslySetInnerHTML={{ __html: sparkSvg }} />}
+        <div className="col-spark">{sparkSvg && <svg width="60" height="20" dangerouslySetInnerHTML={{ __html: sparkSvg }} />}</div>
+        <div className="col-price">
+          <span className={`row-price ${chgClass}`}>{price}c</span>
         </div>
-        <div className="card-right">
-          <span className="card-price">{price}c</span>
-          {chgStr}
-          <div className="card-actions" onClick={e => e.stopPropagation()}>
-            <button className={`star-btn ${inWl ? 'starred' : ''}`}
-              onClick={() => toggleWatchlist(String(m.id))}>★</button>
-            <a className="btn-trade" href={`https://polymarket.com/event/${m.slug}?via=vura`} target="_blank">Trade</a>
-          </div>
+        <div className="col-change">{chgStr}</div>
+        <div className="col-vol">${m.volDisplay}</div>
+        <div className="col-alpha">
+          <div className="alpha-bar"><div className="alpha-fill" style={{ width: `${Math.min(m.alpha * 10, 100)}%` }} /></div>
+          <span>{m.alpha.toFixed(1)}</span>
+        </div>
+        <div className="col-spread">{m.spread > 0.01 ? <span className="spread-badge">{(m.spread * 100).toFixed(2)}%</span> : '—'}</div>
+        <div className="col-actions" onClick={e => e.stopPropagation()}>
+          <button className={`star-btn ${inWl ? 'starred' : ''}`}
+            onClick={() => toggleWatchlist(String(m.id))}>★</button>
+          <a className="btn-trade" href={`https://polymarket.com/event/${m.slug}?via=vura`} target="_blank">Trade</a>
         </div>
       </div>
     );
@@ -475,7 +476,7 @@ export default function Home() {
           </div>
           {watchlistMarkets.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets in this watchlist. Click ★ to add.</div>
-          ) : watchlistMarkets.map((m, i) => renderMarketCard(m, i))}
+          ) : watchlistMarkets.map((m, i) => renderMarketRow(m, i))}
         </div>
       );
     }
@@ -737,7 +738,21 @@ export default function Home() {
     }
 
     if (filteredMarkets.length === 0) return <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-3)' }}>No markets found.</div>;
-    return filteredMarkets.map((m, i) => renderMarketCard(m, i));
+    return (
+      <div className="market-table">
+        <div className="table-head">
+          <div className="col-name">MARKET</div>
+          <div className="col-spark">TREND</div>
+          <div className="col-price">PRICE</div>
+          <div className="col-change">24H</div>
+          <div className="col-vol">VOLUME</div>
+          <div className="col-alpha">ALPHA</div>
+          <div className="col-spread">SPREAD</div>
+          <div className="col-actions" />
+        </div>
+        {filteredMarkets.map((m, i) => renderMarketRow(m, i))}
+      </div>
+    );
   };
 
   const showToastMsg = (text: string) => {
@@ -854,65 +869,28 @@ export default function Home() {
         </div>
       </div>
 
-      <section className="hero">
-        <div className="hero-left">
-          <div className="hero-badge">● LIVE · PREDICTION INTELLIGENCE</div>
-          <h2>SEE THE MARKET</h2>
-          <h2><span className="grad">BEFORE IT MOVES</span></h2>
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Markets</span>
-              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{markets.length.toLocaleString()}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>24H Volume</span>
-              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>${formatVol(totalVol)}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Whale Flow</span>
-              <span style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent-2)' }}>Live</span>
-            </div>
-          </div>
+      <div className="stats-strip">
+        <div className="stats-cell">
+          <span className="stats-label">MARKETS</span>
+          <span className="stats-val">{markets.length.toLocaleString()}</span>
         </div>
-        <div className="hero-right">
-          {aiData?.signals ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.6rem', letterSpacing: '0.15em', color: 'var(--accent)', textTransform: 'uppercase', fontWeight: 600 }}>▼ AI SIGNALS · LIVE</div>
-              {aiData.signals.slice(0, 3).map((s: any, i: number) => (
-                <div key={i} className="animate-slide-up" style={{ animationDelay: `${i*0.15}s`, display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.6rem 0.8rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderLeft: `3px solid ${s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)'}` }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: s.direction === 'bullish' ? 'var(--accent)' : 'var(--red)' }}>{s.direction === 'bullish' ? '▲' : '▼'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
-                    <div style={{ fontSize: '0.55rem', color: 'var(--text-3)', marginTop: 1 }}>{s.reason} · {s.confidence}% confidence</div>
-                  </div>
-                  <span style={{ fontSize: '0.6rem', padding: '2px 8px', background: s.action === 'buy' ? 'rgba(42,255,206,0.12)' : 'rgba(255,77,109,0.12)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
-                </div>
-              ))}
-              {aiData.summary && (
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-2)', lineHeight: 1.5, fontStyle: 'italic', marginTop: '0.25rem' }}>
-                  {aiData.summary}
-                </div>
-              )}
-              {aiData.hotTopics?.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                  {aiData.hotTopics.map((t: string, i: number) => (
-                    <span key={i} style={{ padding: '1px 6px', background: 'var(--bg-2)', border: '1px solid var(--border)', fontSize: '0.5rem', borderRadius: 3, color: 'var(--text-2)', letterSpacing: '0.03em' }}>{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              <p>Track Polymarket order books, volume flows, and cross-platform price discrepancies. Built for traders who need speed.</p>
-              <div className="hero-divider" />
-              <div className="hero-contact">
-                <span>Powered by Polymarket CLOB</span>
-                <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
-              </div>
-            </>
-          )}
+        <div className="stats-cell">
+          <span className="stats-label">24H VOLUME</span>
+          <span className="stats-val accent">${formatVol(totalVol)}</span>
         </div>
-      </section>
+        <div className="stats-cell">
+          <span className="stats-label">TOP VOL</span>
+          <span className="stats-val">{markets[0] ? '$' + markets[0].volDisplay : '—'}</span>
+        </div>
+        <div className="stats-cell">
+          <span className="stats-label">WHALE FLOW</span>
+          <span className="stats-val cyan"><span className="live-dot" /> LIVE</span>
+        </div>
+        <div className="stats-cell">
+          <span className="stats-label">CONNECTED</span>
+          <span className="stats-val">{authenticated ? user?.email?.address || user?.google?.email || 'WALLET' : 'GUEST'}</span>
+        </div>
+      </div>
 
       <div className="tabs-bar">
         <div className="tabs-inner">
