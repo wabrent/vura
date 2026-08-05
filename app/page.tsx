@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
+import CombosExplorer from '@/app/components/CombosExplorer';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
@@ -371,7 +372,7 @@ export default function Home() {
 
   // ── Derived data ────────────────────────────────────────────────────────
   const filteredMarkets = markets.filter(m => {
-    if (activeTab !== 'all' && activeTab !== 'watchlist' && activeTab !== 'arbitrage' && activeTab !== 'whale' && activeTab !== 'alerts' && activeTab !== 'correlation') {
+    if (activeTab !== 'all' && activeTab !== 'watchlist' && activeTab !== 'arbitrage' && activeTab !== 'combos' && activeTab !== 'whale' && activeTab !== 'alerts' && activeTab !== 'correlation') {
       if (m.category !== activeTab) return false;
     }
     if (searchQuery && !m.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -694,6 +695,10 @@ export default function Home() {
       ));
     }
 
+    if (activeTab === 'combos') {
+      return <CombosExplorer markets={markets} />;
+    }
+
     if (activeTab === 'whale') {
       return (
         <>
@@ -773,7 +778,7 @@ export default function Home() {
   };
 
   // ── UI ──────────────────────────────────────────────────────────────────
-  const tabs = ['all', 'crypto', 'politics', 'sports', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation'];
+  const tabs = ['all', 'crypto', 'politics', 'sports', 'combos', 'arbitrage', 'watchlist', 'whale', 'alerts', 'correlation'];
   const wlCount = watchlist.size;
   const alCount = alerts.filter(a => !a.triggered).length;
 
