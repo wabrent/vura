@@ -34,7 +34,7 @@ function buildSparkSvg(history: { t: number; p: number }[] | null, currentPrice:
     const y = h - ((v - min) / range) * (h - 4) - 2;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
-  const color = prices[prices.length - 1] >= prices[0] ? '#059669' : '#dc2626';
+  const color = prices[prices.length - 1] >= prices[0] ? '#2affce' : '#ff4d6d';
   return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" opacity="0.8" class="spark-animate"/>`;
 }
 
@@ -555,7 +555,7 @@ export default function Home() {
           <div className="corr-stats">
             <div className="corr-stat"><span className="corr-stat-label">TOTAL MARKETS</span><span className="corr-stat-val">{markets.length}</span></div>
             <div className="corr-stat"><span className="corr-stat-label">24H VOLUME</span><span className="corr-stat-val accent">${formatVol(totalVol)}</span></div>
-            <div className="corr-stat"><span className="corr-stat-label">BUILDER CODE</span><span className="corr-stat-val" style={{ color: '#6C47FF' }}>VURA</span></div>
+            <div className="corr-stat"><span className="corr-stat-label">BUILDER CODE</span><span className="corr-stat-val" style={{ color: '#00e5ff' }}>VURA</span></div>
           </div>
           <div style={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Top by Volume</div>
           {topByVol.map((m, i) => (
@@ -885,7 +885,7 @@ export default function Home() {
                     <div style={{ fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.market}</div>
                     <div style={{ fontSize: '0.55rem', color: 'var(--text-3)', marginTop: 1 }}>{s.reason} · {s.confidence}% confidence</div>
                   </div>
-                  <span style={{ fontSize: '0.6rem', padding: '2px 8px', background: s.action === 'buy' ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
+                  <span style={{ fontSize: '0.6rem', padding: '2px 8px', background: s.action === 'buy' ? 'rgba(42,255,206,0.12)' : 'rgba(255,77,109,0.12)', color: s.action === 'buy' ? 'var(--accent)' : 'var(--red)', borderRadius: 2, fontWeight: 600 }}>{s.action?.toUpperCase()}</span>
                 </div>
               ))}
               {aiData.summary && (

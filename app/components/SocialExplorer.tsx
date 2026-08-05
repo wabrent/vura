@@ -128,7 +128,7 @@ export default function SocialExplorer() {
         <span style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>Live top holders from Polymarket</span>
       </div>
 
-      {error && <div style={{ padding: '1rem', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 10, fontSize: '0.75rem' }}>{error}</div>}
+      {error && <div style={{ padding: '1rem', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 10, fontSize: '0.75rem' }}>{error}</div>}
 
       {loading && sections.length === 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
