@@ -1,41 +1,62 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 import WeatherTerminal from '@/app/components/WeatherTerminal';
 
 export default function Home() {
+  const { ready, authenticated, login, logout, user } = usePrivy();
+
   return (
     <>
       <nav>
         <div className="nav-inner">
           <a href="/" className="nav-logo">
             <span className="logo-mark">V</span>
-            <span>VURA <span style={{ color: 'var(--accent)', fontWeight: 400, fontSize: '0.75rem', letterSpacing: '0.08em' }}>WEATHER</span></span>
+            <span>VURA <span className="nav-sub">WEATHER</span></span>
           </a>
           <div className="nav-status">
             <span className="live-dot" />
-            <span>Live · Polymarket</span>
-            <a className="btn-trade" href="https://polymarket.com/weather?via=vura" target="_blank">Polymarket Weather ↗</a>
+            <span className="nav-live">Live</span>
+            {!ready ? (
+              <button className="privy-btn" disabled style={{ opacity: 0.5 }}>Loading...</button>
+            ) : authenticated ? (
+              <div className="nav-user">
+                <span className="nav-email">
+                  {user?.email?.address || user?.google?.email || user?.twitter?.username || (user?.id ? user.id.slice(0, 6) + '…' : 'User')}
+                </span>
+                <button className="privy-btn logout" onClick={logout}>Exit</button>
+              </div>
+            ) : (
+              <button className="privy-btn" onClick={login}>Sign in</button>
+            )}
           </div>
         </div>
       </nav>
 
-      <div className="tape">
-        <div className="tape-track">
-          {['temperature', 'precipitation', 'snow', 'wind', 'hurricanes', 'earthquakes', 'tornadoes', 'global'].map((t, i) => (
-            <span key={t} className="tape-item">
-              <span style={{ color: 'var(--accent)' }}>◆</span>
-              <span>{t.toUpperCase()}</span>
-            </span>
-          ))}
-          {['temperature', 'precipitation', 'snow', 'wind', 'hurricanes', 'earthquakes', 'tornadoes', 'global'].map((t, i) => (
-            <span key={t + 'b'} className="tape-item">
-              <span style={{ color: 'var(--accent)' }}>◆</span>
-              <span>{t.toUpperCase()}</span>
-            </span>
-          ))}
+      <section className="hero-slim">
+        <div className="hero-slim-title">
+          <span className="hero-badge">● EDGE SCANNER</span>
+          <h1>Weather markets move slower than the weather.</h1>
+          <p>
+            Polymarket prices are set by people. When a city's forecast changes, the market often lags.
+            VURA compares <b>market price</b> vs <b>real Open-Meteo forecast</b> and flags the gaps.
+          </p>
         </div>
-      </div>
+        <div className="how-steps">
+          <div className="how-step">
+            <span className="how-num">1</span>
+            <span>Find a city with a <b>green +edge</b> — the model thinks that side is cheap.</span>
+          </div>
+          <div className="how-step">
+            <span className="how-num">2</span>
+            <span>Press <b>Buy YES / Buy NO</b> — it opens the market on Polymarket.</span>
+          </div>
+          <div className="how-step">
+            <span className="how-num">3</span>
+            <span>Profit if your call beats the crowd. Small edge, repeated daily.</span>
+          </div>
+        </div>
+      </section>
 
       <main>
         <WeatherTerminal />
@@ -48,7 +69,7 @@ export default function Home() {
           <div className="footer-links">
             <a href="https://docs.polymarket.com" target="_blank">Polymarket Docs ↗</a>
             <a href="https://open-meteo.com" target="_blank">Open-Meteo ↗</a>
-            <a href="https://polymarket.com/weather?via=vura" target="_blank">Trade on Polymarket ↗</a>
+            <a href="https://polymarket.com/weather?via=vura" target="_blank">All weather markets ↗</a>
           </div>
         </div>
       </footer>

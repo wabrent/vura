@@ -195,8 +195,7 @@ export default function WeatherTerminal() {
 
                 <div className="city-card-foot">
                   <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>Vol {fmtVol(g.volume)}</span>
-                  <a className="btn-trade" href={marketUrl(best)} target="_blank"
-                    style={{ fontSize: '0.65rem', color: pos ? 'var(--accent)' : 'var(--red)', borderColor: pos ? 'rgba(42,255,206,0.3)' : 'rgba(255,77,109,0.3)' }}>
+                  <a className="btn-buy" href={marketUrl(best)} target="_blank">
                     Buy {side} @ {Math.round(best.marketPrice * 100)}c
                   </a>
                 </div>

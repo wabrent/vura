@@ -268,6 +268,24 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .alpha-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 2px; }
 
 /* ── CITY WEATHER CARDS ──────────────────────────────────────────────── */
+.nav-sub { color: var(--accent); font-weight: 400; font-size: 0.72rem; letter-spacing: 0.1em; }
+.nav-live { font-size: 0.68rem; color: var(--text-2); }
+.nav-user { display: flex; align-items: center; gap: 0.6rem; }
+.nav-email { font-size: 0.66rem; color: var(--accent); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.hero-slim { max-width: 84rem; margin: 0 auto; padding: 2.5rem 2rem 1rem; display: flex; flex-direction: column; gap: 1.5rem; position: relative; z-index: 1; }
+.hero-slim-title { display: flex; flex-direction: column; gap: 0.75rem; max-width: 46rem; }
+.hero-slim-title h1 { font-size: 2.2rem; line-height: 1.12; letter-spacing: -0.02em; font-weight: 700; }
+.hero-slim-title p { font-size: 0.92rem; line-height: 1.7; color: var(--text-2); max-width: 40rem; }
+.hero-slim-title b { color: var(--text); }
+
+.how-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.6rem; }
+.how-step { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.75rem 1rem; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; font-size: 0.72rem; color: var(--text-2); line-height: 1.55; }
+.how-step b { color: var(--accent); }
+.how-num { flex-shrink: 0; width: 1.4rem; height: 1.4rem; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #04120c; font-weight: 700; font-size: 0.72rem; border-radius: 50%; font-family: var(--mono); }
+
+.btn-buy { display: inline-block; padding: 0.42rem 0.9rem; font-family: var(--display); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; color: #04120c; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; border-radius: 8px; text-decoration: none; cursor: pointer; transition: all 0.15s; box-shadow: var(--glow); white-space: nowrap; }
+.btn-buy:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .city-card { display: flex; flex-direction: column; gap: 0.5rem; background: linear-gradient(180deg, color-mix(in srgb, var(--bg-3) 60%, transparent), var(--bg-2)); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; transition: all 0.18s; animation: cardIn 0.35s ease-out backwards; }
 .city-card:hover { border-color: var(--border-md); box-shadow: var(--shadow), 0 0 0 1px rgba(42, 255, 206, 0.06); transform: translateY(-1px); }
 .city-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
