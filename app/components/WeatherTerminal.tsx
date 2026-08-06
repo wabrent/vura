@@ -16,8 +16,11 @@ interface WeatherRow {
   question: string;
   conditionId: string;
   slug: string;
+  eventSlug: string;
   volume: number;
 }
+
+const marketUrl = (r: WeatherRow) => `https://polymarket.com/event/${r.eventSlug}?marketSlug=${r.slug}&via=vura`;
 
 const fmtDate = (d: string) => {
   const dt = new Date(d + 'T00:00:00Z');
@@ -192,7 +195,7 @@ export default function WeatherTerminal() {
 
                 <div className="city-card-foot">
                   <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>Vol {fmtVol(g.volume)}</span>
-                  <a className="btn-trade" href={`https://polymarket.com/event/${best.slug}?via=vura`} target="_blank"
+                  <a className="btn-trade" href={marketUrl(best)} target="_blank"
                     style={{ fontSize: '0.65rem', color: pos ? 'var(--accent)' : 'var(--red)', borderColor: pos ? 'rgba(42,255,206,0.3)' : 'rgba(255,77,109,0.3)' }}>
                     Buy {side} @ {Math.round(best.marketPrice * 100)}c
                   </a>

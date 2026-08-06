@@ -13,6 +13,7 @@ interface WeatherMarket {
   yesPrice: number;
   noPrice: number;
   slug: string;
+  eventSlug: string;
   volume: number;
 }
 
@@ -30,6 +31,7 @@ interface WeatherRow {
   question: string;
   conditionId: string;
   slug: string;
+  eventSlug: string;
   volume: number;
 }
 
@@ -134,6 +136,7 @@ export async function GET(req: NextRequest) {
             yesPrice,
             noPrice: 1 - yesPrice,
             slug: m.slug,
+            eventSlug: ev.slug,
             volume: Number(m.volumeNum) || Number(m.volume) || 0,
           };
         })
@@ -185,6 +188,7 @@ export async function GET(req: NextRequest) {
           question: m.question,
           conditionId: m.conditionId,
           slug: m.slug,
+          eventSlug: m.eventSlug,
           volume: m.volume,
         });
         seen.add(key);
