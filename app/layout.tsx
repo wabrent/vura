@@ -11,7 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <title>VURA Weather | Trade Polymarket Temperature Markets</title>
         <meta name="description" content="Find price dislocations between Polymarket weather markets and real forecasts. Buy when the market is slow." />
       </head>
-      <body className="dark">
+      <body>
         <PrivyProvider
           appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'cmpcnahqh001m0ci59bk1lokk'}
           config={{
