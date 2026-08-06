@@ -78,11 +78,11 @@ export default function WeatherTerminal() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div className="stats-strip">
         <div className="stats-cell">
-          <span className="stats-label">CITIES</span>
+          <span className="stats-label">SETUPS</span>
           <span className="stats-val">{totalBaskets}</span>
         </div>
         <div className="stats-cell">
-          <span className="stats-label">POSITIVE-EV LADDERS</span>
+          <span className="stats-label">ACTIONABLE</span>
           <span className="stats-val accent">{positiveEv}</span>
         </div>
         <div className="stats-cell">
@@ -97,7 +97,7 @@ export default function WeatherTerminal() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--display)' }}>
-          ⛅ Temperature Ladders <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.75rem' }}>— buy 3-4 adjacent buckets, one winner covers the basket</span>
+          ⛅ Cheap weather ladders <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.75rem' }}>— buy nearby temps cheap, one pays $1</span>
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
@@ -127,11 +127,13 @@ export default function WeatherTerminal() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.75rem' }}>
         {groups.slice(0, 24).map((g, i) => {
           const b = g.best!;
-          const pos = b.edge > 0;
+          const pos = g.basketEv > 0;
           const center = [...g.buckets].reduce((bi, x, xi, arr) => Math.abs(x.thresholdC - (g.type === 'high' ? g.forecastMaxC : g.forecastMinC)) < Math.abs(arr[bi].thresholdC - (g.type === 'high' ? g.forecastMaxC : g.forecastMinC)) ? xi : bi, 0);
-          const ladderSet = new Set(g.buckets.slice(Math.max(0, center - 1), Math.min(g.buckets.length, center + 2)).map(x => x.thresholdC));
+          const ladderRows = g.buckets.slice(Math.max(0, center - 1), Math.min(g.buckets.length, center + 2));
           const forecast = g.type === 'high' ? g.forecastMaxC : g.forecastMinC;
-          const evPct = (g.basketEv * 100).toFixed(1);
+          const winPct = ladderRows.reduce((s, r) => s + r.modelProb, 0);
+          const payout = 100;
+          const roi = g.basketCost > 0 ? ((payout / g.basketCost) - 1) : 0;
           return (
             <div key={`${g.city}|${g.date}|${g.type}`} className="city-card" style={{ animationDelay: `${i * 40}ms` }}>
               <div className="city-card-head">
@@ -139,31 +141,30 @@ export default function WeatherTerminal() {
                   <span style={{ fontSize: '1.5rem' }}>{tempIcon(forecast)}</span>
                   <div>
                     <div className="city-card-name">{g.city}</div>
-                    <div className="city-card-meta">{fmtDate(g.date)} · {g.type === 'high' ? 'HIGH' : 'LOW'} {forecast.toFixed(1)}°C · D+{g.horizonHours >= 48 ? Math.round(g.horizonHours/24) : Math.round(g.horizonHours/24)}</div>
+                    <div className="city-card-meta">{fmtDate(g.date)} · {g.type === 'high' ? 'HIGH' : 'LOW'}</div>
                   </div>
                 </div>
-                <span className="city-edge" style={{ color: g.basketEv > 0 ? 'var(--accent)' : 'var(--red)', background: g.basketEv > 0 ? 'rgba(42,255,206,0.1)' : 'rgba(255,77,109,0.1)' }}>
-                  EV {pos ? '+' : ''}{evPct}%
+                <span className="city-edge" style={{ color: pos ? 'var(--accent)' : 'var(--red)', background: pos ? 'rgba(22,82,240,0.08)' : 'rgba(223,32,32,0.08)' }}>
+                  {pos ? '+' : ''}{(roi * 100).toFixed(0)}% ROI
                 </span>
               </div>
 
               <div className="city-card-body">
-                {g.buckets.slice(0, 6).map(r => {
+                {ladderRows.map(r => {
                   const rPos = r.edge > 0;
-                  const inLadder = ladderSet.has(r.thresholdC);
                   return (
-                    <div key={r.thresholdC} className={`city-market${inLadder ? ' city-market-best' : ''}`}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{r.thresholdC}°C</span>
-                        {inLadder && <span className="ladder-tag">LADDER</span>}
-                        <div className="city-bar"><div className="city-bar-fill" style={{ width: `${Math.min(Math.abs(r.edge) * 400, 100)}%`, background: rPos ? 'var(--accent)' : 'var(--red)' }} /></div>
+                    <div key={r.thresholdC} className="city-market city-market-best">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{r.thresholdC}°C</span>
+                        <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>→ pays $1</span>
+                        <div className="city-bar"><div className="city-bar-fill" style={{ width: `${Math.round(r.modelProb * 100)}%`, background: rPos ? 'var(--accent)' : 'var(--red)' }} /></div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.68rem', fontFamily: 'var(--mono)', fontWeight: 600, color: rPos ? 'var(--accent)' : 'var(--red)' }}>
-                          {r.marketPrice <= 0.5 ? `YES ${Math.round(r.marketPrice * 100)}c` : `NO ${Math.round((1 - r.marketPrice) * 100)}c`}
+                        <span style={{ fontSize: '0.72rem', fontFamily: 'var(--mono)', fontWeight: 700, color: rPos ? 'var(--accent)' : 'var(--red)' }}>
+                          Buy {Math.round(r.marketPrice * 100)}c
                         </span>
                         <span style={{ fontSize: '0.52rem', color: 'var(--text-3)', display: 'block' }}>
-                          {Math.round(r.modelProb * 100)}% model · EV {r.ev >= 0 ? '+' : ''}{(r.ev * 100).toFixed(0)}%
+                          {Math.round(r.modelProb * 100)}% chance
                         </span>
                       </div>
                     </div>
@@ -172,12 +173,12 @@ export default function WeatherTerminal() {
               </div>
 
               <div className="city-card-foot">
-                <div style={{ fontSize: '0.58rem', color: 'var(--text-3)' }}>
-                  <span style={{ fontFamily: 'var(--mono)' }}>Basket ~{(g.basketCost * 100).toFixed(0)}c</span>
-                  {g.basketEv > 0 && <span style={{ color: 'var(--accent)', display: 'block', fontSize: '0.6rem' }}>+{(g.basketEv * 100).toFixed(1)}c EV</span>}
+                <div style={{ fontSize: '0.6rem', color: 'var(--text-2)', lineHeight: 1.5 }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text)' }}>{(g.basketCost * 100).toFixed(0)}c</span> cost
+                  {pos && <span style={{ color: 'var(--accent)', display: 'block' }}>{Math.round(winPct * 100)}% chance one hits → pays $1</span>}
                 </div>
                 <a className="btn-buy" href={`https://polymarket.com/event/${g.bestEventSlug}?marketSlug=${g.bestSlug}&via=vura`} target="_blank">
-                  Ladder on Polymarket
+                  Trade on Polymarket
                 </a>
               </div>
             </div>

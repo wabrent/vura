@@ -239,7 +239,11 @@ export async function GET(req: NextRequest) {
       stationMap.set(key, station);
     }
 
-    const result = [...groups.values()].sort((a, b) => Math.abs(b.best!.edge) - Math.abs(a.best!.edge));
+    const result = [...groups.values()].sort((a, b) => {
+      const roiA = a.basketCost > 0 ? 100 / a.basketCost - 1 : 0;
+      const roiB = b.basketCost > 0 ? 100 / b.basketCost - 1 : 0;
+      return roiB - roiA;
+    });
     return NextResponse.json({ generatedAt: Date.now(), groups: result });
   } catch (e: any) {
     return NextResponse.json({ error: e.message, groups: [] }, { status: 500 });
