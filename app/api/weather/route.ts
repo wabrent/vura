@@ -5,38 +5,43 @@ const GAMMA = 'https://gamma-api.polymarket.com';
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 
 interface WeatherMarket {
-  id: string;
   conditionId: string;
   question: string;
   thresholdC: number | null;
-  direction: 'above' | 'below';
+  mode: 'exact' | 'above' | 'below';
   yesPrice: number;
-  noPrice: number;
   slug: string;
   eventSlug: string;
   volume: number;
 }
 
-interface WeatherRow {
+interface BucketRow {
+  thresholdC: number;
+  mode: 'exact' | 'above' | 'below';
+  marketPrice: number;
+  modelProb: number;
+  edge: number;
+  ev: number;
+}
+
+interface CityGroup {
   city: string;
   date: string;
   type: 'high' | 'low';
-  thresholdC: number | null;
-  direction: 'above' | 'below';
-  marketPrice: number;
-  marketPriceSide: 'YES' | 'NO';
   forecastMaxC: number;
   forecastMinC: number;
-  edge: number;
-  question: string;
-  conditionId: string;
-  slug: string;
-  eventSlug: string;
-  volume: number;
+  resolutionStation: string;
+  buckets: BucketRow[];
+  best: BucketRow | null;
+  basketCost: number;
+  basketEv: number;
+  horizonHours: number;
+  bestSlug: string;
+  bestEventSlug: string;
 }
 
 const cache = new Map<string, { ts: number; data: any }>();
-const CACHE_TTL = 120000;
+const CACHE_TTL = 180000;
 
 async function cachedFetch(key: string, url: string, timeout = 15000) {
   const hit = cache.get(key);
@@ -48,21 +53,16 @@ async function cachedFetch(key: string, url: string, timeout = 15000) {
   return data;
 }
 
-function parseTempQuestion(q: string): { thresholdC: number | null; direction: 'above' | 'below'; fahrenheit: boolean } {
-  const isBelow = / or below| ≤ |below |≤\s*\d/.test(q);
-  const isAbove = / or above| ≥ |above |≥\s*\d/.test(q);
+function parseTempQuestion(q: string): { thresholdC: number | null; mode: 'exact' | 'above' | 'below' } {
+  const isBelow = / or below| below |≤\s*\d/.test(q);
+  const isAbove = / or above| above |≥\s*\d/.test(q);
   const cMatch = q.match(/(\d{1,3})\s*(?:°|º)?C/i);
   const fMatch = q.match(/(\d{2,3})\s*(?:°|º)?F/i);
   let thresholdC: number | null = null;
-  let fahrenheit = false;
-  if (cMatch) {
-    thresholdC = parseInt(cMatch[1]);
-  } else if (fMatch) {
-    thresholdC = Math.round((parseInt(fMatch[1]) - 32) * 5 / 9);
-    fahrenheit = true;
-  }
-  const direction: 'above' | 'below' = isBelow ? 'below' : 'above';
-  return { thresholdC, direction, fahrenheit };
+  if (cMatch) thresholdC = parseInt(cMatch[1]);
+  else if (fMatch) thresholdC = Math.round((parseInt(fMatch[1]) - 32) * 5 / 9);
+  const mode: 'exact' | 'above' | 'below' = isBelow ? 'below' : isAbove ? 'above' : 'exact';
+  return { thresholdC, mode };
 }
 
 function parseDate(q: string): string | null {
@@ -81,23 +81,49 @@ function parseCity(q: string): string | null {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 
+function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+
+function bucketProb(fc: number, X: number, sigma: number): number {
+  return normCdf((X + 0.5 - fc) / sigma) - normCdf((X - 0.5 - fc) / sigma);
+}
+
+function calcEv(p: number, price: number): number {
+  if (price <= 0 || price >= 1) return 0;
+  return p * (1 / price - 1) - (1 - p);
+}
+
+// Estimated forecast error grows with horizon: ~0.8C today, ~1.4C at D+2, ~2C at D+4
+function sigmaForHorizon(hours: number): number {
+  return 0.8 + Math.min(hours, 96) * 0.012;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const maxEvents = Math.min(parseInt(searchParams.get('events') || '100'), 200);
+    const pages = Math.min(parseInt(searchParams.get('pages') || '3'), 6);
 
-    const events = await cachedFetch(
-      'weather-events',
-      `${GAMMA}/events?closed=false&limit=${maxEvents}&tag_slug=weather`
-    );
+    // Fetch fresh events first (order=id desc gives newest weather markets)
+    const allEvents: any[] = [];
+    for (let p = 0; p < pages; p++) {
+      const offset = p * 100;
+      const events = await cachedFetch(
+        `weather-events-${offset}`,
+        `${GAMMA}/events?closed=false&limit=100&offset=${offset}&tag_slug=weather&order=id&ascending=false`
+      );
+      if (!events?.length) break;
+      allEvents.push(...events);
+    }
 
-    const today = new Date();
-    const todayISO = today.toISOString().slice(0, 10);
+    const nowTs = Date.now();
+    const groups = new Map<string, CityGroup>();
+    const stationMap = new Map<string, string>();
 
-    const rows: WeatherRow[] = [];
-    const seen = new Set<string>();
-
-    for (const ev of (events || [])) {
+    for (const ev of allEvents) {
       const title = ev.title || '';
       const isHigh = /highest temperature|high temperature/i.test(title);
       const isLow = /lowest temperature|low temperature/i.test(title);
@@ -107,101 +133,115 @@ export async function GET(req: NextRequest) {
       if (!city) continue;
       const date = parseDate(title);
       if (!date) continue;
-      // Skip old dates and dates more than 5 days out (forecast window)
+
+      // Keep D-0 (after 18:00 skip today) through D+5
       const dateTs = new Date(date + 'T00:00:00Z').getTime();
-      const nowTs = Date.now();
-      if (dateTs < nowTs - 26 * 3600 * 1000) continue;
-      if (dateTs > nowTs + 6 * 24 * 3600 * 1000) continue;
+      const dateStartMs = dateTs; // local midnight UTC approximation
+      const horizonMs = dateStartMs - nowTs;
+      if (horizonMs < -8 * 3600 * 1000) continue;
+      if (horizonMs > 6 * 24 * 3600 * 1000) continue;
+
       const coords = findCity(city);
       if (!coords) continue;
 
       const key = `${city}|${date}|${isHigh ? 'high' : 'low'}`;
-      if (seen.has(key)) continue;
 
       const markets: WeatherMarket[] = (ev.markets || [])
         .filter((m: any) => m.active && !m.closed)
         .map((m: any) => {
-          const { thresholdC, direction } = parseTempQuestion(m.question);
+          const { thresholdC, mode } = parseTempQuestion(m.question);
           let yesPrice = 0.5;
           try {
-            const p = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
-            yesPrice = parseFloat(p[0]) || 0.5;
+            const pp = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
+            yesPrice = parseFloat(pp[0]) || 0.5;
           } catch {}
           return {
-            id: m.conditionId,
             conditionId: m.conditionId,
             question: m.question,
             thresholdC,
-            direction,
+            mode,
             yesPrice,
-            noPrice: 1 - yesPrice,
             slug: m.slug,
             eventSlug: ev.slug,
             volume: Number(m.volumeNum) || Number(m.volume) || 0,
           };
         })
-        .filter((m: WeatherMarket) => m.thresholdC !== null && m.yesPrice > 0.03 && m.yesPrice < 0.97);
+        .filter((m: WeatherMarket) => m.thresholdC !== null && m.yesPrice > 0.005 && m.yesPrice < 0.995);
 
-      if (markets.length < 2) continue;
+      if (markets.length < 3) continue;
 
+      // Fetch forecast: max, min, plus station name
       let forecastMaxC: number | null = null;
       let forecastMinC: number | null = null;
+      let station = 'Open-Meteo';
       try {
         const f = await cachedFetch(
           `om-${coords.lat}-${coords.lon}-${date}`,
-          `${OPEN_METEO}?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&past_days=2&forecast_days=5`
+          `${OPEN_METEO}?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&past_days=2&forecast_days=6`
         );
         const dayIdx = (f.daily?.time || []).findIndex((t: string) => t === date);
         if (dayIdx >= 0) {
           forecastMaxC = f.daily.temperature_2m_max[dayIdx];
           forecastMinC = f.daily.temperature_2m_min[dayIdx];
         }
+        if (f?.location?.name) station = f.location.name;
       } catch {}
+      if (forecastMaxC === null || forecastMinC === null) continue;
 
-      // If today's date and hours have passed, use actual observations
-      if (forecastMaxC === null) continue;
+      const forecast = isHigh ? forecastMaxC : forecastMinC;
+      const sigma = sigmaForHorizon(horizonMs / 3600000);
 
-      for (const m of markets) {
-        if (m.thresholdC === null) continue;
-        const forecast = isHigh ? forecastMaxC : forecastMinC;
-        if (forecast === null) continue;
-
-        const actualProb = m.direction === 'below'
-          ? (forecast <= m.thresholdC ? 0.97 : 0.03)
-          : (forecast >= m.thresholdC ? 0.97 : 0.03);
-
-        const marketProb = m.yesPrice;
-        const edge = actualProb - marketProb;
-        if (Math.abs(edge) < 0.05) continue;
-
-        rows.push({
-          city,
-          date,
-          type: isHigh ? 'high' : 'low',
-          thresholdC: m.thresholdC,
-          direction: m.direction,
-          marketPrice: marketProb,
-          marketPriceSide: edge > 0 ? 'YES' : 'NO',
-          forecastMaxC: forecastMaxC ?? 0,
-          forecastMinC: forecastMinC ?? 0,
+      const buckets: BucketRow[] = markets.map(m => {
+        const X = m.thresholdC!;
+        let modelProb: number;
+        if (m.mode === 'below') modelProb = normCdf((X - forecast) / sigma);
+        else if (m.mode === 'above') modelProb = 1 - normCdf((X - forecast) / sigma);
+        else modelProb = bucketProb(forecast, X, sigma);
+        modelProb = Math.max(0.002, Math.min(0.998, modelProb));
+        const edge = modelProb - m.yesPrice;
+        return {
+          thresholdC: X,
+          mode: m.mode,
+          marketPrice: m.yesPrice,
+          modelProb,
           edge,
-          question: m.question,
-          conditionId: m.conditionId,
-          slug: m.slug,
-          eventSlug: m.eventSlug,
-          volume: m.volume,
-        });
-        seen.add(key);
-      }
+          ev: calcEv(modelProb, m.yesPrice),
+        };
+      }).filter(b => b.mode === 'exact');
+
+      if (buckets.length < 3) continue;
+
+      // Ladder: take 3-4 adjacent buckets centered on the corrected forecast
+      const sorted = [...buckets].sort((a, b) => a.thresholdC - b.thresholdC);
+      const centerIdx = sorted.reduce((bi, b, i, arr) => Math.abs(b.thresholdC - forecast) < Math.abs(arr[bi].thresholdC - forecast) ? i : bi, 0);
+      const ladder = sorted.slice(Math.max(0, centerIdx - 1), Math.min(sorted.length, centerIdx + 2));
+      const basketCost = ladder.reduce((s, b) => s + b.marketPrice, 0);
+      const basketEv = ladder.reduce((s, b) => s + b.ev * b.marketPrice, 0);
+
+      const best = [...buckets].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
+      const bestMarket = markets.find(m => m.thresholdC === best?.thresholdC && m.mode === best.mode) || markets[0];
+
+      groups.set(key, {
+        city,
+        date,
+        type: isHigh ? 'high' : 'low',
+        forecastMaxC,
+        forecastMinC,
+        resolutionStation: station,
+        buckets: sorted,
+        best,
+        basketCost,
+        basketEv,
+        horizonHours: Math.max(0, Math.round(horizonMs / 3600000)),
+        bestSlug: bestMarket?.slug || '',
+        bestEventSlug: bestMarket?.eventSlug || ev.slug || '',
+      });
+      stationMap.set(key, station);
     }
 
-    rows.sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge));
-
-    return NextResponse.json({
-      generatedAt: Date.now(),
-      rows: rows.slice(0, 40),
-    });
+    const result = [...groups.values()].sort((a, b) => Math.abs(b.best!.edge) - Math.abs(a.best!.edge));
+    return NextResponse.json({ generatedAt: Date.now(), groups: result });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, rows: [] }, { status: 500 });
+    return NextResponse.json({ error: e.message, groups: [] }, { status: 500 });
   }
 }
