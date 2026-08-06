@@ -6,6 +6,7 @@ import type { Market, Alert, CorrelationPair } from '@/app/lib/types';
 import TradeModal from '@/app/components/TradeModal';
 import CombosExplorer from '@/app/components/CombosExplorer';
 import SocialExplorer from '@/app/components/SocialExplorer';
+import WeatherTerminal from '@/app/components/WeatherTerminal';
 
 const CONFIG = {
   API: 'https://gamma-api.polymarket.com/events?closed=false&limit=500',
@@ -373,7 +374,7 @@ export default function Home() {
 
   // ── Derived data ────────────────────────────────────────────────────────
   const filteredMarkets = markets.filter(m => {
-    if (activeTab !== 'all' && activeTab !== 'watchlist' && activeTab !== 'arbitrage' && activeTab !== 'combos' && activeTab !== 'social' && activeTab !== 'whale' && activeTab !== 'alerts' && activeTab !== 'correlation') {
+    if (activeTab !== 'all' && activeTab !== 'weather' && activeTab !== 'watchlist' && activeTab !== 'arbitrage' && activeTab !== 'combos' && activeTab !== 'social' && activeTab !== 'whale' && activeTab !== 'alerts' && activeTab !== 'correlation') {
       if (m.category !== activeTab) return false;
     }
     if (searchQuery && !m.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -457,6 +458,10 @@ export default function Home() {
         ))}
       </div>
     );
+
+    if (activeTab === 'weather') {
+      return <WeatherTerminal />;
+    }
 
     if (activeTab === 'watchlist') {
       const wlNames = [...watchlists.keys()];
@@ -798,7 +803,7 @@ export default function Home() {
   };
 
   // ── UI ──────────────────────────────────────────────────────────────────
-  const tabs = ['all', 'crypto', 'politics', 'sports', 'combos', 'arbitrage', 'social', 'watchlist', 'whale', 'alerts', 'correlation'];
+  const tabs = ['weather', 'all', 'crypto', 'politics', 'sports', 'combos', 'arbitrage', 'social', 'watchlist', 'whale', 'alerts', 'correlation'];
   const wlCount = watchlist.size;
   const alCount = alerts.filter(a => !a.triggered).length;
 
@@ -811,9 +816,10 @@ export default function Home() {
             <span>VURA</span>
           </a>
           <div className="nav-links">
+            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('weather'); }} className={activeTab === 'weather' ? 'nav-link-active' : ''}>Weather</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('all'); }} className={activeTab === 'all' ? 'nav-link-active' : ''}>Terminal</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('arbitrage'); }} className={activeTab === 'arbitrage' ? 'nav-link-active' : ''}>Arbitrage</a>
-            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('correlation'); }} className={activeTab === 'correlation' ? 'nav-link-active' : ''}>Correlations</a>
+            <a href="#" onClick={e => { e.preventDefault(); setActiveTab('social'); }} className={activeTab === 'social' ? 'nav-link-active' : ''}>Traders</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('stats'); }} className={activeTab === 'stats' ? 'nav-link-active' : ''}>Stats</a>
             <a href="#" onClick={e => { e.preventDefault(); setActiveTab('ai'); }} className={activeTab === 'ai' ? 'nav-link-active' : ''}>AI</a>
           </div>
