@@ -21,24 +21,32 @@ interface WeatherRow {
 
 const fmtDate = (d: string) => {
   const dt = new Date(d + 'T00:00:00Z');
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
 const fmtVol = (v: number) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + Math.round(v);
+
+function tempIcon(c: number): string {
+  if (c >= 35) return '☀️';
+  if (c >= 28) return '🌤';
+  if (c >= 20) return '🌥';
+  if (c >= 10) return '🌦';
+  if (c >= 0) return '🌧';
+  return '❄️';
+}
 
 export default function WeatherTerminal() {
   const [rows, setRows] = useState<WeatherRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'edge' | 'vol'>('edge');
-  const [onlyTradeable, setOnlyTradeable] = useState(true);
+  const [minEdge, setMinEdge] = useState(0.05);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/weather?events=50');
-      if (!res.ok) throw new Error('Failed');
+      const res = await fetch('/api/weather?events=100');
+      if (!res.ok) throw new Error('Failed to load weather markets');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setRows(data.rows || []);
@@ -52,107 +60,156 @@ export default function WeatherTerminal() {
     load();
   }, [load]);
 
-  const filtered = rows
-    .filter(r => !onlyTradeable || r.volume > 500)
-    .sort((a, b) => sortBy === 'edge' ? Math.abs(b.edge) - Math.abs(a.edge) : b.volume - a.volume);
+  // Group rows by city+date+type
+  const groups = new Map<string, WeatherRow[]>();
+  for (const r of rows) {
+    const key = `${r.city}|${r.date}|${r.type}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
 
-  const winRate = (r: WeatherRow) => {
-    const modelProb = r.direction === 'below'
-      ? (r.type === 'high' ? (r.forecastMaxC <= (r.thresholdC || 0) ? 0.95 : 0.05) : (r.forecastMinC <= (r.thresholdC || 0) ? 0.95 : 0.05))
-      : (r.type === 'high' ? (r.forecastMaxC >= (r.thresholdC || 0) ? 0.95 : 0.05) : (r.forecastMinC >= (r.thresholdC || 0) ? 0.95 : 0.05));
-    return modelProb;
-  };
+  const groupList = [...groups.entries()].map(([key, rs]) => ({
+    key,
+    city: rs[0].city,
+    date: rs[0].date,
+    type: rs[0].type,
+    forecast: rs[0].type === 'high' ? rs[0].forecastMaxC : rs[0].forecastMinC,
+    rows: rs,
+    maxEdge: Math.max(...rs.map(r => Math.abs(r.edge))),
+    volume: rs.reduce((s, r) => s + r.volume, 0),
+  })).sort((a, b) => b.maxEdge - a.maxEdge);
+
+  const bestRow = (rs: WeatherRow[]) => [...rs].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', fontWeight: 600 }}>
-          ⛅ Weather Edge Scanner
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Header stats */}
+      <div className="stats-strip">
+        <div className="stats-cell">
+          <span className="stats-label">CITIES TRACKED</span>
+          <span className="stats-val">{groupList.length}</span>
         </div>
-        <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Scanning...' : '↻ Rescan'}
-        </button>
-        <label style={{ fontSize: '0.65rem', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
-          <input type="checkbox" checked={onlyTradeable} onChange={e => setOnlyTradeable(e.target.checked)} /> Only $500+ vol
-        </label>
-        <span style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
-          Compares market price vs Open-Meteo forecast
-        </span>
+        <div className="stats-cell">
+          <span className="stats-label">EDGE SIGNALS</span>
+          <span className="stats-val accent">{(rows.length)}</span>
+        </div>
+        <div className="stats-cell">
+          <span className="stats-label">DATA SOURCE</span>
+          <span className="stats-val cyan">Open-Meteo</span>
+        </div>
+        <div className="stats-cell">
+          <span className="stats-label">MARKETS</span>
+          <span className="stats-val">100+</span>
+        </div>
       </div>
 
-      {error && <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 10, fontSize: '0.75rem' }}>{error}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--display)' }}>
+          ⛅ Temperature Markets <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.75rem' }}>— city high/low vs market price</span>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <label style={{ fontSize: '0.62rem', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+            Min edge
+            <select className="sort-select" value={minEdge} onChange={e => setMinEdge(Number(e.target.value))} style={{ fontSize: '0.68rem' }}>
+              <option value={0.03}>3%</option>
+              <option value={0.05}>5%</option>
+              <option value={0.1}>10%</option>
+              <option value={0.2}>20%</option>
+            </select>
+          </label>
+          <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
+            {loading ? 'Scanning...' : '↻ Rescan'}
+          </button>
+        </div>
+      </div>
 
-      {loading && rows.length === 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton" style={{ height: '2.6rem', animationDelay: `${i * 0.08}s` }} />)}
+      {error && (
+        <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 10, fontSize: '0.75rem' }}>
+          {error}
         </div>
       )}
 
-      {!loading && rows.length === 0 && !error && (
+      {loading && groupList.length === 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton" style={{ height: '180px', animationDelay: `${i * 0.08}s` }} />)}
+        </div>
+      )}
+
+      {!loading && groupList.length === 0 && !error && (
         <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
-          No edge signals found right now. Prices and forecasts are usually well aligned — scan again in a few hours.
+          No price dislocations found right now. Forecasts and markets are well aligned — check back later.
         </div>
       )}
 
-      {rows.length > 0 && (
-        <div className="market-table">
-          <div className="table-head">
-            <div className="col-name">MARKET</div>
-            <div className="col-price">MODEL</div>
-            <div className="col-change">MKT PRICE</div>
-            <div className="col-vol">EDGE</div>
-            <div className="col-alpha">FORECAST</div>
-            <div className="col-actions" />
-          </div>
-          {filtered.map((r, i) => {
-            const side = r.marketPriceSide === 'YES' ? 'YES' : 'NO';
-            const modelProb = winRate(r);
-            const edgePct = (r.edge * 100).toFixed(1);
-            const isPos = r.edge > 0;
+      {/* City cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.75rem' }}>
+        {groupList
+          .filter(g => Math.max(...g.rows.map(r => Math.abs(r.edge))) >= minEdge)
+          .slice(0, 24)
+          .map((g, i) => {
+            const best = bestRow(g.rows);
+            const pos = best.edge > 0;
+            const side = best.marketPriceSide;
+            const edgePct = (best.edge * 100).toFixed(1);
             return (
-              <div key={r.conditionId} className="market-row" style={{ animationDelay: `${i * 15}ms` }}
-                onClick={() => window.open(`https://polymarket.com/event/${r.slug}?via=vura`, '_blank')}>
-                <div className="col-name">
-                  <span className="row-cat">{r.city.toUpperCase()} · {r.type === 'high' ? 'HIGH' : 'LOW'} · {fmtDate(r.date)}</span>
-                  <span className="row-title">{r.thresholdC}°C {r.direction === 'below' ? 'or below' : 'or above'}</span>
-                </div>
-                <div className="col-price">
-                  <span className="row-price" style={{ color: isPos ? 'var(--accent)' : 'var(--red)' }}>
-                    {Math.round(modelProb * 100)}%
-                  </span>
-                </div>
-                <div className="col-change">
-                  <span style={{ fontSize: '0.68rem', fontFamily: 'var(--mono)' }}>
-                    {r.marketPriceSide} {Math.round(r.marketPrice * 100)}c
-                  </span>
-                </div>
-                <div className="col-vol">
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--mono)', color: isPos ? 'var(--accent)' : 'var(--red)' }}>
-                    {isPos ? '+' : ''}{edgePct}%
-                  </span>
-                </div>
-                <div className="col-alpha">
-                  <div style={{ flex: 1, fontSize: '0.62rem', color: 'var(--text-2)', fontFamily: 'var(--mono)' }}>
-                    {r.type === 'high' ? `↑${r.forecastMaxC}°` : `↓${r.forecastMinC}°`}
+              <div key={g.key} className="city-card" style={{ animationDelay: `${i * 40}ms` }}>
+                <div className="city-card-head">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>{tempIcon(g.forecast)}</span>
+                    <div>
+                      <div className="city-card-name">{g.city}</div>
+                      <div className="city-card-meta">{fmtDate(g.date)} · {g.type === 'high' ? 'HIGH' : 'LOW'} {g.forecast}°C</div>
+                    </div>
                   </div>
-                  <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{fmtVol(r.volume)}</span>
+                  <span className="city-edge" style={{ color: pos ? 'var(--accent)' : 'var(--red)', background: pos ? 'rgba(42,255,206,0.1)' : 'rgba(255,77,109,0.1)' }}>
+                    {pos ? '+' : ''}{edgePct}%
+                  </span>
                 </div>
-                <div className="col-actions">
-                  <a className="btn-trade" href={`https://polymarket.com/event/${r.slug}?via=vura`} target="_blank"
-                    style={{ color: isPos ? 'var(--accent)' : 'var(--red)', borderColor: isPos ? 'rgba(42,255,206,0.3)' : 'rgba(255,77,109,0.3)' }}>
-                    {side} @ {Math.round(r.marketPrice * 100)}c
+
+                <div className="city-card-body">
+                  {g.rows.sort((a, b) => a.thresholdC! - b.thresholdC!).slice(0, 5).map(r => {
+                    const rPos = r.edge > 0;
+                    const isBest = r === best;
+                    return (
+                      <div key={r.conditionId} className={`city-market${isBest ? ' city-market-best' : ''}`}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{r.thresholdC}°C</span>
+                          <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>{r.direction === 'below' ? 'or below' : 'or above'}</span>
+                          <div className="city-bar"><div className="city-bar-fill" style={{ width: `${Math.min(Math.abs(r.edge) * 500, 100)}%`, background: rPos ? 'var(--accent)' : 'var(--red)' }} /></div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.68rem', fontFamily: 'var(--mono)', fontWeight: 600, color: rPos ? 'var(--accent)' : 'var(--red)' }}>
+                            {r.marketPriceSide} {Math.round(r.marketPrice * 100)}c
+                          </span>
+                          <span style={{ fontSize: '0.52rem', color: 'var(--text-3)', display: 'block' }}>
+                            {Math.round((r.marketPrice + r.edge) * 100)}% model
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="city-card-foot">
+                  <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>Vol {fmtVol(g.volume)}</span>
+                  <a className="btn-trade" href={`https://polymarket.com/event/${best.slug}?via=vura`} target="_blank"
+                    style={{ fontSize: '0.65rem', color: pos ? 'var(--accent)' : 'var(--red)', borderColor: pos ? 'rgba(42,255,206,0.3)' : 'rgba(255,77,109,0.3)' }}>
+                    Buy {side} @ {Math.round(best.marketPrice * 100)}c
                   </a>
                 </div>
               </div>
             );
           })}
+      </div>
+
+      {groupList.length > 0 && groupList.filter(g => Math.max(...g.rows.map(r => Math.abs(r.edge))) >= minEdge).length === 0 && (
+        <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-3)', fontSize: '0.75rem' }}>
+          No signals above {Math.round(minEdge * 100)}% edge. Try a lower threshold.
         </div>
       )}
 
-      <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', lineHeight: 1.7, maxWidth: 48 }}>
-        How it works: each Polymarket weather market settles on a city's official high/low temperature for a given day.
-        This scanner pulls the Open-Meteo forecast for that city/day and compares the model probability vs the market price.
-        When they diverge by 5%+, the row is flagged. Edge is model_probability − market_price; a positive edge on YES means the model thinks YES is underpriced.
+      <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', lineHeight: 1.7, maxWidth: 46, opacity: 0.8 }}>
+        How it works: each Polymarket market settles on a city's official daily high/low temperature. VURA pulls the Open-Meteo forecast for that city/day and compares model probability vs market price. Edge = model probability − market price. A positive edge means the model thinks that side is underpriced. Trade directly on Polymarket.
       </div>
     </div>
   );
