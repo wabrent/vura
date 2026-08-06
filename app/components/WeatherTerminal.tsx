@@ -207,10 +207,6 @@ export default function WeatherTerminal() {
           No signals above {Math.round(minEdge * 100)}% edge. Try a lower threshold.
         </div>
       )}
-
-      <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', lineHeight: 1.7, maxWidth: 46, opacity: 0.8 }}>
-        How it works: each Polymarket market settles on a city's official daily high/low temperature. VURA pulls the Open-Meteo forecast for that city/day and compares model probability vs market price. Edge = model probability − market price. A positive edge means the model thinks that side is underpriced. Trade directly on Polymarket.
-      </div>
     </div>
   );
 }
