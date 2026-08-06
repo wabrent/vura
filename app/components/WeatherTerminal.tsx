@@ -133,7 +133,7 @@ export default function WeatherTerminal() {
           const forecast = g.type === 'high' ? g.forecastMaxC : g.forecastMinC;
           const winPct = ladderRows.reduce((s, r) => s + r.modelProb, 0);
           const payout = 100;
-          const roi = g.basketCost > 0 ? ((payout / g.basketCost) - 1) : 0;
+          const roi = g.basketCost > 0 ? Math.min((payout / g.basketCost) - 1, 10) : 0;
           return (
             <div key={`${g.city}|${g.date}|${g.type}`} className="city-card" style={{ animationDelay: `${i * 40}ms` }}>
               <div className="city-card-head">

@@ -207,7 +207,10 @@ export async function GET(req: NextRequest) {
           edge,
           ev: calcEv(modelProb, m.yesPrice),
         };
-      }).filter(b => b.mode === 'exact');
+      })
+        // Only tradable buckets: real probability + real price (not illiquid 1c dust)
+        .filter(b => b.mode === 'exact')
+        .filter(b => b.modelProb >= 0.04 && b.marketPrice >= 0.02 && b.marketPrice <= 0.85);
 
       if (buckets.length < 3) continue;
 
@@ -217,6 +220,10 @@ export async function GET(req: NextRequest) {
       const ladder = sorted.slice(Math.max(0, centerIdx - 1), Math.min(sorted.length, centerIdx + 2));
       const basketCost = ladder.reduce((s, b) => s + b.marketPrice, 0);
       const basketEv = ladder.reduce((s, b) => s + b.ev * b.marketPrice, 0);
+      const winPct = ladder.reduce((s, b) => s + b.modelProb, 0);
+
+      // Skip setups that are too cheap (dust) or have no real chance
+      if (basketCost < 0.03 || winPct < 0.12) continue;
 
       const best = [...buckets].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
       const bestMarket = markets.find(m => m.thresholdC === best?.thresholdC && m.mode === best.mode) || markets[0];
