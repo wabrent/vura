@@ -1,246 +1,214 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface Recommendation {
+interface Bucket {
+  thresholdC: number;
+  yesPrice: number;
+  slug: string;
+  volume: number;
+}
+
+interface CityData {
   city: string;
   date: string;
   type: string;
-  thresholdC: number;
-  side: 'YES' | 'NO';
-  price: number;
-  forecast: number;
-  reason: string;
-  slug: string;
   eventSlug: string;
+  currentTemp: number | null;
+  forecastMax: number[];
+  forecastMin: number[];
+  dailyTime: string[];
+  hourly: { t: string; temp: number }[];
+  buckets: Bucket[];
 }
 
-const fmtDate = (d: string) => {
+const fmtDay = (d: string) => {
   const dt = new Date(d + 'T00:00:00Z');
-  const days = Math.round((dt.getTime() - Date.now()) / 86400000);
-  const label = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (days === 0) return 'TODAY';
-  if (days === 1) return 'TOMORROW';
-  return label;
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
+const fmtVol = (v: number) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + Math.round(v);
+
+function TempChart({ data, forecast }: { data: { t: string; temp: number }[]; forecast: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, w, h);
+    const pad = { l: 8, r: 8, t: 8, b: 18 };
+    const iw = w - pad.l - pad.r;
+    const ih = h - pad.t - pad.b;
+
+    const pts = data.length ? data : [{ t: '00:00', temp: forecast }, { t: '23:00', temp: forecast }];
+    const temps = pts.map(p => p.temp);
+    const min = Math.min(...temps, forecast) - 2;
+    const max = Math.max(...temps, forecast) + 2;
+    const range = max - min || 1;
+
+    // grid
+    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 1;
+    for (let g = 0; g <= 4; g++) {
+      const y = pad.t + (ih * g) / 4;
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(w - pad.r, y);
+      ctx.stroke();
+      const v = max - (range * g) / 4;
+      ctx.fillStyle = '#7B8794';
+      ctx.font = '10px JetBrains Mono';
+      ctx.fillText(v.toFixed(0) + '°', 2, y + 3);
+    }
+
+    const x = (i: number) => pad.l + (iw * i) / (pts.length - 1);
+    const y = (v: number) => pad.t + ih - ((v - min) / range) * ih;
+
+    // forecast line
+    ctx.strokeStyle = '#1652F0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(x(i), y(p.temp)) : ctx.lineTo(x(i), y(p.temp)));
+    ctx.stroke();
+
+    // area fill
+    ctx.lineTo(x(pts.length - 1), y(min));
+    ctx.lineTo(x(0), y(min));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(22,82,240,0.08)';
+    ctx.fill();
+
+    // points
+    pts.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(x(i), y(p.temp), 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#1652F0';
+      ctx.fill();
+    });
+
+    // x labels
+    const step = Math.max(1, Math.floor(pts.length / 5));
+    ctx.fillStyle = '#7B8794';
+    ctx.font = '9px JetBrains Mono';
+    for (let i = 0; i < pts.length; i += step) {
+      ctx.fillText(pts[i].t, x(i) - 10, h - 4);
+    }
+  }, [data, forecast]);
+
+  return <canvas ref={ref} style={{ width: '100%', height: '100%', display: 'block' }} />;
+}
+
 export default function WeatherTerminal() {
-  const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [cities, setCities] = useState<CityData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'trades' | 'arb'>('trades');
-  const [arbs, setArbs] = useState<any[]>([]);
-  const [arbLoading, setArbLoading] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/weather/ai?pages=3');
+      const res = await fetch('/api/weather/terminal?pages=4');
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setRecs(data.recs || []);
+      setCities(data.cities || []);
+      if (!selected && data.cities?.length) setSelected(data.cities[0].city);
     } catch (e: any) {
       setError(e.message);
     }
     setLoading(false);
-  }, []);
-
-  const loadArb = useCallback(async () => {
-    setArbLoading(true);
-    try {
-      const res = await fetch('/api/weather/arb?pages=4');
-      if (res.ok) {
-        const data = await res.json();
-        setArbs(data.arbs || []);
-      }
-    } catch {}
-    setArbLoading(false);
-  }, []);
+  }, [selected]);
 
   useEffect(() => {
-    load();
-    loadArb();
-  }, [load, loadArb]);
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/weather/terminal?pages=4');
+        const data = await res.json();
+        setCities(data.cities || []);
+        if (data.cities?.length) setSelected(data.cities[0].city);
+      } catch (e: any) { setError(e.message); }
+      setLoading(false);
+    })();
+  }, []);
+
+  const active = cities.find(c => c.city === selected) || cities[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '46rem', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 1, background: 'var(--border)', padding: 2, borderRadius: 12, alignSelf: 'center' }}>
-        {([['trades', '⚡ Best trades'], ['arb', '💰 Arbitrage']] as const).map(([v, label]) => (
-          <button key={v} onClick={() => setView(v)}
-            style={{
-              border: 'none', background: view === v ? 'var(--bg-2)' : 'transparent', color: view === v ? 'var(--accent)' : 'var(--text-3)',
-              padding: '0.45rem 1.2rem', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em',
-              fontWeight: 600, cursor: 'pointer', borderRadius: 10, fontFamily: 'var(--display)'
-            }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {view === 'arb' ? (
-        <ArbitrageView loading={arbLoading} arbs={arbs} onRefresh={loadArb} />
-      ) : (
-      <>
-      <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Today's best trades</div>
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
-          AI compares the weather forecast with market prices. Tap a card to buy.
+    <div className="term-layout">
+      {/* City list */}
+      <aside className="term-side">
+        <div className="term-side-head">CITIES <span>{cities.length}</span></div>
+        <div className="term-side-list">
+          {cities.map(c => {
+            const fc = c.type === 'high' ? (c.forecastMax?.[0] ?? 0) : (c.forecastMin?.[0] ?? 0);
+            const isSel = c.city === (active?.city);
+            return (
+              <button key={c.city + c.date} className={`term-city${isSel ? ' term-city-active' : ''}`} onClick={() => setSelected(c.city)}>
+                <span className="term-city-name">{c.city}</span>
+                <span className="term-city-temp">{fc ? fc.toFixed(1) + '°' : '—'}</span>
+              </button>
+            );
+          })}
         </div>
-        {!loading && (
-          <div className="rec-stats">
-            <div className="rec-stat"><span className="rec-stat-label">SETUPS</span><span className="rec-stat-val">{recs.length}</span></div>
-            <div className="rec-stat"><span className="rec-stat-label">BEST MULT</span><span className="rec-stat-val accent">{recs.length ? '×' + Math.round(100 / Math.min(...recs.map(r => r.price))) : '—'}</span></div>
-            <div className="rec-stat"><span className="rec-stat-label">BEST WIN</span><span className="rec-stat-val green">{recs.length ? '$' + Math.round(20 / Math.min(...recs.map(r => r.price))) : '—'}</span></div>
-          </div>
+      </aside>
+
+      {/* Main */}
+      <section className="term-main">
+        {loading && <div className="skeleton" style={{ height: '60vh', borderRadius: 12 }} />}
+        {error && <div className="term-error">{error}</div>}
+        {!loading && !error && active && (
+          <>
+            <div className="term-head">
+              <div>
+                <h2 className="term-title">{active.city}</h2>
+                <div className="term-meta">{fmtDay(active.date)} · {active.type.toUpperCase()} · {active.currentTemp != null ? `now ${active.currentTemp.toFixed(1)}°C` : ''}</div>
+              </div>
+              <div className="term-now">
+                <span className="term-now-label">MODEL HIGH</span>
+                <span className="term-now-val">{(active.type === 'high' ? active.forecastMax?.[0] : active.forecastMin?.[0])?.toFixed(1)}°C</span>
+              </div>
+            </div>
+
+            <div className="term-chart">
+              <TempChart data={active.hourly} forecast={active.type === 'high' ? (active.forecastMax?.[0] ?? 0) : (active.forecastMin?.[0] ?? 0)} />
+            </div>
+
+            <div className="term-buckets">
+              <div className="term-buckets-head">MARKET BUCKETS · Polymarket</div>
+              {active.buckets.slice(0, 12).map(b => {
+                const forecast = active.type === 'high' ? active.forecastMax?.[0] : active.forecastMin?.[0];
+                const isNear = forecast != null && Math.abs(b.thresholdC - forecast) <= 1;
+                const url = `https://polymarket.com/event/${active.eventSlug}?marketSlug=${b.slug}&via=vura`;
+                return (
+                  <div key={b.thresholdC} className={`term-bucket${isNear ? ' term-bucket-near' : ''}`}>
+                    <span className="term-bucket-temp">{b.thresholdC}°C</span>
+                    <div className="term-bucket-bars">
+                      <div className="term-bar-yes" style={{ width: `${Math.round(b.yesPrice * 100)}%` }} />
+                    </div>
+                    <div className="term-bucket-prices">
+                      <span style={{ color: 'var(--accent-2)' }}>YES {Math.round(b.yesPrice * 100)}¢</span>
+                      <span style={{ color: 'var(--red)' }}>NO {Math.round((1 - b.yesPrice) * 100)}¢</span>
+                      <span style={{ color: 'var(--text-3)', fontSize: '0.55rem' }}>{fmtVol(b.volume)}</span>
+                    </div>
+                    <a className="btn-trade" href={url} target="_blank" style={{ fontSize: '0.6rem' }}>Trade</a>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
-      </div>
-
-      {error && (
-        <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(223,32,32,0.06)', border: '1px solid rgba(223,32,32,0.25)', borderRadius: 10, fontSize: '0.75rem' }}>
-          {error}
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton" style={{ height: '84px', animationDelay: `${i * 0.08}s` }} />)}
-        </div>
-      )}
-
-      {!loading && recs.length === 0 && !error && (
-        <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
-          No trades available right now. Check back later.
-        </div>
-      )}
-
-      {!loading && recs.map((r, i) => {
-        const url = `https://polymarket.com/event/${r.eventSlug}?marketSlug=${r.slug}&via=vura`;
-        const priceC = Math.round(r.price * 100);
-        const multiplier = priceC > 0 ? 100 / priceC : 0;
-        const win20 = (20 / r.price).toFixed(0);
-        const noSide = r.side === 'YES';
-        return (
-          <div key={r.city + r.thresholdC + r.side} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
-            <div className="rec-top">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div className="rec-rank">{i + 1}</div>
-                <div>
-                  <div className="rec-city">{r.city} · {fmtDate(r.date)}</div>
-                  <div className="rec-reason">{r.reason}</div>
-                </div>
-              </div>
-              <span className="rec-badge">{noSide ? 'BUY YES' : 'BUY NO'}</span>
-            </div>
-
-            <div className="rec-row">
-              <div className="rec-price">
-                {noSide ? 'YES' : 'NO'} {r.thresholdC}°C
-                <span className="rec-cents">@ {priceC}¢</span>
-              </div>
-              <div className="rec-win">
-                <span className="rec-win-mult">×{multiplier.toFixed(0)}</span>
-                <span className="rec-win-detail">$20 → ${Math.round(20 * multiplier)}</span>
-              </div>
-            </div>
-
-            <div className="rec-action">
-              <div style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
-                {noSide
-                  ? `If ${r.city} hits ${r.thresholdC}°C, each share pays $1`
-                  : `If ${r.city} stays away from ${r.thresholdC}°C, each share pays $1`}
-              </div>
-              <a className="rec-buy" href={url} target="_blank">Buy now</a>
-            </div>
-          </div>
-        );
-      })}
-
-      <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
-        <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Loading...' : '↻ Refresh'}
-        </button>
-        <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.75rem' }}>
-          How it works: Buy opens the market on Polymarket. Buy Yes/No at the shown price. If you're right, each share pays $1.
-        </div>
-      </div>
-      </>
-      )}
-    </div>
-  );
-}
-
-function ArbitrageView({ loading, arbs, onRefresh }: { loading: boolean; arbs: any[]; onRefresh: () => void }) {
-  const fmtDate = (d: string) => {
-    const dt = new Date(d + 'T00:00:00Z');
-    const days = Math.round((dt.getTime() - Date.now()) / 86400000);
-    const label = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    if (days === 0) return 'TODAY';
-    if (days === 1) return 'TOMORROW';
-    return label;
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Guaranteed arbitrage</div>
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
-          Markets where YES + NO cost less than $1 (ARB = guaranteed). Or where the mid sum is off — a repricing signal.
-        </div>
-        {!loading && (
-          <div className="rec-stats">
-            <div className="rec-stat"><span className="rec-stat-label">FOUND</span><span className="rec-stat-val">{arbs.length}</span></div>
-            <div className="rec-stat"><span className="rec-stat-label">BEST EDGE</span><span className="rec-stat-val accent">{arbs.length ? '+' + arbs[0].edgeC.toFixed(1) + '¢' : '—'}</span></div>
-          </div>
-        )}
-      </div>
-
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: '76px', animationDelay: `${i * 0.08}s` }} />)}
-        </div>
-      )}
-
-      {!loading && arbs.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
-          No arbitrage opportunities right now. Check back — they appear often on fresh markets.
-        </div>
-      )}
-
-      {arbs.map((a, i) => {
-        const url = `https://polymarket.com/event/${a.eventSlug}?marketSlug=${a.slug}&via=vura`;
-        return (
-          <div key={a.city + a.thresholdC} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
-            <div className="rec-top">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div className="rec-rank">{i + 1}</div>
-                <div>
-                  <div className="rec-city">{a.city} · {fmtDate(a.date)} · {a.type === 'high' ? 'HIGH' : 'LOW'}</div>
-                  <div className="rec-reason">Buy YES at {Math.round(a.yesAsk * 100)}¢ + NO at {Math.round(a.noAsk * 100)}¢ = {Math.round(a.total * 100)}¢</div>
-                </div>
-              </div>
-              <span className="rec-badge" style={{ background: a.total < 0.995 ? 'var(--accent-2)' : 'var(--accent)' }}>
-                {a.total < 0.995 ? 'ARB' : '+potential'}
-              </span>
-            </div>
-            <div className="rec-action">
-              <div style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
-                {a.thresholdC}°C — {a.total < 0.995
-                  ? `guaranteed +${a.edgeC.toFixed(1)}¢ per $1`
-                  : `YES+NO mid off by ${(a.midEdgeC ?? 0).toFixed(1)}¢ — watch for repricing`}
-              </div>
-              <a className="rec-buy" href={url} target="_blank">Open market</a>
-            </div>
-          </div>
-        );
-      })}
-
-      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-        <button className="btn-retry" onClick={onRefresh} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Scanning...' : '↻ Rescan'}
-        </button>
-      </div>
+      </section>
     </div>
   );
 }
