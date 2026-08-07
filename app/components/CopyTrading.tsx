@@ -140,7 +140,7 @@ export default function CopyTrading() {
                     <span className="row-cat">{p.outcome} · {Math.round(p.size).toLocaleString()} @ {(p.avgPrice * 100).toFixed(1)}¢</span>
                   </div>
                   <div style={{ textAlign: 'right', flex: '0 0 130px' }}>
-                    <div className="row-price" style={{ color: p.cashPnl >= 0 ? 'var(--accent-2)' : 'var(--red)' }}>
+                    <div className="row-price" style={{ color: p.cashPnl >= 0 ? 'var(--text)' : 'var(--text-2)' }}>
                       {p.cashPnl >= 0 ? '+' : ''}{fmtMoney(p.cashPnl)}
                     </div>
                     <div className="row-cat">{(p.percentPnl * 100).toFixed(1)}% · {fmtMoney(p.currentValue)}</div>

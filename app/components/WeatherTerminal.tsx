@@ -74,7 +74,7 @@ function TempChart({ data, forecast }: { data: { t: string; temp: number }[]; fo
     const y = (v: number) => pad.t + ih - ((v - min) / range) * ih;
 
     // forecast line
-    ctx.strokeStyle = '#1652F0';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath();
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(x(i), y(p.temp)) : ctx.lineTo(x(i), y(p.temp)));
@@ -84,14 +84,14 @@ function TempChart({ data, forecast }: { data: { t: string; temp: number }[]; fo
     ctx.lineTo(x(pts.length - 1), y(min));
     ctx.lineTo(x(0), y(min));
     ctx.closePath();
-    ctx.fillStyle = 'rgba(22,82,240,0.08)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fill();
 
     // points
     pts.forEach((p, i) => {
       ctx.beginPath();
       ctx.arc(x(i), y(p.temp), 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#1652F0';
+      ctx.fillStyle = '#ffffff';
       ctx.fill();
     });
 
@@ -197,8 +197,8 @@ export default function WeatherTerminal() {
                       <div className="term-bar-yes" style={{ width: `${Math.round(b.yesPrice * 100)}%` }} />
                     </div>
                     <div className="term-bucket-prices">
-                      <span style={{ color: 'var(--accent-2)' }}>YES {Math.round(b.yesPrice * 100)}¢</span>
-                      <span style={{ color: 'var(--red)' }}>NO {Math.round((1 - b.yesPrice) * 100)}¢</span>
+                      <span style={{ color: 'var(--text)' }}>YES {Math.round(b.yesPrice * 100)}¢</span>
+                      <span style={{ color: 'var(--text-2)' }}>NO {Math.round((1 - b.yesPrice) * 100)}¢</span>
                       <span style={{ color: 'var(--text-3)', fontSize: '0.55rem' }}>{fmtVol(b.volume)}</span>
                     </div>
                     <a className="btn-trade" href={url} target="_blank" style={{ fontSize: '0.6rem' }}>Trade</a>
