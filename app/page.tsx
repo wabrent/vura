@@ -1,19 +1,26 @@
 'use client';
 
+import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import WeatherTerminal from '@/app/components/WeatherTerminal';
+import HubTerminal from '@/app/components/HubTerminal';
 
 export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
+  const [view, setView] = useState<'weather' | 'hub'>('hub');
 
   return (
     <>
       <nav>
         <div className="nav-inner">
-          <a href="/" className="nav-logo">
+          <a href="/" className="nav-logo" onClick={e => e.preventDefault()}>
             <span className="logo-mark">V</span>
-            <span>VURA <span className="nav-sub">WEATHER</span></span>
+            <span>VURA <span className="nav-sub">MARKETS</span></span>
           </a>
+          <div className="nav-center">
+            <button className={`nav-tab${view === 'hub' ? ' nav-tab-active' : ''}`} onClick={() => setView('hub')}>All Markets</button>
+            <button className={`nav-tab${view === 'weather' ? ' nav-tab-active' : ''}`} onClick={() => setView('weather')}>Weather</button>
+          </div>
           <div className="nav-status">
             <span className="live-dot" />
             <span className="nav-live">Live</span>
@@ -33,48 +40,18 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="hero-slim">
-        <div className="hero-slim-title">
-          <span className="hero-badge"><span className="hero-badge-dot" /> WEATHER EDGE SCANNER</span>
-          <h1>Weather markets move <span className="grad">slower than the weather.</span></h1>
-          <p>
-            Polymarket prices are set by people. When a city's forecast changes, the market often lags.
-            VURA compares <b>market price</b> vs <b>real Open-Meteo forecast</b> and flags the gaps.
-          </p>
-        </div>
-        <div className="hero-decor" aria-hidden="true">
-          <span className="orb orb-1" />
-          <span className="orb orb-2" />
-          <span className="orb orb-3" />
-        </div>
-        <div className="how-steps">
-          <div className="how-step">
-            <span className="how-num">1</span>
-            <span>Find a city with a <b>big multiplier</b> — the market price is likely wrong.</span>
-          </div>
-          <div className="how-step">
-            <span className="how-num">2</span>
-            <span>Press <b>Buy now</b> — it opens the market on Polymarket.</span>
-          </div>
-          <div className="how-step">
-            <span className="how-num">3</span>
-            <span>Profit if your call beats the crowd. Small edge, repeated daily.</span>
-          </div>
-        </div>
-      </section>
-
-      <main>
-        <WeatherTerminal />
+      <main style={{ maxWidth: '84rem' }}>
+        {view === 'weather' ? <WeatherTerminal /> : <HubTerminal />}
       </main>
 
       <footer>
         <div className="footer-line" />
         <div className="footer-inner">
-          <span>© 2026 VURA Weather</span>
+          <span>© 2026 VURA Markets</span>
           <div className="footer-links">
             <a href="https://docs.polymarket.com" target="_blank">Polymarket Docs ↗</a>
             <a href="https://open-meteo.com" target="_blank">Open-Meteo ↗</a>
-            <a href="https://polymarket.com/weather?via=vura" target="_blank">All weather markets ↗</a>
+            <a href="https://polymarket.com/?via=vura" target="_blank">Polymarket ↗</a>
           </div>
         </div>
       </footer>
