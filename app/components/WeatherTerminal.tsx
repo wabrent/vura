@@ -51,9 +51,9 @@ export default function WeatherTerminal() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '46rem', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
-        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>Лучшие сделки сегодня</div>
+        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>Today's best trades</div>
         <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
-          AI сравнивает прогноз погоды с ценами рынка. Карточка = сделка. Жми «Купить».
+          AI compares the weather forecast with market prices. Tap a card to buy.
         </div>
       </div>
 
@@ -119,10 +119,10 @@ export default function WeatherTerminal() {
 
       <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
         <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Загрузка...' : '↻ Обновить'}
+          {loading ? 'Loading...' : '↻ Refresh'}
         </button>
         <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.75rem' }}>
-          Как это работает: «Купить» открывает рынок на Polymarket. Покупаешь YES/NO по указанной цене. Если угадал — акция стоит $1.
+          How it works: Buy opens the market on Polymarket. Buy Yes/No at the shown price. If you're right, each share pays $1.
         </div>
       </div>
     </div>
