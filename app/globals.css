@@ -83,13 +83,17 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.9rem; background: color-
 
 /* ── TICKER ──────────────────────────────────────────────────────────── */
 .tape { overflow: hidden; border-bottom: 1px solid var(--border); background: var(--bg-2); position: relative; z-index: 1; }
-.tape-track { display: flex; gap: 2.5rem; width: max-content; animation: tickerMove 80s linear infinite; padding: 0.6rem 1.5rem; }
+.tape-track { display: flex; gap: 2.2rem; width: max-content; animation: tickerMove 90s linear infinite; padding: 0.55rem 1.5rem; }
 .tape:hover .tape-track { animation-play-state: paused; }
-.tape-group { display: flex; align-items: center; gap: 2.5rem; }
-.tape-vura { font-family: var(--display); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; color: #000; background: #fff; padding: 0.3rem 0.7rem; border-radius: 6px; flex-shrink: 0; }
-.tape-item { font-family: var(--display); font-size: 0.8rem; color: var(--text-2); white-space: nowrap; text-decoration: none; transition: color 0.15s; }
-.tape-item:hover { color: #fff; }
-.tape-name { font-weight: 500; }
+.tape-group { display: flex; align-items: center; gap: 2.2rem; }
+.tape-vura { font-family: var(--display); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: #000; background: #fff; padding: 0.3rem 0.65rem; border-radius: 6px; flex-shrink: 0; }
+.tape-item { display: flex; align-items: center; gap: 0.6rem; font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); white-space: nowrap; text-decoration: none; transition: color 0.15s; }
+.tape-item:hover { color: var(--text); }
+.tape-name { font-family: var(--display); font-size: 0.78rem; font-weight: 500; color: var(--text); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.tape-price { font-weight: 700; color: var(--text); }
+.tape-chg { font-size: 0.66rem; }
+.tape-up { color: #fff; }
+.tape-down { color: #9a9a9a; }
 
 /* ── HERO ────────────────────────────────────────────────────────────── */
 .hero { max-width: 84rem; margin: 0 auto; padding: 3.5rem 2rem 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 3rem; position: relative; z-index: 1; }
