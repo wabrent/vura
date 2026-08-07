@@ -27,10 +27,10 @@ const fmtVol = (v: number) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >=
 
 // Decorative sparkline: smooth curve from change24h direction + current price
 function Sparkline({ price, change }: { price: number; change: number }) {
-  const up = change >= 0;
+  const safeChange = Number(change) || 0;
+  const up = safeChange >= 0;
   const pts = 20;
-  const base = 50;
-  const amp = Math.min(Math.abs(change) * 150, 25);
+  const amp = Math.min(Math.abs(safeChange) * 150, 25);
   const w = 60, h = 22;
   let path = '';
   for (let i = 0; i < pts; i++) {
@@ -38,7 +38,6 @@ function Sparkline({ price, change }: { price: number; change: number }) {
     const x = t * w;
     const wave = Math.sin(t * Math.PI * 2) * amp * (1 - t * 0.5);
     const drift = up ? t * 22 : (1 - t) * 22;
-    const y = base / (h / 2) - (h - 8) / 2 - wave + (up ? -drift : drift);
     const yy = (h - 6) / 2 - wave * 0.5 + (up ? -drift * 0.5 : drift * 0.5);
     path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + (12 + yy / 2).toFixed(1) + ' ';
   }
@@ -131,9 +130,9 @@ export default function HubTerminal() {
                     <div className="col-name">
                       {m.image && <img src={m.image} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0, marginRight: 8 }} />}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                        <span className="row-title">{m.question.substring(0, 55)}</span>
+                        <span className="row-title">{String(m.question || '').substring(0, 55)}</span>
                         <div className="prob-track">
-                          <div className="prob-fill" style={{ width: `${Math.round(m.yesPrice * 100)}%` }} />
+                          <div className="prob-fill" style={{ width: `${Math.round((Number(m.yesPrice) || 0) * 100)}%` }} />
                         </div>
                       </div>
                     </div>

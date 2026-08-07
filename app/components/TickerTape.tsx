@@ -35,12 +35,12 @@ export default function TickerTape() {
     <div className="tape">
       <div className="tape-track">
         {renderItems.map((m, i) => {
-          const chg = m.change24h;
+          const chg = Number(m.change24h) || 0;
           return (
             <span key={m.id + i} className="tape-item">
               <span style={{ color: chg > 0 ? 'var(--text)' : 'var(--text-2)' }}>{chg > 0 ? '▲' : chg < 0 ? '▼' : '◆'}</span>
-              <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title.substring(0, 38)}</span>
-              <span className="tape-price">{Math.round(m.yesPrice * 100)}c</span>
+              <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(m.title || '').substring(0, 38)}</span>
+              <span className="tape-price">{Math.round((Number(m.yesPrice) || 0) * 100)}c</span>
               <span style={{ fontSize: '0.64rem' }}>{chg > 0 ? '+' : ''}{(chg * 100).toFixed(1)}%</span>
             </span>
           );

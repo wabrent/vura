@@ -153,7 +153,7 @@ export default function EdgeScanner() {
                 <span style={{ fontSize: '1.5rem' }}>{tempIcon(r.forecast)}</span>
                 <div>
                   <div className="rec-city">{r.city} · {fmtDate(r.date)}</div>
-                  <div className="rec-reason">{r.reason} · forecast {r.forecast.toFixed(1)}°C</div>
+                  <div className="rec-reason">{r.reason || ''} · forecast {Number(r.forecast).toFixed(1)}°C</div>
                 </div>
               </div>
               <span className="rec-badge">{noSide ? 'BUY YES' : 'BUY NO'}</span>
