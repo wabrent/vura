@@ -35,8 +35,8 @@ export default function Home() {
 
       <section className="hero-slim">
         <div className="hero-slim-title">
-          <span className="hero-badge">● EDGE SCANNER</span>
-          <h1>Weather markets move slower than the weather.</h1>
+          <span className="hero-badge"><span className="hero-badge-dot" /> WEATHER EDGE SCANNER</span>
+          <h1>Weather markets move <span className="grad">slower than the weather.</span></h1>
           <p>
             Polymarket prices are set by people. When a city's forecast changes, the market often lags.
             VURA compares <b>market price</b> vs <b>real Open-Meteo forecast</b> and flags the gaps.
@@ -45,11 +45,11 @@ export default function Home() {
         <div className="how-steps">
           <div className="how-step">
             <span className="how-num">1</span>
-            <span>Find a city with a <b>green +edge</b> — the model thinks that side is cheap.</span>
+            <span>Find a city with a <b>big multiplier</b> — the market price is likely wrong.</span>
           </div>
           <div className="how-step">
             <span className="how-num">2</span>
-            <span>Press <b>Buy YES / Buy NO</b> — it opens the market on Polymarket.</span>
+            <span>Press <b>Buy now</b> — it opens the market on Polymarket.</span>
           </div>
           <div className="how-step">
             <span className="how-num">3</span>

@@ -51,10 +51,17 @@ export default function WeatherTerminal() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '46rem', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
-        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>Today's best trades</div>
+        <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Today's best trades</div>
         <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
           AI compares the weather forecast with market prices. Tap a card to buy.
         </div>
+        {!loading && (
+          <div className="rec-stats">
+            <div className="rec-stat"><span className="rec-stat-label">SETUPS</span><span className="rec-stat-val">{recs.length}</span></div>
+            <div className="rec-stat"><span className="rec-stat-label">BEST MULT</span><span className="rec-stat-val accent">{recs.length ? '×' + Math.round(100 / Math.min(...recs.map(r => r.price))) : '—'}</span></div>
+            <div className="rec-stat"><span className="rec-stat-label">BEST WIN</span><span className="rec-stat-val green">{recs.length ? '$' + Math.round(20 / Math.min(...recs.map(r => r.price))) : '—'}</span></div>
+          </div>
+        )}
       </div>
 
       {error && (
