@@ -37,8 +37,14 @@ body.dark {
 body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
-    radial-gradient(600px 300px at 85% -5%, rgba(22, 82, 240, 0.06), transparent 60%),
-    radial-gradient(500px 260px at 5% 10%, rgba(46, 189, 133, 0.05), transparent 55%);
+    radial-gradient(700px 360px at 85% -5%, rgba(22, 82, 240, 0.09), transparent 60%),
+    radial-gradient(600px 300px at 5% 15%, rgba(46, 189, 133, 0.07), transparent 55%),
+    radial-gradient(800px 400px at 60% 110%, rgba(22, 82, 240, 0.05), transparent 60%);
+  animation: bgDrift 18s ease-in-out infinite;
+}
+@keyframes bgDrift {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
 }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -281,6 +287,16 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 @keyframes heroIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .grad { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% 100%; animation: gradShift 4s ease-in-out infinite; }
 @keyframes gradShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.hero-decor { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+.orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.5; }
+.orb-1 { width: 340px; height: 340px; right: 6%; top: -60px; background: radial-gradient(circle, rgba(22, 82, 240, 0.45), transparent 70%); animation: orbFloat 12s ease-in-out infinite; }
+.orb-2 { width: 260px; height: 260px; right: 28%; bottom: -40px; background: radial-gradient(circle, rgba(46, 189, 133, 0.35), transparent 70%); animation: orbFloat 15s ease-in-out 2s infinite; }
+.orb-3 { width: 180px; height: 180px; left: 30%; top: 30%; background: radial-gradient(circle, rgba(22, 82, 240, 0.3), transparent 70%); animation: orbFloat 18s ease-in-out 4s infinite; }
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-24px, 18px) scale(1.06); }
+  66% { transform: translate(20px, -14px) scale(0.97); }
+}
 .hero-badge-dot { display: inline-block; width: 7px; height: 7px; background: var(--accent); border-radius: 50%; margin-right: 6px; animation: dotPulse 1.5s ease-in-out infinite; }
 @keyframes dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
 .how-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.6rem; }
@@ -356,6 +372,7 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .rec-stat-val.green { color: var(--accent-2); }
 
 @media (max-width: 768px) {
+  .orb-1, .orb-2, .orb-3 { display: none; }
   .hero { flex-direction: column; padding: 2.5rem 1rem; }
   .hero-left h2 { font-size: 2.4rem; }
   .nav-inner { padding: 0 1rem; }

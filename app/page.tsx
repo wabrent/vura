@@ -42,6 +42,11 @@ export default function Home() {
             VURA compares <b>market price</b> vs <b>real Open-Meteo forecast</b> and flags the gaps.
           </p>
         </div>
+        <div className="hero-decor" aria-hidden="true">
+          <span className="orb orb-1" />
+          <span className="orb orb-2" />
+          <span className="orb orb-3" />
+        </div>
         <div className="how-steps">
           <div className="how-step">
             <span className="how-num">1</span>
