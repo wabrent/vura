@@ -42,6 +42,36 @@ export default function Home() {
         </div>
       </nav>
 
+      <section className="hero">
+        <div className="hero-left">
+          <div className="hero-badge">● LIVE · PREDICTION INTELLIGENCE</div>
+          <h2>REAL-TIME</h2>
+          <h2><span className="grad">PREDICTION</span></h2>
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Markets</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>—</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Categories</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>4</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Weather Cities</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>48</span>
+            </div>
+          </div>
+        </div>
+        <div className="hero-right">
+          <p>Track Polymarket markets, weather temperature ladders, and top trader wallets — all in one terminal.</p>
+          <div className="hero-divider" />
+          <div className="hero-contact">
+            <span>Powered by Polymarket CLOB · Open-Meteo</span>
+            <a href="https://docs.polymarket.com" target="_blank">API Docs ↗</a>
+          </div>
+        </div>
+      </section>
+
       <main style={{ maxWidth: '84rem' }}>
         {view === 'weather' ? <WeatherTerminal /> : view === 'wallets' ? <CopyTrading /> : <HubTerminal />}
       </main>
