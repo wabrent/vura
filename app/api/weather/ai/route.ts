@@ -38,7 +38,7 @@ interface Row {
   date: string;
   type: string;
   forecast: number;
-  buckets: { thresholdC: number; yesPrice: number; buyYesPrice: number; slug: string; eventSlug: string }[];
+  buckets: { thresholdC: number; yesPrice: number; buyYesPrice: number; tokenId: string | null; slug: string; eventSlug: string }[];
 }
 
 export async function GET(req: NextRequest) {
@@ -103,7 +103,12 @@ export async function GET(req: NextRequest) {
           // Real price you pay to BUY YES = best ask, fallback to mid
           const ask = parseFloat(m.bestAsk);
           const buyYesPrice = ask > 0 ? Math.max(ask, 0.001) : yesPrice;
-          return { thresholdC, yesPrice, buyYesPrice, slug: m.slug, eventSlug: ev.slug };
+          let tokenId = null;
+          try {
+            const ids = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds;
+            tokenId = ids?.[0] || null;
+          } catch {}
+          return { thresholdC, yesPrice, buyYesPrice, tokenId, slug: m.slug, eventSlug: ev.slug };
         })
         .filter((b: any) => b.thresholdC !== null && !/below|above/i.test(ev.title + ' ' + (ev.markets || []).find((x: any) => x.slug === b.slug)?.question || '') && b.buyYesPrice > 0.01 && b.buyYesPrice < 0.99)
         .sort((a: any, b: any) => a.thresholdC - b.thresholdC);
@@ -150,7 +155,7 @@ Do NOT include a price — I'll use the real market price myself. Only pick trad
     const content: string = data.choices?.[0]?.message?.content || '';
 
     // Parse DeepSeek lines into structured recommendations
-    const recs: { city: string; date: string; type: string; thresholdC: number; side: 'YES' | 'NO'; price: number; forecast: number; reason: string; slug: string; eventSlug: string }[] = [];
+    const recs: { city: string; date: string; type: string; thresholdC: number; side: 'YES' | 'NO'; price: number; forecast: number; reason: string; slug: string; eventSlug: string; tokenId: string | null }[] = [];
 
     for (const line of content.split('\n')) {
       const parts = line.split('|').map(s => s.trim());
@@ -182,6 +187,7 @@ Do NOT include a price — I'll use the real market price myself. Only pick trad
         reason,
         slug: bucket.slug,
         eventSlug: bucket.eventSlug,
+        tokenId: bucket.tokenId,
       });
     }
 

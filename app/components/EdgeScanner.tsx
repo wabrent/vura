@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import TradeModal from '@/app/components/TradeModal';
 
 interface Rec {
   city: string;
@@ -13,6 +14,7 @@ interface Rec {
   reason: string;
   slug: string;
   eventSlug: string;
+  tokenId: string | null;
 }
 
 const fmtDate = (d: string) => {
@@ -37,6 +39,7 @@ export default function EdgeScanner() {
   const [recs, setRecs] = useState<Rec[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [buy, setBuy] = useState<Rec | null>(null);
   const [tgToken, setTgToken] = useState('');
   const [tgChat, setTgChat] = useState('');
   const [tgOn, setTgOn] = useState(false);
@@ -176,11 +179,13 @@ export default function EdgeScanner() {
                   ? `If ${r.city} hits ${r.thresholdC}°C, each share pays $1`
                   : `If ${r.city} stays away from ${r.thresholdC}°C, each share pays $1`}
               </div>
-              <a className="rec-buy" href={url} target="_blank">Buy now</a>
+              <button className="rec-buy" style={{ border: 'none' }} onClick={() => setBuy(r)}>Buy now</button>
             </div>
           </div>
         );
       })}
+
+      {buy && <TradeModal rec={buy} onClose={() => setBuy(null)} />}
     </div>
   );
 }
