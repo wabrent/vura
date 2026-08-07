@@ -305,6 +305,18 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .ai-panel-head { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem; }
 .ai-panel-body { font-size: 0.78rem; line-height: 1.7; color: var(--text-2); white-space: pre-wrap; }
 
+.rec-card { display: flex; flex-direction: column; gap: 0.8rem; background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.2rem; transition: all 0.18s; animation: cardIn 0.35s ease-out backwards; }
+.rec-card:hover { border-color: var(--border-md); box-shadow: var(--shadow); }
+.rec-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.rec-rank { flex-shrink: 0; width: 1.7rem; height: 1.7rem; display: flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.8rem; border-radius: 50%; font-family: var(--mono); }
+.rec-city { font-size: 1rem; font-weight: 700; }
+.rec-reason { font-size: 0.72rem; color: var(--text-2); margin-top: 0.15rem; }
+.rec-action { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+.rec-price { font-size: 1rem; font-weight: 700; font-family: var(--mono); }
+.rec-cents { font-size: 0.8rem; font-weight: 600; color: var(--accent); margin-left: 0.3rem; }
+.rec-buy { display: inline-block; padding: 0.55rem 1.4rem; font-family: var(--display); font-size: 0.85rem; font-weight: 700; color: #fff; background: var(--accent); border-radius: 10px; text-decoration: none; transition: all 0.15s; }
+.rec-buy:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
 @media (max-width: 768px) {
   .hero { flex-direction: column; padding: 2.5rem 1rem; }
   .hero-left h2 { font-size: 2.4rem; }

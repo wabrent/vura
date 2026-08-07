@@ -33,6 +33,14 @@ function parseCity(q: string): string | null {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 
+interface Row {
+  city: string;
+  date: string;
+  type: string;
+  forecast: number;
+  buckets: { thresholdC: number; yesPrice: number; slug: string; eventSlug: string }[];
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -50,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     const nowTs = Date.now();
-    const rows: { city: string; date: string; type: string; forecast: number; market: number; price: number }[] = [];
+    const rows: Row[] = [];
 
     for (const ev of allEvents) {
       const title = ev.title || '';
@@ -78,43 +86,41 @@ export async function GET(req: NextRequest) {
       } catch {}
       if (forecast === null) continue;
 
-      // Find the closest-priced market bucket around the forecast
-      const markets = (ev.markets || []).filter((m: any) => m.active && !m.closed);
-      const near = markets.map((m: any) => {
-        let threshold = null;
-        const cm = m.question.match(/(\d{1,3})\s*(?:°|º)?C/i);
-        const fm = m.question.match(/(\d{2,3})\s*(?:°|º)?F/i);
-        if (cm) threshold = parseInt(cm[1]);
-        else if (fm) threshold = Math.round((parseInt(fm[1]) - 32) * 5 / 9);
-        let price = 0.5;
-        try {
-          const pp = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
-          price = parseFloat(pp[0]) || 0.5;
-        } catch {}
-        return { threshold, price };
-      }).filter((m: any) => m.threshold !== null)
-        .sort((a: any, b: any) => Math.abs(a.threshold - forecast) - Math.abs(b.threshold - forecast))[0];
+      const buckets = (ev.markets || [])
+        .filter((m: any) => m.active && !m.closed)
+        .map((m: any) => {
+          let thresholdC = null;
+          const cm = m.question.match(/(\d{1,3})\s*(?:°|º)?C/i);
+          const fm = m.question.match(/(\d{2,3})\s*(?:°|º)?F/i);
+          if (cm) thresholdC = parseInt(cm[1]);
+          else if (fm) thresholdC = Math.round((parseInt(fm[1]) - 32) * 5 / 9);
+          let yesPrice = 0.5;
+          try {
+            const pp = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
+            yesPrice = parseFloat(pp[0]) || 0.5;
+          } catch {}
+          return { thresholdC, yesPrice, slug: m.slug, eventSlug: ev.slug };
+        })
+        .filter((b: any) => b.thresholdC !== null && !/below|above/i.test(ev.title + ' ' + (ev.markets || []).find((x: any) => x.slug === b.slug)?.question || '') && b.yesPrice > 0.01 && b.yesPrice < 0.99)
+        .sort((a: any, b: any) => a.thresholdC - b.thresholdC);
 
-      if (!near) continue;
-      rows.push({
-        city,
-        date,
-        type: isHigh ? 'high' : 'low',
-        forecast,
-        market: near.threshold,
-        price: near.price,
-      });
+      if (buckets.length >= 2) {
+        rows.push({ city, date, type: isHigh ? 'high' : 'low', forecast, buckets });
+      }
     }
 
-    // Ask DeepSeek to analyze the top divergences
-    const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-112e3801734f4c2b9e914fb1b72fe774';    const prompt = `You are a weather prediction market analyst. Here is real forecast data vs Polymarket prices.
+    // Ask DeepSeek to pick the best trades
+    const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-112e3801734f4c2b9e914fb1b72fe774';
+    const prompt = `You are a weather prediction market trader. For each city below I give: forecast high/low temp (°C), and the Polymarket buckets with YES price (0-1, in %).
 
-For each line: City | Date | Type(high/low) | Forecast temp (°C) | Nearest market bucket (°C) | Market price of that bucket (0-1, = % chance market gives).
+The goal: find the best trades where the market price is clearly wrong vs the forecast. A bucket near the forecast should be cheap (YES < 40%), or a bucket far from the forecast should be expensive (YES > 60%).
 
-Data:
-${rows.slice(0, 25).map(r => `${r.city} | ${r.date} | ${r.type} | ${r.forecast}°C | ${r.market}°C | ${(r.price * 100).toFixed(0)}%`).join('\n')}
+Data (City | Date | type | forecast°C | buckets as temp:price%):
+${rows.slice(0, 30).map(r => `${r.city} | ${r.date} | ${r.type} | ${r.forecast} | ${r.buckets.map(b => `${b.thresholdC}:${(b.yesPrice * 100).toFixed(0)}%`).join(', ')}`).join('\n')}
 
-Find 3-5 of the most interesting situations where the market price looks mispriced vs the forecast (market gives a bucket a very different probability than the forecast implies). For each, output a short line: City, what to consider (buy YES/NO on which bucket), and why in one sentence. Be concise. Return as a plain list, no markdown.`;
+Pick up to 6 best trades. For each return a line:
+City | Date | BUY YES or BUY NO | temp°C | price¢ | short reason (max 10 words)
+Only pick trades where the mismatch is clear. Use exactly this pipe format, no markdown.`;
 
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -122,21 +128,55 @@ Find 3-5 of the most interesting situations where the market price looks mispric
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500,
+        temperature: 0.2,
+        max_tokens: 600,
       }),
       signal: AbortSignal.timeout(25000),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      return NextResponse.json({ error: err, rows }, { status: res.status });
+      return NextResponse.json({ error: err, recs: [] }, { status: res.status });
     }
 
     const data = await res.json();
-    const analysis = data.choices?.[0]?.message?.content || '';
-    return NextResponse.json({ analysis, generatedAt: Date.now(), rows: rows.slice(0, 25) });
+    const content: string = data.choices?.[0]?.message?.content || '';
+
+    // Parse DeepSeek lines into structured recommendations
+    const recs: { city: string; date: string; type: string; thresholdC: number; side: 'YES' | 'NO'; price: number; forecast: number; reason: string; slug: string; eventSlug: string }[] = [];
+
+    for (const line of content.split('\n')) {
+      const parts = line.split('|').map(s => s.trim());
+      if (parts.length < 5) continue;
+      const city = parts[0];
+      const date = parts[1];
+      const sideRaw = parts[2].toUpperCase();
+      const side: 'YES' | 'NO' = sideRaw.includes('NO') ? 'NO' : 'YES';
+      const thresholdC = parseInt(parts[3]) || 0;
+      const price = parseInt(parts[4]) / 100;
+      const reason = parts[5] || '';
+      if (!city || !thresholdC || !price) continue;
+
+      const row = rows.find(r => r.city === city && r.date === date);
+      const bucket = row?.buckets.find(b => b.thresholdC === thresholdC);
+      if (!row || !bucket) continue;
+
+      recs.push({
+        city,
+        date,
+        type: row.type,
+        thresholdC,
+        side,
+        price,
+        forecast: row.forecast,
+        reason,
+        slug: bucket.slug,
+        eventSlug: bucket.eventSlug,
+      });
+    }
+
+    return NextResponse.json({ generatedAt: Date.now(), recs });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, rows: [] }, { status: 500 });
+    return NextResponse.json({ error: e.message, recs: [] }, { status: 500 });
   }
 }
