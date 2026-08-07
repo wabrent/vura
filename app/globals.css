@@ -293,6 +293,18 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .city-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
 .city-card-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 0.3rem; border-top: 1px solid var(--border); margin-top: auto; }
 
+.city-temp { font-size: 1.3rem; font-weight: 700; font-family: var(--mono); }
+.city-temp-now { font-size: 0.55rem; color: var(--text-3); font-family: var(--mono); }
+.city-minmax { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.58rem; color: var(--text-2); font-family: var(--mono); padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+.hourly-row { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.4rem 0; }
+.hourly-cell { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; padding: 0.3rem 0.5rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px; min-width: 42px; }
+.hourly-temp { font-size: 0.75rem; font-weight: 700; font-family: var(--mono); }
+.hourly-time { font-size: 0.5rem; color: var(--text-3); font-family: var(--mono); }
+
+.ai-panel { background: linear-gradient(180deg, rgba(22, 82, 240, 0.05), rgba(255, 255, 255, 0)); border: 1px solid rgba(22, 82, 240, 0.2); border-radius: 12px; padding: 1rem 1.2rem; }
+.ai-panel-head { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem; }
+.ai-panel-body { font-size: 0.78rem; line-height: 1.7; color: var(--text-2); white-space: pre-wrap; }
+
 @media (max-width: 768px) {
   .hero { flex-direction: column; padding: 2.5rem 1rem; }
   .hero-left h2 { font-size: 2.4rem; }

@@ -4,24 +4,19 @@ import { findCity } from '@/app/lib/cities';
 const GAMMA = 'https://gamma-api.polymarket.com';
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 
-interface WeatherMarket {
-  conditionId: string;
-  question: string;
-  thresholdC: number | null;
+interface PriceRow {
+  thresholdC: number;
   mode: 'exact' | 'above' | 'below';
   yesPrice: number;
+  noPrice: number;
   slug: string;
   eventSlug: string;
   volume: number;
 }
 
-interface BucketRow {
-  thresholdC: number;
-  mode: 'exact' | 'above' | 'below';
-  marketPrice: number;
-  modelProb: number;
-  edge: number;
-  ev: number;
+interface HourlyPoint {
+  time: string;
+  tempC: number;
 }
 
 interface CityGroup {
@@ -30,18 +25,16 @@ interface CityGroup {
   type: 'high' | 'low';
   forecastMaxC: number;
   forecastMinC: number;
-  resolutionStation: string;
-  buckets: BucketRow[];
-  best: BucketRow | null;
-  basketCost: number;
-  basketEv: number;
-  horizonHours: number;
+  currentTempC: number | null;
+  station: string;
+  hourly: HourlyPoint[];
+  prices: PriceRow[];
   bestSlug: string;
   bestEventSlug: string;
 }
 
 const cache = new Map<string, { ts: number; data: any }>();
-const CACHE_TTL = 180000;
+const CACHE_TTL = 300000;
 
 async function cachedFetch(key: string, url: string, timeout = 15000) {
   const hit = cache.get(key);
@@ -81,33 +74,11 @@ function parseCity(q: string): string | null {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 
-function normCdf(x: number): number {
-  const t = 1 / (1 + 0.2316419 * Math.abs(x));
-  const d = 0.3989422804014327 * Math.exp(-x * x / 2);
-  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-  return x >= 0 ? 1 - p : p;
-}
-
-function bucketProb(fc: number, X: number, sigma: number): number {
-  return normCdf((X + 0.5 - fc) / sigma) - normCdf((X - 0.5 - fc) / sigma);
-}
-
-function calcEv(p: number, price: number): number {
-  if (price <= 0 || price >= 1) return 0;
-  return p * (1 / price - 1) - (1 - p);
-}
-
-// Estimated forecast error grows with horizon: ~0.8C today, ~1.4C at D+2, ~2C at D+4
-function sigmaForHorizon(hours: number): number {
-  return 0.8 + Math.min(hours, 96) * 0.012;
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const pages = Math.min(parseInt(searchParams.get('pages') || '3'), 6);
 
-    // Fetch fresh events first (order=id desc gives newest weather markets)
     const allEvents: any[] = [];
     for (let p = 0; p < pages; p++) {
       const offset = p * 100;
@@ -121,7 +92,6 @@ export async function GET(req: NextRequest) {
 
     const nowTs = Date.now();
     const groups = new Map<string, CityGroup>();
-    const stationMap = new Map<string, string>();
 
     for (const ev of allEvents) {
       const title = ev.title || '';
@@ -134,10 +104,8 @@ export async function GET(req: NextRequest) {
       const date = parseDate(title);
       if (!date) continue;
 
-      // Keep D-0 (after 18:00 skip today) through D+5
       const dateTs = new Date(date + 'T00:00:00Z').getTime();
-      const dateStartMs = dateTs; // local midnight UTC approximation
-      const horizonMs = dateStartMs - nowTs;
+      const horizonMs = dateTs - nowTs;
       if (horizonMs < -8 * 3600 * 1000) continue;
       if (horizonMs > 6 * 24 * 3600 * 1000) continue;
 
@@ -145,8 +113,9 @@ export async function GET(req: NextRequest) {
       if (!coords) continue;
 
       const key = `${city}|${date}|${isHigh ? 'high' : 'low'}`;
+      if (groups.has(key)) continue;
 
-      const markets: WeatherMarket[] = (ev.markets || [])
+      const prices: PriceRow[] = (ev.markets || [])
         .filter((m: any) => m.active && !m.closed)
         .map((m: any) => {
           const { thresholdC, mode } = parseTempQuestion(m.question);
@@ -156,77 +125,51 @@ export async function GET(req: NextRequest) {
             yesPrice = parseFloat(pp[0]) || 0.5;
           } catch {}
           return {
-            conditionId: m.conditionId,
-            question: m.question,
             thresholdC,
             mode,
             yesPrice,
+            noPrice: 1 - yesPrice,
             slug: m.slug,
             eventSlug: ev.slug,
             volume: Number(m.volumeNum) || Number(m.volume) || 0,
           };
         })
-        .filter((m: WeatherMarket) => m.thresholdC !== null && m.yesPrice > 0.005 && m.yesPrice < 0.995);
+        .filter((p: PriceRow) => p.thresholdC !== null && p.mode === 'exact' && p.yesPrice > 0.01 && p.yesPrice < 0.99)
+        .sort((a: PriceRow, b: PriceRow) => (a.thresholdC || 0) - (b.thresholdC || 0));
 
-      if (markets.length < 3) continue;
+      if (prices.length < 2) continue;
 
-      // Fetch forecast: max, min, plus station name
+      // Real forecast: hourly + daily max/min + current temp
       let forecastMaxC: number | null = null;
       let forecastMinC: number | null = null;
+      let currentTempC: number | null = null;
       let station = 'Open-Meteo';
+      const hourly: HourlyPoint[] = [];
       try {
         const f = await cachedFetch(
           `om-${coords.lat}-${coords.lon}-${date}`,
-          `${OPEN_METEO}?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&past_days=2&forecast_days=6`
+          `${OPEN_METEO}?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&past_days=2&forecast_days=6&current=temperature_2m`
         );
         const dayIdx = (f.daily?.time || []).findIndex((t: string) => t === date);
         if (dayIdx >= 0) {
           forecastMaxC = f.daily.temperature_2m_max[dayIdx];
           forecastMinC = f.daily.temperature_2m_min[dayIdx];
         }
+        if (f?.current?.temperature_2m != null) currentTempC = f.current.temperature_2m;
+        const times = f.hourly?.time || [];
+        const temps = f.hourly?.temperature_2m || [];
+        for (let i = 0; i < times.length; i++) {
+          const t = String(times[i]);
+          if (t.startsWith(date)) {
+            const hh = t.slice(11, 13);
+            if (+hh % 3 === 0) hourly.push({ time: hh + ':00', tempC: temps[i] });
+          }
+        }
         if (f?.location?.name) station = f.location.name;
       } catch {}
       if (forecastMaxC === null || forecastMinC === null) continue;
 
-      const forecast = isHigh ? forecastMaxC : forecastMinC;
-      const sigma = sigmaForHorizon(horizonMs / 3600000);
-
-      const buckets: BucketRow[] = markets.map(m => {
-        const X = m.thresholdC!;
-        let modelProb: number;
-        if (m.mode === 'below') modelProb = normCdf((X - forecast) / sigma);
-        else if (m.mode === 'above') modelProb = 1 - normCdf((X - forecast) / sigma);
-        else modelProb = bucketProb(forecast, X, sigma);
-        modelProb = Math.max(0.002, Math.min(0.998, modelProb));
-        const edge = modelProb - m.yesPrice;
-        return {
-          thresholdC: X,
-          mode: m.mode,
-          marketPrice: m.yesPrice,
-          modelProb,
-          edge,
-          ev: calcEv(modelProb, m.yesPrice),
-        };
-      })
-        // Only tradable buckets: real probability + real price (not illiquid 1c dust)
-        .filter(b => b.mode === 'exact')
-        .filter(b => b.modelProb >= 0.04 && b.marketPrice >= 0.02 && b.marketPrice <= 0.85);
-
-      if (buckets.length < 3) continue;
-
-      // Ladder: take 3-4 adjacent buckets centered on the corrected forecast
-      const sorted = [...buckets].sort((a, b) => a.thresholdC - b.thresholdC);
-      const centerIdx = sorted.reduce((bi, b, i, arr) => Math.abs(b.thresholdC - forecast) < Math.abs(arr[bi].thresholdC - forecast) ? i : bi, 0);
-      const ladder = sorted.slice(Math.max(0, centerIdx - 1), Math.min(sorted.length, centerIdx + 2));
-      const basketCost = ladder.reduce((s, b) => s + b.marketPrice, 0);
-      const basketEv = ladder.reduce((s, b) => s + b.ev * b.marketPrice, 0);
-      const winPct = ladder.reduce((s, b) => s + b.modelProb, 0);
-
-      // Skip setups that are too cheap (dust) or have no real chance
-      if (basketCost < 0.03 || winPct < 0.12) continue;
-
-      const best = [...buckets].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
-      const bestMarket = markets.find(m => m.thresholdC === best?.thresholdC && m.mode === best.mode) || markets[0];
+      const bestMarket = prices.find(p => p.thresholdC === Math.round(forecastMaxC)) || prices[Math.floor(prices.length / 2)];
 
       groups.set(key, {
         city,
@@ -234,23 +177,16 @@ export async function GET(req: NextRequest) {
         type: isHigh ? 'high' : 'low',
         forecastMaxC,
         forecastMinC,
-        resolutionStation: station,
-        buckets: sorted,
-        best,
-        basketCost,
-        basketEv,
-        horizonHours: Math.max(0, Math.round(horizonMs / 3600000)),
+        currentTempC,
+        station,
+        hourly,
+        prices,
         bestSlug: bestMarket?.slug || '',
         bestEventSlug: bestMarket?.eventSlug || ev.slug || '',
       });
-      stationMap.set(key, station);
     }
 
-    const result = [...groups.values()].sort((a, b) => {
-      const roiA = a.basketCost > 0 ? 100 / a.basketCost - 1 : 0;
-      const roiB = b.basketCost > 0 ? 100 / b.basketCost - 1 : 0;
-      return roiB - roiA;
-    });
+    const result = [...groups.values()].sort((a, b) => a.city.localeCompare(b.city));
     return NextResponse.json({ generatedAt: Date.now(), groups: result });
   } catch (e: any) {
     return NextResponse.json({ error: e.message, groups: [] }, { status: 500 });

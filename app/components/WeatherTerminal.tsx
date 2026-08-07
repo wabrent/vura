@@ -2,13 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-interface BucketRow {
+interface PriceRow {
   thresholdC: number;
   mode: 'exact' | 'above' | 'below';
-  marketPrice: number;
-  modelProb: number;
-  edge: number;
-  ev: number;
+  yesPrice: number;
+  noPrice: number;
+  slug: string;
+  eventSlug: string;
+  volume: number;
+}
+
+interface HourlyPoint {
+  time: string;
+  tempC: number;
 }
 
 interface CityGroup {
@@ -17,12 +23,10 @@ interface CityGroup {
   type: 'high' | 'low';
   forecastMaxC: number;
   forecastMinC: number;
-  resolutionStation: string;
-  buckets: BucketRow[];
-  best: BucketRow | null;
-  basketCost: number;
-  basketEv: number;
-  horizonHours: number;
+  currentTempC: number | null;
+  station: string;
+  hourly: HourlyPoint[];
+  prices: PriceRow[];
   bestSlug: string;
   bestEventSlug: string;
 }
@@ -51,13 +55,16 @@ export default function WeatherTerminal() {
   const [groups, setGroups] = useState<CityGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'today' | 'tomorrow'>('all');
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/weather?pages=3');
-      if (!res.ok) throw new Error('Failed to load weather markets');
+      if (!res.ok) throw new Error('Failed to load weather');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setGroups(data.groups || []);
@@ -67,73 +74,86 @@ export default function WeatherTerminal() {
     setLoading(false);
   }, []);
 
+  const loadAI = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/weather/ai?pages=3');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.analysis) setAiAnalysis(data.analysis);
+      }
+    } catch {}
+    setAiLoading(false);
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadAI();
+  }, [load, loadAI]);
 
-  const totalBaskets = groups.length;
-  const positiveEv = groups.filter(g => g.basketEv > 0.05).length;
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const filtered = groups.filter(g => {
+    if (filter === 'today') return g.date === today;
+    if (filter === 'tomorrow') return g.date === tomorrow;
+    return true;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="stats-strip">
-        <div className="stats-cell">
-          <span className="stats-label">SETUPS</span>
-          <span className="stats-val">{totalBaskets}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 1, background: 'var(--border)', padding: 2, borderRadius: 10, alignSelf: 'flex-start' }}>
+          {([['all', 'All'], ['today', 'Today'], ['tomorrow', 'Tomorrow']] as const).map(([v, label]) => (
+            <button key={v} onClick={() => setFilter(v)}
+              style={{
+                border: 'none', background: filter === v ? 'var(--bg-2)' : 'transparent', color: filter === v ? 'var(--accent)' : 'var(--text-3)',
+                padding: '0.35rem 0.9rem', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.06em',
+                fontWeight: 600, cursor: 'pointer', borderRadius: 8, fontFamily: 'var(--display)'
+              }}>
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="stats-cell">
-          <span className="stats-label">ACTIONABLE</span>
-          <span className="stats-val accent">{positiveEv}</span>
-        </div>
-        <div className="stats-cell">
-          <span className="stats-label">DATA</span>
-          <span className="stats-val cyan">Open-Meteo</span>
-        </div>
-        <div className="stats-cell">
-          <span className="stats-label">BUCKETS/MARKET</span>
-          <span className="stats-val">3-4 ladder</span>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--display)' }}>
-          ⛅ Cheap weather ladders <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.75rem' }}>— buy nearby temps cheap, one pays $1</span>
+        <div style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--display)' }}>
+          ⛅ City weather vs Polymarket
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-            {loading ? 'Scanning...' : '↻ Rescan'}
+            {loading ? 'Loading...' : '↻ Refresh'}
           </button>
         </div>
       </div>
 
       {error && (
-        <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 10, fontSize: '0.75rem' }}>
+        <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(223,32,32,0.06)', border: '1px solid rgba(223,32,32,0.25)', borderRadius: 10, fontSize: '0.75rem' }}>
           {error}
+        </div>
+      )}
+
+      {aiLoading && <div className="skeleton" style={{ height: '4.5rem', animationDelay: '0.2s' }} />}
+
+      {aiAnalysis && !aiLoading && (
+        <div className="ai-panel">
+          <div className="ai-panel-head">✨ DeepSeek analysis — forecast vs market</div>
+          <div className="ai-panel-body">{aiAnalysis}</div>
         </div>
       )}
 
       {loading && groups.length === 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.75rem' }}>
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton" style={{ height: '220px', animationDelay: `${i * 0.08}s` }} />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="skeleton" style={{ height: '240px', animationDelay: `${i * 0.08}s` }} />)}
         </div>
       )}
 
-      {!loading && groups.length === 0 && !error && (
+      {!loading && filtered.length === 0 && !error && (
         <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
-          No weather ladders available right now. Markets may be closed for the day — check back tomorrow.
+          No weather data available right now. Markets may be closed — check back later.
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0.75rem' }}>
-        {groups.slice(0, 24).map((g, i) => {
-          const b = g.best!;
-          const pos = g.basketEv > 0;
-          const center = [...g.buckets].reduce((bi, x, xi, arr) => Math.abs(x.thresholdC - (g.type === 'high' ? g.forecastMaxC : g.forecastMinC)) < Math.abs(arr[bi].thresholdC - (g.type === 'high' ? g.forecastMaxC : g.forecastMinC)) ? xi : bi, 0);
-          const ladderRows = g.buckets.slice(Math.max(0, center - 1), Math.min(g.buckets.length, center + 2));
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '0.75rem' }}>
+        {filtered.slice(0, 24).map((g, i) => {
           const forecast = g.type === 'high' ? g.forecastMaxC : g.forecastMinC;
-          const winPct = ladderRows.reduce((s, r) => s + r.modelProb, 0);
-          const payout = 100;
-          const roi = g.basketCost > 0 ? Math.min((payout / g.basketCost) - 1, 10) : 0;
           return (
             <div key={`${g.city}|${g.date}|${g.type}`} className="city-card" style={{ animationDelay: `${i * 40}ms` }}>
               <div className="city-card-head">
@@ -144,39 +164,52 @@ export default function WeatherTerminal() {
                     <div className="city-card-meta">{fmtDate(g.date)} · {g.type === 'high' ? 'HIGH' : 'LOW'}</div>
                   </div>
                 </div>
-                <span className="city-edge" style={{ color: pos ? 'var(--accent)' : 'var(--red)', background: pos ? 'rgba(22,82,240,0.08)' : 'rgba(223,32,32,0.08)' }}>
-                  {pos ? '+' : ''}{(roi * 100).toFixed(0)}% ROI
-                </span>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="city-temp">{forecast.toFixed(1)}°C</div>
+                  {g.currentTempC !== null && <div className="city-temp-now">now {g.currentTempC.toFixed(1)}°C</div>}
+                </div>
               </div>
 
-              <div className="city-card-body">
-                {ladderRows.map(r => {
-                  const rPos = r.edge > 0;
-                  return (
-                    <div key={r.thresholdC} className="city-market city-market-best">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{r.thresholdC}°C</span>
-                        <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>→ pays $1</span>
-                        <div className="city-bar"><div className="city-bar-fill" style={{ width: `${Math.round(r.modelProb * 100)}%`, background: rPos ? 'var(--accent)' : 'var(--red)' }} /></div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.72rem', fontFamily: 'var(--mono)', fontWeight: 700, color: rPos ? 'var(--accent)' : 'var(--red)' }}>
-                          Buy {Math.round(r.marketPrice * 100)}c
-                        </span>
-                        <span style={{ fontSize: '0.52rem', color: 'var(--text-3)', display: 'block' }}>
-                          {Math.round(r.modelProb * 100)}% chance
-                        </span>
-                      </div>
+              <div className="city-minmax">
+                <span>min {g.forecastMinC.toFixed(1)}°C</span>
+                <span>max {g.forecastMaxC.toFixed(1)}°C</span>
+                <span>{g.station}</span>
+              </div>
+
+              {g.hourly.length > 0 && (
+                <div className="hourly-row">
+                  {g.hourly.map(h => (
+                    <div key={h.time} className="hourly-cell">
+                      <span className="hourly-temp">{Math.round(h.tempC)}°</span>
+                      <span className="hourly-time">{h.time}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              )}
+
+              <div className="city-card-body">
+                {g.prices.slice(0, 6).map(r => (
+                  <div key={r.thresholdC} className="city-market">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 600, fontFamily: 'var(--mono)' }}>{r.thresholdC}°C</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--mono)', color: 'var(--accent-2)', fontWeight: 600 }}>
+                        YES {Math.round(r.yesPrice * 100)}c
+                      </span>
+                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--mono)', color: 'var(--red)', marginLeft: '0.5rem' }}>
+                        NO {Math.round(r.noPrice * 100)}c
+                      </span>
+                      <span style={{ fontSize: '0.52rem', color: 'var(--text-3)', display: 'block' }}>
+                        Vol {fmtVol(r.volume)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="city-card-foot">
-                <div style={{ fontSize: '0.6rem', color: 'var(--text-2)', lineHeight: 1.5 }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text)' }}>{(g.basketCost * 100).toFixed(0)}c</span> cost
-                  {pos && <span style={{ color: 'var(--accent)', display: 'block' }}>{Math.round(winPct * 100)}% chance one hits → pays $1</span>}
-                </div>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-3)' }}>Market prices from Polymarket</span>
                 <a className="btn-buy" href={`https://polymarket.com/event/${g.bestEventSlug}?marketSlug=${g.bestSlug}&via=vura`} target="_blank">
                   Trade on Polymarket
                 </a>
