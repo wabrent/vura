@@ -70,8 +70,9 @@ export async function GET(req: NextRequest) {
       const date = parseDate(title);
       if (!date) continue;
       const dateTs = new Date(date + 'T00:00:00Z').getTime();
-      if (dateTs - nowTs > 6 * 24 * 3600 * 1000) continue;
+      // Only today and next 2 days (real tradeable horizon)
       if (dateTs < nowTs - 8 * 3600 * 1000) continue;
+      if (dateTs > nowTs + 2 * 24 * 3600 * 1000) continue;
       const coords = findCity(city);
       if (!coords) continue;
 
@@ -108,6 +109,9 @@ export async function GET(req: NextRequest) {
         rows.push({ city, date, type: isHigh ? 'high' : 'low', forecast, buckets });
       }
     }
+
+    // Closest dates first so AI prioritizes today/tomorrow
+    rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
     // Ask DeepSeek to pick the best trades
     const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-112e3801734f4c2b9e914fb1b72fe774';
