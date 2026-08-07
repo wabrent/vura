@@ -82,18 +82,13 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.9rem; background: color-
 @keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
 /* ── TICKER ──────────────────────────────────────────────────────────── */
-.tape { overflow: hidden; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg-2) 60%, transparent); position: relative; z-index: 1; display: flex; align-items: center; }
-.tape-track { display: flex; gap: 2.2rem; width: max-content; animation: tickerMove 60s linear infinite; padding: 0.55rem 1.5rem; }
+.tape { overflow: hidden; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, #fff, var(--bg-2)); position: relative; z-index: 1; display: flex; align-items: center; gap: 1rem; padding-left: 1rem; }
+.tape::before { content: 'VURA'; font-family: var(--display); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; color: #000; background: #fff; padding: 0.35rem 0.8rem; border-radius: 6px; flex-shrink: 0; box-shadow: 0 0 14px rgba(255,255,255,0.25); }
+.tape-track { display: flex; gap: 2.5rem; width: max-content; animation: tickerMove 80s linear infinite; padding: 0.6rem 1.5rem 0.6rem 0; }
 .tape:hover .tape-track { animation-play-state: paused; }
-.tape-item { display: flex; align-items: center; gap: 0.5rem; font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); white-space: nowrap; text-decoration: none; padding: 0.2rem 0.5rem; border-radius: 6px; transition: background 0.15s; }
-.tape-item:hover { background: var(--bg-3); }
-.tape-cat { flex-shrink: 0; width: 20px; text-align: center; font-size: 0.7rem; }
-.tape-name { color: var(--text); font-weight: 500; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
-.tape-price { color: var(--text); font-weight: 700; }
-.tape-chg { font-size: 0.66rem; }
-.tape-up { color: #fff; }
-.tape-down { color: #9a9a9a; }
-.tape-label { position: sticky; right: 0; flex-shrink: 0; font-family: var(--display); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; color: #000; background: #fff; padding: 0.3rem 0.7rem; margin-left: auto; border-radius: 6px 0 0 6px; }
+.tape-item { font-family: var(--display); font-size: 0.8rem; color: var(--text); white-space: nowrap; text-decoration: none; transition: color 0.15s; }
+.tape-item:hover { color: #fff; text-shadow: 0 0 12px rgba(255,255,255,0.5); }
+.tape-name { font-weight: 500; }
 
 /* ── HERO ────────────────────────────────────────────────────────────── */
 .hero { max-width: 84rem; margin: 0 auto; padding: 3.5rem 2rem 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 3rem; position: relative; z-index: 1; }
