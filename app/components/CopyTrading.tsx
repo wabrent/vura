@@ -57,20 +57,10 @@ export default function CopyTrading() {
     setPosLoading(true);
     setPositions([]);
     try {
-      const res = await fetch(`https://data-api.polymarket.com/positions?user=${w.wallet}&limit=40`);
+      const res = await fetch(`/api/copy/positions/${w.wallet}`);
       if (res.ok) {
         const data = await res.json();
-        setPositions((data || []).map((p: any) => ({
-          title: p.title,
-          slug: p.slug,
-          icon: p.icon,
-          outcome: p.outcome,
-          size: Number(p.size) || 0,
-          avgPrice: Number(p.avgPrice) || 0,
-          currentValue: Number(p.currentValue) || 0,
-          cashPnl: Number(p.cashPnl) || 0,
-          percentPnl: Number(p.percentPnl) || 0,
-        })).filter((p: any) => p.size > 0));
+        setPositions(data.positions || []);
       }
     } catch {}
     setPosLoading(false);

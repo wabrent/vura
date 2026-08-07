@@ -52,7 +52,8 @@ export async function GET(req: NextRequest) {
     const wallets = [...walletMap.values()]
       .filter(w => w.markets.size >= 2)
       .sort((a, b) => b.amount - a.amount)
-      .slice(0, 15);
+      .slice(0, 15)
+      .map(w => ({ wallet: w.wallet, name: w.name, image: w.image, amount: w.amount, markets: w.markets.size }));
 
     return NextResponse.json({ generatedAt: Date.now(), wallets });
   } catch (e: any) {
