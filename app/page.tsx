@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import HubTerminal from '@/app/components/HubTerminal';
 import CopyTrading from '@/app/components/CopyTrading';
@@ -8,6 +8,25 @@ import CopyTrading from '@/app/components/CopyTrading';
 export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const [view, setView] = useState<'hub' | 'wallets'>('hub');
+  const [marketCount, setMarketCount] = useState<number | null>(null);
+  const [totalVol, setTotalVol] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/hub?limit=30');
+        if (res.ok) {
+          const data = await res.json();
+          const cats = data.categories || [];
+          const all = cats.flatMap((c: any) => c.markets || []);
+          setMarketCount(all.length);
+          setTotalVol(all.reduce((s: number, m: any) => s + (m.volume || 0), 0));
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const fmtVol = (v: number) => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : Math.round(v).toString();
 
   return (
     <>
@@ -48,11 +67,11 @@ export default function Home() {
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Markets</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>—</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>{marketCount !== null ? marketCount : '—'}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Categories</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)' }}>4</span>
+              <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>24H Volume</span>
+              <span style={{ fontSize: '1.3rem', fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{totalVol !== null ? '$' + fmtVol(totalVol) : '—'}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <span style={{ fontSize: '0.6rem', letterSpacing: '0.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>Weather Cities</span>
