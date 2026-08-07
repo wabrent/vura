@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import HubTerminal from '@/app/components/HubTerminal';
 import CopyTrading from '@/app/components/CopyTrading';
+import TickerTape from '@/app/components/TickerTape';
 
 export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
@@ -58,6 +59,8 @@ export default function Home() {
           </div>
         </div>
       </nav>
+
+      <TickerTape />
 
       <section className="hero">
         <div className="hero-left">

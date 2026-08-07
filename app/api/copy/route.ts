@@ -21,13 +21,11 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const marketsLimit = Math.min(parseInt(searchParams.get('markets') || '15'), 30);
 
-    // Top liquid markets across categories
     const topMarkets = await cachedFetch(
       'top-markets',
       `${GAMMA}/markets?closed=false&limit=${marketsLimit}&order=volumeNum&ascending=false`
     );
 
-    // Collect holders from each top market, aggregate by wallet
     const walletMap = new Map<string, { wallet: string; name: string; image: string; amount: number; markets: Set<string> }>();
 
     for (const m of (topMarkets || [])) {
@@ -40,7 +38,7 @@ export async function GET(req: NextRequest) {
       } catch {}
       for (const h of holders) {
         const amount = Number(h.amount) || 0;
-        if (amount < 10000) continue; // only meaningful holders
+        if (amount < 10000) continue;
         const w = h.proxyWallet;
         const e = walletMap.get(w) || { wallet: w, name: h.name || h.pseudonym || w.slice(0, 8), image: h.profileImage || '', amount: 0, markets: new Set() };
         e.amount += amount;
@@ -52,10 +50,38 @@ export async function GET(req: NextRequest) {
     const wallets = [...walletMap.values()]
       .filter(w => w.markets.size >= 2)
       .sort((a, b) => b.amount - a.amount)
-      .slice(0, 15)
+      .slice(0, 12)
       .map(w => ({ wallet: w.wallet, name: w.name, image: w.image, amount: w.amount, markets: w.markets.size }));
 
-    return NextResponse.json({ generatedAt: Date.now(), wallets });
+    // Enrich each wallet with position stats (win-rate, live PnL)
+    const enriched = [];
+    for (const w of wallets) {
+      let livePnl = 0;
+      let liveCount = 0;
+      let winCount = 0;
+      let volume = 0;
+      try {
+        const hit = cache.get(`pos-${w.wallet}`);
+        const data = hit ? hit.data : await cachedFetch(`pos-${w.wallet}`, `${DATA}/positions?user=${w.wallet}&limit=40`, 12000);
+        for (const p of data || []) {
+          const sz = Number(p.size) || 0;
+          if (sz <= 0) continue;
+          liveCount++;
+          livePnl += Number(p.cashPnl) || 0;
+          if (Number(p.cashPnl) > 0) winCount++;
+          volume += Number(p.initialValue) || Number(p.currentValue) || 0;
+        }
+      } catch {}
+      enriched.push({
+        ...w,
+        winRate: liveCount > 0 ? Math.round((winCount / liveCount) * 100) : null,
+        livePnl,
+        positionCount: liveCount,
+        volume,
+      });
+    }
+
+    return NextResponse.json({ generatedAt: Date.now(), wallets: enriched });
   } catch (e: any) {
     return NextResponse.json({ error: e.message, wallets: [] }, { status: 500 });
   }

@@ -8,6 +8,10 @@ interface Wallet {
   image: string;
   amount: number;
   markets: number;
+  winRate: number | null;
+  livePnl: number;
+  positionCount: number;
+  volume: number;
 }
 
 interface Position {
@@ -112,7 +116,32 @@ export default function CopyTrading() {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="rec-win-mult">{fmtMoney(w.amount)}</div>
-              <div className="rec-win-detail">total exposure</div>
+              <div className="rec-win-detail">exposure</div>
+            </div>
+          </div>
+
+          <div className="rec-row" style={{ padding: '0.45rem 0' }}>
+            <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap', width: '100%' }}>
+              <div>
+                <div className="rec-stat-label" style={{ fontSize: '0.5rem' }}>WIN RATE</div>
+                <div className="rec-win-detail" style={{ fontSize: '0.8rem', color: 'var(--text)', fontWeight: 700 }}>
+                  {w.winRate != null ? w.winRate + '%' : '—'}
+                </div>
+              </div>
+              <div>
+                <div className="rec-stat-label" style={{ fontSize: '0.5rem' }}>LIVE P&L</div>
+                <div className="rec-win-detail" style={{ fontSize: '0.8rem', fontWeight: 700, color: w.livePnl >= 0 ? 'var(--text)' : 'var(--text-2)' }}>
+                  {w.livePnl >= 0 ? '+' : ''}{fmtMoney(w.livePnl)}
+                </div>
+              </div>
+              <div>
+                <div className="rec-stat-label" style={{ fontSize: '0.5rem' }}>POSITIONS</div>
+                <div className="rec-win-detail" style={{ fontSize: '0.8rem', fontWeight: 700 }}>{w.positionCount}</div>
+              </div>
+              <div>
+                <div className="rec-stat-label" style={{ fontSize: '0.5rem' }}>VOLUME</div>
+                <div className="rec-win-detail" style={{ fontSize: '0.8rem', fontWeight: 700 }}>{fmtMoney(w.volume)}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -145,6 +174,8 @@ export default function CopyTrading() {
                     </div>
                     <div className="row-cat">{(p.percentPnl * 100).toFixed(1)}% · {fmtMoney(p.currentValue)}</div>
                   </div>
+                  <a className="btn-trade" href={`https://polymarket.com/event/${p.slug}?via=vura`} target="_blank"
+                    style={{ fontSize: '0.58rem', flex: '0 0 auto' }}>Copy</a>
                 </div>
               ))}
               <a href={`https://polymarket.com/profile/${active.wallet}?via=vura`} target="_blank" rel="noreferrer"

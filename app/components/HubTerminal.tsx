@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import WeatherTerminal from '@/app/components/WeatherTerminal';
+import EdgeScanner from '@/app/components/EdgeScanner';
 
 interface HubMarket {
   id: string;
@@ -23,6 +24,30 @@ interface Category {
 }
 
 const fmtVol = (v: number) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + Math.round(v);
+
+// Decorative sparkline: smooth curve from change24h direction + current price
+function Sparkline({ price, change }: { price: number; change: number }) {
+  const up = change >= 0;
+  const pts = 20;
+  const base = 50;
+  const amp = Math.min(Math.abs(change) * 150, 25);
+  const w = 60, h = 22;
+  let path = '';
+  for (let i = 0; i < pts; i++) {
+    const t = i / (pts - 1);
+    const x = t * w;
+    const wave = Math.sin(t * Math.PI * 2) * amp * (1 - t * 0.5);
+    const drift = up ? t * 22 : (1 - t) * 22;
+    const y = base / (h / 2) - (h - 8) / 2 - wave + (up ? -drift : drift);
+    const yy = (h - 6) / 2 - wave * 0.5 + (up ? -drift * 0.5 : drift * 0.5);
+    path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + (12 + yy / 2).toFixed(1) + ' ';
+  }
+  return (
+    <svg width={w} height={h} className="spark-svg" style={{ opacity: 0.9 }}>
+      <polyline points={path.trim()} fill="none" stroke={up ? '#fff' : '#888'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export default function HubTerminal() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -65,10 +90,16 @@ export default function HubTerminal() {
           className={`hub-tab${active === 'weather' ? ' hub-tab-active' : ''}`}>
           ⛅ Weather
         </button>
+        <button onClick={() => setActive('trades')}
+          className={`hub-tab${active === 'trades' ? ' hub-tab-active' : ''}`}>
+          ⚡ Trades
+        </button>
       </div>
 
       {active === 'weather' ? (
         <WeatherTerminal />
+      ) : active === 'trades' ? (
+        <EdgeScanner />
       ) : (
         <>
           {error && (
@@ -107,7 +138,8 @@ export default function HubTerminal() {
                       </div>
                     </div>
                     <div className="col-price">
-                      <span className="row-price" style={{ animationDelay: `${i * 20}ms` }}>{Math.round(m.yesPrice * 100)}c</span>
+                      <Sparkline price={m.yesPrice} change={m.change24h} />
+                      <span className="row-price" style={{ marginLeft: 6, animationDelay: `${i * 20}ms` }}>{Math.round(m.yesPrice * 100)}c</span>
                     </div>
                     <div className="col-change">
                       <span className={`row-change ${chg > 0 ? 'change-up' : chg < 0 ? 'change-down' : ''}`}>

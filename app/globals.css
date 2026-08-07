@@ -440,7 +440,9 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
   .market-row { flex-wrap: wrap; gap: 0.4rem; padding: 0.7rem 0.9rem; }
   .col-name { flex: 1 1 100%; }
   .col-spark { display: none; }
-  .col-price { flex: 0 0 70px; }
+.col-price { flex: 0 0 90px; display: flex; align-items: center; gap: 0.3rem; }
+.spark-svg polyline { stroke-dasharray: 200; stroke-dashoffset: 200; animation: sparkDraw 1s ease-out forwards; }
+@keyframes sparkDraw { to { stroke-dashoffset: 0; } }
   .col-change { flex: 0 0 60px; }
   .col-vol { flex: 0 0 80px; }
   .col-alpha { flex: 0 0 80px; }
