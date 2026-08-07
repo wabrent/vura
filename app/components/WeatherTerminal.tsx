@@ -28,6 +28,9 @@ export default function WeatherTerminal() {
   const [recs, setRecs] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'trades' | 'arb'>('trades');
+  const [arbs, setArbs] = useState<any[]>([]);
+  const [arbLoading, setArbLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,12 +47,42 @@ export default function WeatherTerminal() {
     setLoading(false);
   }, []);
 
+  const loadArb = useCallback(async () => {
+    setArbLoading(true);
+    try {
+      const res = await fetch('/api/weather/arb?pages=4');
+      if (res.ok) {
+        const data = await res.json();
+        setArbs(data.arbs || []);
+      }
+    } catch {}
+    setArbLoading(false);
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadArb();
+  }, [load, loadArb]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '46rem', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 1, background: 'var(--border)', padding: 2, borderRadius: 12, alignSelf: 'center' }}>
+        {([['trades', '⚡ Best trades'], ['arb', '💰 Arbitrage']] as const).map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)}
+            style={{
+              border: 'none', background: view === v ? 'var(--bg-2)' : 'transparent', color: view === v ? 'var(--accent)' : 'var(--text-3)',
+              padding: '0.45rem 1.2rem', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em',
+              fontWeight: 600, cursor: 'pointer', borderRadius: 10, fontFamily: 'var(--display)'
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'arb' ? (
+        <ArbitrageView loading={arbLoading} arbs={arbs} onRefresh={loadArb} />
+      ) : (
+      <>
       <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
         <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Today's best trades</div>
         <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
@@ -131,6 +164,82 @@ export default function WeatherTerminal() {
         <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.75rem' }}>
           How it works: Buy opens the market on Polymarket. Buy Yes/No at the shown price. If you're right, each share pays $1.
         </div>
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+function ArbitrageView({ loading, arbs, onRefresh }: { loading: boolean; arbs: any[]; onRefresh: () => void }) {
+  const fmtDate = (d: string) => {
+    const dt = new Date(d + 'T00:00:00Z');
+    const days = Math.round((dt.getTime() - Date.now()) / 86400000);
+    const label = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (days === 0) return 'TODAY';
+    if (days === 1) return 'TOMORROW';
+    return label;
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
+        <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Guaranteed arbitrage</div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
+          Markets where YES + NO cost less than $1 (ARB = guaranteed). Or where the mid sum is off — a repricing signal.
+        </div>
+        {!loading && (
+          <div className="rec-stats">
+            <div className="rec-stat"><span className="rec-stat-label">FOUND</span><span className="rec-stat-val">{arbs.length}</span></div>
+            <div className="rec-stat"><span className="rec-stat-label">BEST EDGE</span><span className="rec-stat-val accent">{arbs.length ? '+' + arbs[0].edgeC.toFixed(1) + '¢' : '—'}</span></div>
+          </div>
+        )}
+      </div>
+
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: '76px', animationDelay: `${i * 0.08}s` }} />)}
+        </div>
+      )}
+
+      {!loading && arbs.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
+          No arbitrage opportunities right now. Check back — they appear often on fresh markets.
+        </div>
+      )}
+
+      {arbs.map((a, i) => {
+        const url = `https://polymarket.com/event/${a.eventSlug}?marketSlug=${a.slug}&via=vura`;
+        return (
+          <div key={a.city + a.thresholdC} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
+            <div className="rec-top">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div className="rec-rank">{i + 1}</div>
+                <div>
+                  <div className="rec-city">{a.city} · {fmtDate(a.date)} · {a.type === 'high' ? 'HIGH' : 'LOW'}</div>
+                  <div className="rec-reason">Buy YES at {Math.round(a.yesAsk * 100)}¢ + NO at {Math.round(a.noAsk * 100)}¢ = {Math.round(a.total * 100)}¢</div>
+                </div>
+              </div>
+              <span className="rec-badge" style={{ background: a.total < 0.995 ? 'var(--accent-2)' : 'var(--accent)' }}>
+                {a.total < 0.995 ? 'ARB' : '+potential'}
+              </span>
+            </div>
+            <div className="rec-action">
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
+                {a.thresholdC}°C — {a.total < 0.995
+                  ? `guaranteed +${a.edgeC.toFixed(1)}¢ per $1`
+                  : `YES+NO mid off by ${(a.midEdgeC ?? 0).toFixed(1)}¢ — watch for repricing`}
+              </div>
+              <a className="rec-buy" href={url} target="_blank">Open market</a>
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        <button className="btn-retry" onClick={onRefresh} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Scanning...' : '↻ Rescan'}
+        </button>
       </div>
     </div>
   );
