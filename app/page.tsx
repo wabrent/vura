@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import WeatherTerminal from '@/app/components/WeatherTerminal';
 import HubTerminal from '@/app/components/HubTerminal';
+import CopyTrading from '@/app/components/CopyTrading';
 
 export default function Home() {
   const { ready, authenticated, login, logout, user } = usePrivy();
-  const [view, setView] = useState<'weather' | 'hub'>('hub');
+  const [view, setView] = useState<'hub' | 'weather' | 'wallets'>('hub');
 
   return (
     <>
@@ -20,6 +21,7 @@ export default function Home() {
           <div className="nav-center">
             <button className={`nav-tab${view === 'hub' ? ' nav-tab-active' : ''}`} onClick={() => setView('hub')}>All Markets</button>
             <button className={`nav-tab${view === 'weather' ? ' nav-tab-active' : ''}`} onClick={() => setView('weather')}>Weather</button>
+            <button className={`nav-tab${view === 'wallets' ? ' nav-tab-active' : ''}`} onClick={() => setView('wallets')}>Wallets</button>
           </div>
           <div className="nav-status">
             <span className="live-dot" />
@@ -41,7 +43,7 @@ export default function Home() {
       </nav>
 
       <main style={{ maxWidth: '84rem' }}>
-        {view === 'weather' ? <WeatherTerminal /> : <HubTerminal />}
+        {view === 'weather' ? <WeatherTerminal /> : view === 'wallets' ? <CopyTrading /> : <HubTerminal />}
       </main>
 
       <footer>
