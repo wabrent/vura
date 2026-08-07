@@ -87,11 +87,11 @@ export default function HubTerminal() {
         ))}
         <button onClick={() => setActive('weather')}
           className={`hub-tab${active === 'weather' ? ' hub-tab-active' : ''}`}>
-          ⛅ Weather
+          Weather
         </button>
         <button onClick={() => setActive('trades')}
           className={`hub-tab${active === 'trades' ? ' hub-tab-active' : ''}`}>
-          ⚡ Trades
+          Trades
         </button>
       </div>
 

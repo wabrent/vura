@@ -5,14 +5,16 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useTrading } from '@/app/hooks/useTrading';
 
 interface TradeRec {
-  city: string;
-  date: string;
-  thresholdC: number;
-  side: 'YES' | 'NO';
-  price: number;
+  category?: string;
+  title?: string;
+  buyYesPrice: number;
   slug: string;
   eventSlug: string;
   tokenId: string | null;
+  side?: string;
+  thresholdC?: number;
+  city?: string;
+  price?: number;
 }
 
 export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: () => void }) {
@@ -24,8 +26,8 @@ export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: (
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
-  const priceC = Math.round(rec.price * 100);
-  const shares = priceC > 0 ? Math.floor(amount / rec.price) : 0;
+  const priceC = Math.round((rec.price || rec.buyYesPrice) * 100);
+  const shares = priceC > 0 ? Math.floor(amount / (rec.price || rec.buyYesPrice)) : 0;
 
   const run = async () => {
     setBusy(true);
@@ -50,7 +52,7 @@ export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: (
     <div className="modal-overlay" onClick={e => { if ((e.target as HTMLElement).className === 'modal-overlay') onClose(); }}>
       <div className="modal modal-sm">
         <div className="modal-header">
-          <span className="modal-title">Buy {rec.side} {rec.thresholdC}°C · {rec.city}</span>
+          <span className="modal-title">Buy YES @ {priceC}¢{rec.title ? ' · ' + rec.title.substring(0, 40) : ''}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">

@@ -3,43 +3,29 @@
 import { useState, useEffect, useCallback } from 'react';
 import TradeModal from '@/app/components/TradeModal';
 
-interface Rec {
-  city: string;
-  date: string;
-  type: string;
-  thresholdC: number;
-  side: 'YES' | 'NO';
-  price: number;
-  forecast: number;
-  reason: string;
+interface Trade {
+  category: string;
+  title: string;
+  yesPrice: number;
+  buyYesPrice: number;
+  change24h: number;
+  volume: number;
   slug: string;
   eventSlug: string;
   tokenId: string | null;
+  reason: string;
 }
 
-const fmtDate = (d: string) => {
-  const dt = new Date(d + 'T00:00:00Z');
-  const days = Math.round((dt.getTime() - Date.now()) / 86400000);
-  const label = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (days === 0) return 'TODAY';
-  if (days === 1) return 'TOMORROW';
-  return label;
-};
+const fmtDate = () => '';
+const fmtVol = (v: number) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + Math.round(v);
 
-function tempIcon(c: number): string {
-  if (c >= 35) return '☀️';
-  if (c >= 28) return '🌤';
-  if (c >= 20) return '🌥';
-  if (c >= 10) return '🌦';
-  if (c >= 0) return '🌧';
-  return '❄️';
-}
+const CAT_LABEL: Record<string, string> = { crypto: 'Crypto', sports: 'Sports', politics: 'Politics', economy: 'Economy' };
 
 export default function EdgeScanner() {
-  const [recs, setRecs] = useState<Rec[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [buy, setBuy] = useState<Rec | null>(null);
+  const [buy, setBuy] = useState<Trade | null>(null);
   const [tgToken, setTgToken] = useState('');
   const [tgChat, setTgChat] = useState('');
   const [tgOn, setTgOn] = useState(false);
@@ -60,7 +46,7 @@ export default function EdgeScanner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: tgChat, text, parse_mode: 'Markdown' }),
       });
-      setTgMsg('Sent to Telegram ✓');
+      setTgMsg('Sent to Telegram');
       setTimeout(() => setTgMsg(null), 2500);
     } catch {
       setTgMsg('Telegram send failed');
@@ -71,36 +57,35 @@ export default function EdgeScanner() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/weather/ai?pages=3');
+      const res = await fetch('/api/trades?limit=20');
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setRecs(data.recs || []);
+      setTrades(data.trades || []);
     } catch (e: any) {
       setError(e.message);
     }
     setLoading(false);
   }, []);
 
-  // Auto-send top signal to Telegram when enabled
-  useEffect(() => {
-    if (!tgOn || !recs.length) return;
-    const top = recs[0];
-    const priceC = Math.round(top.price * 100);
-    const mult = priceC > 0 ? Math.round(100 / priceC) : 0;
-    sendTg(`⚡ VURA Edge\n${top.city} ${top.date}\n${top.side} ${top.thresholdC}°C @ ${priceC}¢ (×${mult})\n${top.reason}\nhttps://polymarket.com/event/${top.eventSlug}?marketSlug=${top.slug}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recs, tgOn]);
-
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!tgOn || !trades.length) return;
+    const top = trades[0];
+    const priceC = Math.round(top.buyYesPrice * 100);
+    const mult = priceC > 0 ? Math.round(100 / priceC) : 0;
+    sendTg(`[VURA] ${top.category.toUpperCase()} — ${top.title.substring(0, 60)}\nYES @ ${priceC}¢ (×${mult})\n${top.reason}\nhttps://polymarket.com/event/${top.eventSlug}?marketSlug=${top.slug}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades, tgOn]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'var(--display)' }}>
-          ⛅ Weather trades <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.72rem' }}>— AI spots mispriced temps vs forecast</span>
+          AI trades <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: '0.72rem' }}>— across all Polymarket categories</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1, padding: '0.4rem 0.9rem', fontSize: '0.72rem' }}>
@@ -109,18 +94,18 @@ export default function EdgeScanner() {
           {tgMsg && <span style={{ fontSize: '0.62rem', color: 'var(--accent)' }}>{tgMsg}</span>}
           <button className="csv-btn" onClick={() => setTgOn(!tgOn)}
             style={{ color: tgOn ? 'var(--accent)' : 'var(--text-3)', borderColor: tgOn ? 'rgba(255,255,255,0.3)' : 'var(--border)' }}>
-            {tgOn ? '🔔 TG on' : '🔕 TG off'}
+            {tgOn ? 'TG on' : 'TG off'}
           </button>
         </div>
       </div>
 
       {tgOn && (
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.7rem 1rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.7rem 1rem', background: 'rgba(17,17,17,0.45)', border: '1px solid var(--border)', borderRadius: 10 }}>
           <input className="search-input" type="text" placeholder="Bot token" value={tgToken}
             onChange={e => { setTgToken(e.target.value); localStorage.setItem('vura_tg_token', e.target.value); }} style={{ width: 180, fontSize: '0.7rem' }} />
           <input className="search-input" type="text" placeholder="Chat ID" value={tgChat}
             onChange={e => { setTgChat(e.target.value); localStorage.setItem('vura_tg_chat', e.target.value); }} style={{ width: 120, fontSize: '0.7rem' }} />
-          <button className="csv-btn" onClick={() => recs[0] && sendTg('⚡ VURA test')}>Test</button>
+          <button className="csv-btn" onClick={() => trades[0] && sendTg('VURA test')}>Test</button>
           <span style={{ fontSize: '0.58rem', color: 'var(--text-3)' }}>Get from @BotFather + @userinfobot</span>
         </div>
       )}
@@ -137,34 +122,32 @@ export default function EdgeScanner() {
         </div>
       )}
 
-      {!loading && recs.length === 0 && !error && (
+      {!loading && trades.length === 0 && !error && (
         <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-3)' }}>
-          No trades right now — markets are well priced. Check back in a few hours.
+          No trades right now. Try refresh.
         </div>
       )}
 
-      {!loading && recs.map((r, i) => {
+      {!loading && trades.map((r, i) => {
         const url = `https://polymarket.com/event/${r.eventSlug}?marketSlug=${r.slug}&via=vura`;
-        const priceC = Math.round(r.price * 100);
+        const priceC = Math.round(r.buyYesPrice * 100);
         const multiplier = priceC > 0 ? 100 / priceC : 0;
-        const win20 = (20 / r.price).toFixed(0);
-        const noSide = r.side === 'YES';
         return (
-          <div key={r.city + r.thresholdC + r.side} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
+          <div key={r.slug + i} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
             <div className="rec-top">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>{tempIcon(r.forecast)}</span>
+                <div className="rec-rank">{i + 1}</div>
                 <div>
-                  <div className="rec-city">{r.city} · {fmtDate(r.date)}</div>
-                  <div className="rec-reason">{r.reason || ''} · forecast {Number(r.forecast).toFixed(1)}°C</div>
+                  <div className="rec-city">{CAT_LABEL[r.category] || r.category} · {fmtVol(r.volume)}</div>
+                  <div className="rec-reason">{r.title.substring(0, 80)}</div>
                 </div>
               </div>
-              <span className="rec-badge">{noSide ? 'BUY YES' : 'BUY NO'}</span>
+              <span className="rec-badge">{r.change24h > 0 ? '▲' : r.change24h < 0 ? '▼' : '•'} {(r.change24h * 100).toFixed(1)}%</span>
             </div>
 
             <div className="rec-row">
               <div className="rec-price">
-                {noSide ? 'YES' : 'NO'} {r.thresholdC}°C
+                YES {r.buyYesPrice <= 0.5 ? Math.round(r.buyYesPrice * 100) : 100 - Math.round(r.buyYesPrice * 100)}c
                 <span className="rec-cents">@ {priceC}¢</span>
               </div>
               <div className="rec-win">
@@ -175,9 +158,7 @@ export default function EdgeScanner() {
 
             <div className="rec-action">
               <div style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
-                {noSide
-                  ? `If ${r.city} hits ${r.thresholdC}°C, each share pays $1`
-                  : `If ${r.city} stays away from ${r.thresholdC}°C, each share pays $1`}
+                {r.reason || 'AI pick'}
               </div>
               <button className="rec-buy" style={{ border: 'none' }} onClick={() => setBuy(r)}>Buy now</button>
             </div>
