@@ -79,7 +79,7 @@ export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: (
           {!authenticated ? (
             <button className="btn-retry" style={{ width: '100%' }} onClick={login}>Connect wallet</button>
           ) : !address ? (
-            <button className="btn-retry" style={{ width: '100%' }} onClick={login}>Create wallet</button>
+            <button className="btn-retry" style={{ width: '100%' }} onClick={login}>Connect wallet</button>
           ) : (
             <button className="btn-retry" style={{ width: '100%' }} onClick={run} disabled={busy}>
               {busy ? 'Trading...' : `Buy ${shares} shares`}
@@ -93,7 +93,7 @@ export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: (
           )}
 
           <div style={{ fontSize: '0.58rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
-            Trades execute on Polymarket CLOB from your own wallet. You approve USDC once, then VURA signs and submits the order. Requires USDC.e and POL for gas on Polygon.
+            Connect your own wallet (MetaMask etc). Switch to Polygon network. Trades execute on Polymarket CLOB from your wallet — approve USDC once, then VURA signs and submits the order. Needs USDC.e and POL for gas.
           </div>
         </div>
       </div>

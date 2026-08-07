@@ -16,8 +16,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'cmpcnahqh001m0ci59bk1lokk'}
           config={{
             appearance: { theme: 'dark', accentColor: '#ffffff' },
-            loginMethods: ['email', 'wallet', 'google'],
-            embeddedWallets: { ethereum: { createOnLogin: 'all-users' } }
+            loginMethods: ['wallet', 'email', 'google'],
+            embeddedWallets: { ethereum: { createOnLogin: 'off' } }
           }}
         >
           {children}
