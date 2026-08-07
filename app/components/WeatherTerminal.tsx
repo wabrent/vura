@@ -51,9 +51,9 @@ export default function WeatherTerminal() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '46rem', margin: '0 auto' }}>
       <div style={{ textAlign: 'center', padding: '0.5rem 0 0.5rem' }}>
-        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>Today's best trades</div>
+        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>Лучшие сделки сегодня</div>
         <div style={{ fontSize: '0.78rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
-          AI compares the weather forecast with market prices. Tap a card to buy.
+          AI сравнивает прогноз погоды с ценами рынка. Карточка = сделка. Жми «Купить».
         </div>
       </div>
 
@@ -77,6 +77,10 @@ export default function WeatherTerminal() {
 
       {!loading && recs.map((r, i) => {
         const url = `https://polymarket.com/event/${r.eventSlug}?marketSlug=${r.slug}&via=vura`;
+        const priceC = Math.round(r.price * 100);
+        const multiplier = priceC > 0 ? 100 / priceC : 0;
+        const win20 = (20 / r.price).toFixed(0);
+        const noSide = r.side === 'YES';
         return (
           <div key={r.city + r.thresholdC + r.side} className="rec-card" style={{ animationDelay: `${i * 50}ms` }}>
             <div className="rec-top">
@@ -87,11 +91,25 @@ export default function WeatherTerminal() {
                   <div className="rec-reason">{r.reason}</div>
                 </div>
               </div>
+              <span className="rec-badge">{noSide ? 'BUY YES' : 'BUY NO'}</span>
             </div>
-            <div className="rec-action">
+
+            <div className="rec-row">
               <div className="rec-price">
-                {r.side} {r.thresholdC}°C
-                <span className="rec-cents">@ {Math.round(r.price * 100)}¢</span>
+                {noSide ? 'YES' : 'NO'} {r.thresholdC}°C
+                <span className="rec-cents">@ {priceC}¢</span>
+              </div>
+              <div className="rec-win">
+                <span className="rec-win-mult">×{multiplier.toFixed(0)}</span>
+                <span className="rec-win-detail">$20 → ${Math.round(20 * multiplier)}</span>
+              </div>
+            </div>
+
+            <div className="rec-action">
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-3)' }}>
+                {noSide
+                  ? `If ${r.city} hits ${r.thresholdC}°C, each share pays $1`
+                  : `If ${r.city} stays away from ${r.thresholdC}°C, each share pays $1`}
               </div>
               <a className="rec-buy" href={url} target="_blank">Buy now</a>
             </div>
@@ -101,10 +119,10 @@ export default function WeatherTerminal() {
 
       <div style={{ textAlign: 'center', padding: '1rem 0 0.5rem' }}>
         <button className="btn-retry" onClick={load} disabled={loading} style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Loading...' : '↻ Refresh'}
+          {loading ? 'Загрузка...' : '↻ Обновить'}
         </button>
         <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', marginTop: '0.75rem' }}>
-          Buy means: open the market and tap Buy Yes/No at the shown price. If you're right, $1 per share.
+          Как это работает: «Купить» открывает рынок на Polymarket. Покупаешь YES/NO по указанной цене. Если угадал — акция стоит $1.
         </div>
       </div>
     </div>

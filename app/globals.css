@@ -316,6 +316,11 @@ footer { max-width: 84rem; margin: 0 auto; padding: 0 2rem 3rem; margin-top: 6re
 .rec-cents { font-size: 0.8rem; font-weight: 600; color: var(--accent); margin-left: 0.3rem; }
 .rec-buy { display: inline-block; padding: 0.55rem 1.4rem; font-family: var(--display); font-size: 0.85rem; font-weight: 700; color: #fff; background: var(--accent); border-radius: 10px; text-decoration: none; transition: all 0.15s; }
 .rec-buy:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.rec-badge { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; padding: 0.25rem 0.6rem; border-radius: 6px; color: #fff; background: var(--accent); }
+.rec-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.6rem 0; }
+.rec-win { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+.rec-win-mult { font-size: 1.2rem; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+.rec-win-detail { font-size: 0.65rem; color: var(--text-2); font-family: var(--mono); }
 
 @media (max-width: 768px) {
   .hero { flex-direction: column; padding: 2.5rem 1rem; }
