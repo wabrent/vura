@@ -36,10 +36,13 @@ export default function TickerTape() {
         {renderItems.map((m, i) => {
           const url = `https://polymarket.com/event/${m.eventSlug}?marketSlug=${m.slug}&via=vura`;
           return (
-            <a key={m.id + i} className="tape-item" href={url} target="_blank" rel="noreferrer"
-              title={String(m.title || '')}>
-              <span className="tape-name">{String(m.title || '').substring(0, 40)}</span>
-            </a>
+            <span key={m.id + i} className="tape-group">
+              {i === 0 || i === items.length ? <span className="tape-vura">VURA</span> : null}
+              <a className="tape-item" href={url} target="_blank" rel="noreferrer"
+                title={String(m.title || '')}>
+                <span className="tape-name">{String(m.title || '').substring(0, 40)}</span>
+              </a>
+            </span>
           );
         })}
       </div>
