@@ -86,7 +86,8 @@ nav { position: sticky; top: 0; z-index: 100; height: 3.9rem; background: color-
 .tape-track { display: flex; gap: 2.2rem; width: max-content; animation: tickerMove 90s linear infinite; padding: 0.55rem 1.5rem; }
 .tape:hover .tape-track { animation-play-state: paused; }
 .tape-group { display: flex; align-items: center; gap: 2.2rem; }
-.tape-vura { font-family: var(--display); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.14em; color: #000; background: #fff; padding: 0.3rem 0.65rem; border-radius: 6px; flex-shrink: 0; }
+.tape-vura { font-family: var(--display); font-size: 0.9rem; font-weight: 800; letter-spacing: 0.2em; color: var(--text); flex-shrink: 0; text-transform: uppercase; position: relative; }
+.tape-vura::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: linear-gradient(90deg, transparent, #fff, transparent); }
 .tape-item { display: flex; align-items: center; gap: 0.6rem; font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); white-space: nowrap; text-decoration: none; transition: color 0.15s; }
 .tape-item:hover { color: var(--text); }
 .tape-name { font-family: var(--display); font-size: 0.78rem; font-weight: 500; color: var(--text); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
