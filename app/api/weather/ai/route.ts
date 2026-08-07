@@ -38,7 +38,7 @@ interface Row {
   date: string;
   type: string;
   forecast: number;
-  buckets: { thresholdC: number; yesPrice: number; slug: string; eventSlug: string }[];
+  buckets: { thresholdC: number; yesPrice: number; buyYesPrice: number; slug: string; eventSlug: string }[];
 }
 
 export async function GET(req: NextRequest) {
@@ -100,9 +100,12 @@ export async function GET(req: NextRequest) {
             const pp = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
             yesPrice = parseFloat(pp[0]) || 0.5;
           } catch {}
-          return { thresholdC, yesPrice, slug: m.slug, eventSlug: ev.slug };
+          // Real price you pay to BUY YES = best ask, fallback to mid
+          const ask = parseFloat(m.bestAsk);
+          const buyYesPrice = ask > 0 ? Math.max(ask, 0.001) : yesPrice;
+          return { thresholdC, yesPrice, buyYesPrice, slug: m.slug, eventSlug: ev.slug };
         })
-        .filter((b: any) => b.thresholdC !== null && !/below|above/i.test(ev.title + ' ' + (ev.markets || []).find((x: any) => x.slug === b.slug)?.question || '') && b.yesPrice > 0.01 && b.yesPrice < 0.99)
+        .filter((b: any) => b.thresholdC !== null && !/below|above/i.test(ev.title + ' ' + (ev.markets || []).find((x: any) => x.slug === b.slug)?.question || '') && b.buyYesPrice > 0.01 && b.buyYesPrice < 0.99)
         .sort((a: any, b: any) => a.thresholdC - b.thresholdC);
 
       if (buckets.length >= 2) {
@@ -115,16 +118,16 @@ export async function GET(req: NextRequest) {
 
     // Ask DeepSeek to pick the best trades
     const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-112e3801734f4c2b9e914fb1b72fe774';
-    const prompt = `You are a weather prediction market trader. For each city below I give: forecast high/low temp (°C), and the Polymarket buckets with YES price (0-1, in %).
+    const prompt = `You are a weather prediction market trader. For each city below I give: forecast high/low temp (°C), and the Polymarket buckets with YES buy price (0-1, in %).
 
 The goal: find the best trades where the market price is clearly wrong vs the forecast. A bucket near the forecast should be cheap (YES < 40%), or a bucket far from the forecast should be expensive (YES > 60%).
 
-Data (City | Date | type | forecast°C | buckets as temp:price%):
-${rows.slice(0, 30).map(r => `${r.city} | ${r.date} | ${r.type} | ${r.forecast} | ${r.buckets.map(b => `${b.thresholdC}:${(b.yesPrice * 100).toFixed(0)}%`).join(', ')}`).join('\n')}
+Data (City | Date | type | forecast°C | buckets as temp:buyYESprice%):
+${rows.slice(0, 30).map(r => `${r.city} | ${r.date} | ${r.type} | ${r.forecast} | ${r.buckets.map(b => `${b.thresholdC}:${(b.buyYesPrice * 100).toFixed(0)}%`).join(', ')}`).join('\n')}
 
 Pick up to 6 best trades. For each return a line:
-City | Date | BUY YES or BUY NO | temp°C | price¢ | short reason (max 10 words)
-Only pick trades where the mismatch is clear. Use exactly this pipe format, no markdown.`;
+City | Date | BUY YES or BUY NO | temp°C | short reason (max 10 words)
+Do NOT include a price — I'll use the real market price myself. Only pick trades where the mismatch is clear. Use exactly this pipe format, no markdown.`;
 
     const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -151,19 +154,22 @@ Only pick trades where the mismatch is clear. Use exactly this pipe format, no m
 
     for (const line of content.split('\n')) {
       const parts = line.split('|').map(s => s.trim());
-      if (parts.length < 5) continue;
+      if (parts.length < 4) continue;
       const city = parts[0];
       const date = parts[1];
       const sideRaw = parts[2].toUpperCase();
       const side: 'YES' | 'NO' = sideRaw.includes('NO') ? 'NO' : 'YES';
       const thresholdC = parseInt(parts[3]) || 0;
-      const price = parseInt(parts[4]) / 100;
-      const reason = parts[5] || '';
-      if (!city || !thresholdC || !price) continue;
+      const reason = parts[4] || '';
+      if (!city || !thresholdC) continue;
 
       const row = rows.find(r => r.city === city && r.date === date);
       const bucket = row?.buckets.find(b => b.thresholdC === thresholdC);
       if (!row || !bucket) continue;
+
+      // Real price: for YES use the buy-ask; for NO use the NO ask = (1 - YES bid) roughly, fallback to 1 - buyYesPrice
+      const price = side === 'YES' ? bucket.buyYesPrice : (1 - bucket.yesPrice);
+      if (price <= 0.005 || price >= 0.995) continue;
 
       recs.push({
         city,
