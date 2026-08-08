@@ -1,7 +1,20 @@
 'use client';
 
-import { PrivyProvider } from '@privy-io/react-auth';
+import '@rainbow-me/rainbowkit/styles.css';
+import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { polygon } from 'wagmi/chains';
 import './globals.css';
+
+const queryClient = new QueryClient();
+
+const config = getDefaultConfig({
+  appName: 'VURA',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_ID || 'YOUR_WALLETCONNECT_PROJECT_ID',
+  chains: [polygon],
+  ssr: true,
+});
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,16 +25,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="description" content="VURA — prediction market terminal for Polymarket. Trade weather, crypto, sports and more." />
       </head>
       <body>
-        <PrivyProvider
-          appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'cmpcnahqh001m0ci59bk1lokk'}
-          config={{
-            appearance: { theme: 'dark', accentColor: '#ffffff' },
-            loginMethods: ['wallet', 'email', 'google'],
-            embeddedWallets: { ethereum: { createOnLogin: 'off' } }
-          }}
-        >
-          {children}
-        </PrivyProvider>
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            <RainbowKitProvider>
+              {children}
+            </RainbowKitProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
       </body>
     </html>
   );

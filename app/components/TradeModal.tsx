@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useTrading } from '@/app/hooks/useTrading';
 
 interface TradeRec {
@@ -18,10 +19,8 @@ interface TradeRec {
 }
 
 export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: () => void }) {
-  const privy = usePrivy() as any;
-  const login = privy.login;
-  const authenticated = privy.authenticated;
-  const { address, approveUSDC, placeOrder } = useTrading();
+  const { address, isConnected } = useAccount();
+  const { approveUSDC, placeOrder } = useTrading();
   const [amount, setAmount] = useState(20);
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
@@ -76,10 +75,10 @@ export default function TradeModal({ rec, onClose }: { rec: TradeRec; onClose: (
             <input type="number" className="pnl-input" value={amount} onChange={e => setAmount(Number(e.target.value))} min={5} />
           </div>
 
-          {!authenticated ? (
-            <button className="btn-retry" style={{ width: '100%' }} onClick={login}>Connect wallet</button>
-          ) : !address ? (
-            <button className="btn-retry" style={{ width: '100%' }} onClick={login}>Connect wallet</button>
+          {!isConnected ? (
+            <div style={{ width: '100%' }}>
+              <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
+            </div>
           ) : (
             <button className="btn-retry" style={{ width: '100%' }} onClick={run} disabled={busy}>
               {busy ? 'Trading...' : `Buy ${shares} shares`}

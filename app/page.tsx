@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import HubTerminal from '@/app/components/HubTerminal';
 import CopyTrading from '@/app/components/CopyTrading';
 import TickerTape from '@/app/components/TickerTape';
 
 export default function Home() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { address, isConnected } = useAccount();
   const [view, setView] = useState<'hub' | 'wallets'>('hub');
   const [marketCount, setMarketCount] = useState<number | null>(null);
   const [totalVol, setTotalVol] = useState<number | null>(null);
@@ -44,18 +45,7 @@ export default function Home() {
           <div className="nav-status">
             <span className="live-dot" />
             <span className="nav-live">Live</span>
-            {!ready ? (
-              <button className="privy-btn" disabled style={{ opacity: 0.5 }}>Loading...</button>
-            ) : authenticated ? (
-              <div className="nav-user">
-                <span className="nav-email">
-                  {user?.email?.address || user?.google?.email || user?.twitter?.username || (user?.id ? user.id.slice(0, 6) + '…' : 'User')}
-                </span>
-                <button className="privy-btn logout" onClick={logout}>Exit</button>
-              </div>
-            ) : (
-              <button className="privy-btn" onClick={login}>Sign in</button>
-            )}
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
           </div>
         </div>
       </nav>

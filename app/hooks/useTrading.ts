@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { usePrivy, toViemAccount } from '@privy-io/react-auth';
-import { createWalletClient, custom, encodeFunctionData } from 'viem';
+import { useAccount, useConnectorClient } from 'wagmi';
+import { encodeFunctionData } from 'viem';
 import { polygon } from 'viem/chains';
 import { ClobClient, Side } from '@polymarket/clob-client-v2';
 import { Wallet } from 'ethers';
@@ -11,19 +11,12 @@ const USDC_POLYGON = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
 const EXCHANGE = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
 
 export function useTrading() {
-  const privy = usePrivy() as any;
-  const wallets: any[] = privy.wallets || [];
-  const wallet = wallets[0];
-  const address = wallet?.address;
-
-  const getWalletClient = useCallback(async () => {
-    const provider = await wallet?.getEthereumProvider?.();
-    if (!provider) throw new Error('No wallet provider');
-    return createWalletClient({ chain: polygon, transport: custom(provider) });
-  }, [wallet]);
+  const { address, isConnected } = useAccount();
+  const { data: connectorClient } = useConnectorClient();
 
   const approveUSDC = useCallback(async () => {
-    const client = await getWalletClient();
+    if (!connectorClient) throw new Error('No wallet connected');
+    const client = connectorClient as any;
     const [account] = await client.getAddresses();
     const data = encodeFunctionData({
       abi: [{ name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
@@ -32,13 +25,13 @@ export function useTrading() {
     });
     const tx = await (client as any).sendTransaction({ to: USDC_POLYGON, data, account });
     return tx;
-  }, [getWalletClient]);
+  }, [connectorClient]);
 
   const signOrder = useCallback(async (tokenId: string, price: number, size: number, side: 'BUY' | 'SELL') => {
-    // Build order shape with the user's wallet as maker via viem account
-    const viemAccount = await toViemAccount({ wallet });
-    const signer = new Wallet(address);
+    if (!connectorClient || !address) throw new Error('No wallet connected');
 
+    // Build order shape via CLOB SDK
+    const signer = new Wallet(address);
     const client = new ClobClient({
       host: 'https://clob.polymarket.com',
       chain: 137,
@@ -57,12 +50,11 @@ export function useTrading() {
 
     const order = built?.order || built;
 
-    // EIP-712 sign with the user's wallet
     const domain = {
       name: 'Polymarket CTF Exchange',
       version: '1',
       chainId: 137,
-      verifyingContract: '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
+      verifyingContract: EXCHANGE,
     };
     const types = {
       Order: [
@@ -81,35 +73,7 @@ export function useTrading() {
       ],
     };
 
-    const typedData = {
-      types: { ...types, EIP712Domain: [
-        { name: 'name', type: 'string' },
-        { name: 'version', type: 'string' },
-        { name: 'chainId', type: 'uint256' },
-        { name: 'verifyingContract', type: 'address' },
-      ] },
-      primaryType: 'Order' as const,
-      domain,
-      message: {
-        salt: order.salt?.toString?.() || '0',
-        maker: order.maker || address,
-        signer: order.signer || address,
-        taker: order.taker || '0x0000000000000000000000000000000000000000',
-        tokenId: order.tokenId?.toString?.() || String(tokenId),
-        makerAmount: order.makerAmount?.toString?.() || '0',
-        takerAmount: order.takerAmount?.toString?.() || '0',
-        expiration: order.expiration?.toString?.() || '0',
-        nonce: order.nonce?.toString?.() || '0',
-        feeRateBps: order.feeRateBps?.toString?.() || '0',
-        side: order.side?.toString?.() || (side === 'BUY' ? '0' : '1'),
-        signatureType: order.signatureType?.toString?.() || '0',
-      },
-    };
-
-    const signature = await viemAccount.signTypedData(typedData as any);
-
-    return {
-      ...order,
+    const message = {
       salt: order.salt?.toString?.() || '0',
       maker: order.maker || address,
       signer: order.signer || address,
@@ -122,9 +86,33 @@ export function useTrading() {
       feeRateBps: order.feeRateBps?.toString?.() || '0',
       side: order.side?.toString?.() || (side === 'BUY' ? '0' : '1'),
       signatureType: order.signatureType?.toString?.() || '0',
+    };
+
+    // Sign via connected wallet (MetaMask etc)
+    const signature = await (connectorClient as any).signTypedData({
+      account: address,
+      domain,
+      types,
+      primaryType: 'Order',
+      message,
+    });
+
+    return {
+      salt: message.salt,
+      maker: message.maker,
+      signer: message.signer,
+      taker: message.taker,
+      tokenId: message.tokenId,
+      makerAmount: message.makerAmount,
+      takerAmount: message.takerAmount,
+      expiration: message.expiration,
+      nonce: message.nonce,
+      feeRateBps: message.feeRateBps,
+      side: message.side,
+      signatureType: message.signatureType,
       signature,
     };
-  }, [wallet, address]);
+  }, [connectorClient, address]);
 
   const placeOrder = useCallback(async (tokenId: string, price: number, size: number, side: 'BUY' | 'SELL') => {
     const signed = await signOrder(tokenId, price, size, side);
@@ -136,5 +124,5 @@ export function useTrading() {
     return res.json();
   }, [signOrder]);
 
-  return { address, approveUSDC, signOrder, placeOrder, connected: !!address };
+  return { address, approveUSDC, signOrder, placeOrder, connected: !!address && !!isConnected };
 }
