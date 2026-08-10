@@ -15,17 +15,16 @@ export function useTrading() {
   const { data: connectorClient } = useConnectorClient();
 
   const approveUSDC = useCallback(async () => {
-    if (!connectorClient) throw new Error('No wallet connected');
+    if (!connectorClient || !address) throw new Error('No wallet connected');
     const client = connectorClient as any;
-    const [account] = await client.getAddresses();
     const data = encodeFunctionData({
       abi: [{ name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
       functionName: 'approve',
       args: [EXCHANGE, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
     });
-    const tx = await (client as any).sendTransaction({ to: USDC_POLYGON, data, account });
+    const tx = await client.sendTransaction({ to: USDC_POLYGON, data, account: address });
     return tx;
-  }, [connectorClient]);
+  }, [connectorClient, address]);
 
   const signOrder = useCallback(async (tokenId: string, price: number, size: number, side: 'BUY' | 'SELL') => {
     if (!connectorClient || !address) throw new Error('No wallet connected');
@@ -96,7 +95,6 @@ export function useTrading() {
       primaryType: 'Order',
       message,
     });
-
     return {
       salt: message.salt,
       maker: message.maker,
