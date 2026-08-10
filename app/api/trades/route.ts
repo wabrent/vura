@@ -33,7 +33,7 @@ interface Trade {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '15'), 30);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
 
     const candidates: { category: string; title: string; yesPrice: number; buyYesPrice: number; change24h: number; volume: number; slug: string; eventSlug: string; tokenId: string | null }[] = [];
 
@@ -74,14 +74,14 @@ export async function GET(req: NextRequest) {
 
     // Keep high-volume, mid-price candidates (interesting, tradable)
     const pool = candidates
-      .filter(c => c.buyYesPrice > 0.03 && c.buyYesPrice < 0.97 && c.volume > 5000)
+      .filter(c => c.buyYesPrice > 0.03 && c.buyYesPrice < 0.97 && c.volume > 2000)
       .sort((a, b) => b.volume - a.volume)
-      .slice(0, 60);
+      .slice(0, 100);
 
     const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-112e3801734f4c2b9e914fb1b72fe774';
     const prompt = `You are a Polymarket prediction market trader. For each market below: Category | Market title | YES price (0-1, %) | 24h change (%). The YES price is what you'd pay.
 
-Find the best 8 trades where the price looks mispriced or momentum is strong. Prefer:
+Find the best 15 trades where the price looks mispriced or momentum is strong. Prefer:
 - Markets with clear, tradeable logic (not just noise)
 - Big moves with a clear direction
 - Cheap YES (<40%) where the market might be underpricing a real event
@@ -99,7 +99,7 @@ Category | YES or NO | 0-based-index-from-data | short reason (max 8 words)`;
         model: 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: 1200,
       }),
       signal: AbortSignal.timeout(25000),
     });

@@ -57,7 +57,7 @@ export default function EdgeScanner() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/trades?limit=20');
+      const res = await fetch('/api/trades?limit=30');
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
