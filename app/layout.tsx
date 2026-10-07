@@ -1,37 +1,31 @@
-'use client';
+import type { Metadata } from "next";
+import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
+import { Providers } from "@/components/web3/Providers";
+import "./globals.css";
 
-import '@rainbow-me/rainbowkit/styles.css';
-import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { polygon } from 'wagmi/chains';
-import './globals.css';
+export const metadata: Metadata = {
+  title: "VURA // ACCESS TERMINAL",
+  description:
+    "Vura Genesis Pass — 333 1-bit passes on Robinhood. Intelligence terminal for the VURA ecosystem. vura.ink",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+  },
+};
 
-const queryClient = new QueryClient();
-
-const config = getDefaultConfig({
-  appName: 'VURA',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_ID || 'YOUR_WALLETCONNECT_PROJECT_ID',
-  chains: [polygon],
-  ssr: true,
-});
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-        <title>VURA Markets | Prediction Terminal</title>
-        <meta name="description" content="VURA — prediction market terminal for Polymarket. Trade weather, crypto, sports and more." />
-      </head>
-      <body>
-        <WagmiProvider config={config}>
-          <QueryClientProvider client={queryClient}>
-            <RainbowKitProvider>
-              {children}
-            </RainbowKitProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+    <html lang="en" className="dark">
+      <body className="bg-[#0a0a0a] text-white font-sans antialiased">
+        <Providers>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </Providers>
       </body>
     </html>
   );

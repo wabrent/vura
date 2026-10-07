@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>VURA // LIQUIDITY RADAR V1.0</title>
+<style>
+  :root {
+    --bg: #080a09;
+    --panel: #0a0f0c;
+    --fg: #35e07f;
+    --fg-dim: #249e5d;
+    --fg-faint: #14513180;
+    --red: #ff6b7f;
+    --line: #1f7a4a;
+    --line-bright: #35e07f;
+    --mono: "Courier New", Courier, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    background-image: linear-gradient(rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0.55)), url('/bg-waves.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: var(--fg);
+    font-family: var(--mono);
+  }
+
+  body.cursor-hidden,
+  body.cursor-hidden * { cursor: none !important; }
+
+  /* CRT scanlines + vignette */
+  .crt {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 900;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0, 0, 0, 0.10) 3px, rgba(0, 0, 0, 0.10) 4px),
+      radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+  }
+
+  .crt::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 50%, rgba(53, 224, 127, 0.015) 50%);
+    background-size: 100% 4px;
+    opacity: 0.35;
+  }
+
+  /* ========== APP GRID ========== */
+  .app {
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ========== ALPHA TOP BAR ========== */
+  .alpha-bar {
+    padding: 7px 14px;
+    background: #111111;
+    border-bottom: 1px solid #2a2a2a;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #8a8a8a;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* ========== HEADER ========== */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    text-transform: uppercase;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: clamp(14px, 1.8vw, 24px);
+    letter-spacing: 4px;
+    font-weight: 700;
+    text-shadow: 0 0 12px rgba(53, 224, 127, 0.24);
+    white-space: nowrap;
+  }
+
+  /* menu */
+  .menu {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .menu a {
+    font-family: var(--mono);
+    font-size: clamp(10px, 1.05vw, 13px);
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--fg-dim);
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    text-transform: uppercase;
+    transition: color 0.08s, border-color 0.08s, background 0.08s, box-shadow 0.08s;
+  }
+
+  .menu a:hover {
+    color: var(--fg);
+    border-color: var(--fg);
+    background: rgba(53, 224, 127, 0.08);
+    box-shadow: 0 0 10px rgba(53, 224, 127, 0.35);
+    text-shadow: 0 0 8px rgba(53, 224, 127, 0.28);
+  }
+
+  .menu a.active {
+    color: var(--bg);
+    background: var(--fg);
+    border-color: var(--fg);
+    box-shadow: 0 0 12px rgba(53, 224, 127, 0.24);
+    text-shadow: none;
+  }
+
+  .menu a.active:hover {
+    color: var(--bg);
+    background: #33ff88;
+    border-color: #33ff88;
+  }
+
+  header .live {
+    font-size: clamp(10px, 1.1vw, 14px);
+    letter-spacing: 2px;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  header .live .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--fg);
+    box-shadow: 0 0 8px var(--fg);
+    animation: pulse 1.1s steps(2) infinite;
+  }
+
+  @keyframes pulse { 50% { opacity: 0.2; } }
+
+  /* ========== MAIN ========== */
+  main {
+    display: grid;
+    grid-template-columns: minmax(300px, 36%) 1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .left .skull-wrap { max-height: 26vh; }
+  }
+
+  /* ========== LEFT PANEL ========== */
+  .left {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: rgba(0, 20, 8, 0.25);
+    padding: 10px;
+  }
+
+  .operator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    flex-shrink: 0;
+  }
+
+  .operator .mini-skull {
+    font-size: 26px;
+    line-height: 1;
+    text-shadow: 0 0 10px var(--fg);
+    animation: pulse 2s steps(2) infinite;
+  }
+
+  .operator .info {
+    font-size: clamp(11px, 1.2vw, 14px);
+    letter-spacing: 1px;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+
+  .operator .info .dim { color: var(--fg-dim); }
+
+  /* big skull */
+  .skull-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    padding: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .skull-grid {
+    display: grid;
+    gap: clamp(1px, 0.35vw, 4px);
+    --cell: clamp(6px, 1.6vw, 22px);
+    filter: drop-shadow(0 0 10px rgba(53, 224, 127, 0.24));
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+
+  .skull-grid.pulse {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 12px rgba(53, 224, 127, 0.35)) brightness(1.08);
+  }
+
+  .skull-grid .cell {
+    width: var(--cell);
+    height: var(--cell);
+    background: transparent;
+  }
+
+  .skull-grid .cell.on {
+    background: var(--fg);
+    animation: skullGlow 3s ease-in-out infinite;
+  }
+
+  @keyframes skullGlow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.82; }
+  }
+
+  /* logs console */
+  .console {
+    border: 1px solid var(--line);
+    height: clamp(120px, 22vh, 220px);
+    overflow-y: auto;
+    padding: 8px 10px;
+    font-size: clamp(10px, 1vw, 13px);
+    line-height: 1.55;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.45);
+    scrollbar-width: thin;
+    scrollbar-color: var(--fg-faint) transparent;
+  }
+
+  .console .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .console .line.alert { color: var(--red); }
+  .console .line.dim { color: var(--fg-dim); }
+  .console .line .ts { color: var(--fg-faint); }
+
+  .console .caret {
+    display: inline-block;
+    width: 8px;
+    height: 12px;
+    background: var(--fg);
+    vertical-align: text-bottom;
+    animation: blink 0.9s steps(1) infinite;
+    box-shadow: 0 0 6px var(--fg);
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ========== RIGHT PANEL ========== */
+  .right {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: rgba(0, 20, 8, 0.25);
+  }
+
+  .right-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    background: rgba(53, 224, 127, 0.05);
+  }
+
+  .right-head .title {
+    font-size: clamp(12px, 1.4vw, 18px);
+    letter-spacing: 3px;
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(53, 224, 127, 0.22);
+  }
+
+  .right-head .metrics {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: clamp(9px, 1vw, 12px);
+    letter-spacing: 1.5px;
+    color: var(--fg-dim);
+  }
+
+  .right-head .metrics .dot {
+    width: 7px;
+    height: 7px;
+    background: var(--fg);
+    animation: pulse 1s steps(2) infinite;
+  }
+
+  .table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fg-faint) transparent;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: clamp(10px, 1.05vw, 13px);
+    letter-spacing: 0.5px;
+    min-width: 720px;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #0a0f0a;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    font-weight: 700;
+    font-size: 0.92em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(53, 224, 127, 0.14);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover td { background: rgba(53, 224, 127, 0.07); }
+
+  tbody tr.new-row td {
+    background: rgba(53, 224, 127, 0.12);
+    text-shadow: 0 0 8px rgba(53, 224, 127, 0.28);
+  }
+
+  .chn {
+    color: var(--fg);
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(53, 224, 127, 0.22);
+  }
+
+  .pair { color: #eafff2; font-weight: 700; }
+  .pool { color: var(--fg-dim); }
+  .age { color: var(--fg); }
+  .liq { color: #eafff2; }
+  .vol { color: #9fe8c4; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 0.9em;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: 1px solid var(--fg);
+    color: var(--fg);
+    background: rgba(53, 224, 127, 0.1);
+    text-shadow: 0 0 5px rgba(53, 224, 127, 0.24);
+  }
+
+  .badge.rug {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255, 51, 85, 0.14);
+    text-shadow: 0 0 5px rgba(255, 107, 127, 0.35);
+  }
+
+  .badge.pending {
+    border-color: var(--fg-faint);
+    color: var(--fg-dim);
+    background: transparent;
+    text-shadow: none;
+    cursor: pointer;
+  }
+
+  .badge.pending:hover { border-color: var(--fg); color: var(--fg); }
+
+  .acts { display: flex; gap: 5px; }
+
+  .mini-btn {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--fg-faint);
+    cursor: pointer;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .mini-btn:hover {
+    border-color: var(--fg);
+    background: var(--fg);
+    color: var(--bg);
+    box-shadow: 0 0 10px rgba(53, 224, 127, 0.22);
+  }
+
+  .empty-row {
+    text-align: center;
+    color: var(--fg-dim);
+    padding: 28px 12px !important;
+    letter-spacing: 2px;
+  }
+
+  /* ========== FOOTER ========== */
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+
+  .stats {
+    display: flex;
+    gap: clamp(12px, 3vw, 36px);
+    flex-wrap: wrap;
+    font-size: clamp(10px, 1.1vw, 14px);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .stats .item .label { color: var(--fg-dim); margin-right: 6px; }
+  .stats .item .val {
+    color: var(--fg);
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(53, 224, 127, 0.24);
+  }
+
+  .stats .item .val.bad { color: var(--red); text-shadow: 0 0 8px rgba(255, 107, 127, 0.35); }
+
+  .eq {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 26px;
+  }
+
+  .eq i {
+    display: block;
+    width: 5px;
+    background: var(--fg);
+    box-shadow: 0 0 6px var(--fg);
+    height: 20%;
+    transition: height 0.18s ease;
+    opacity: 0.9;
+  }
+
+  /* ========== POOL INTEL (DETAIL) ========== */
+  .detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 950;
+    background: rgba(4, 6, 5, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .detail-overlay[hidden] { display: none; }
+
+  .detail-box {
+    width: min(1060px, 96vw);
+    max-height: 92vh;
+    overflow: auto;
+    background: var(--panel);
+    border: 1px solid var(--line-bright);
+    box-shadow: 0 0 40px rgba(53, 224, 127, 0.18);
+    animation: detail-in 0.18s ease;
+  }
+
+  @keyframes detail-in {
+    from { opacity: 0; transform: translateY(8px); }
+  }
+
+  .detail-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    text-transform: uppercase;
+  }
+
+  .detail-head .dt-title {
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-size: 13px;
+    color: var(--fg);
+    white-space: nowrap;
+  }
+
+  .detail-head .dt-pair {
+    flex: 1;
+    min-width: 0;
+    color: var(--fg-dim);
+    font-size: 12px;
+    letter-spacing: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .detail-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  }
+
+  @media (max-width: 900px) {
+    .detail-body { grid-template-columns: 1fr; }
+    .dt-chart-wrap { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+
+  .dt-chart-wrap {
+    position: relative;
+    padding: 12px;
+    border-right: 1px solid var(--line);
+  }
+
+  .dt-chart-label {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+
+  #dt-canvas { display: block; width: 100%; height: 300px; }
+
+  .dt-chart-empty {
+    position: absolute;
+    inset: 44px 12px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-dim);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  .dt-chart-empty[hidden] { display: none; }
+
+  .dt-side {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dt-verdict {
+    border: 1px solid var(--line);
+    padding: 9px 11px;
+  }
+
+  .dt-verdict .v-head {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  .dt-verdict .v-src {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--fg-dim);
+    margin-top: 4px;
+    line-height: 1.5;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  .dt-verdict.ok { border-color: var(--line-bright); color: var(--fg); }
+  .dt-verdict.warn { border-color: #f5b942; color: #f5b942; }
+  .dt-verdict.bad { border-color: var(--red); color: var(--red); }
+
+  .dt-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  .dt-reasons .r { color: var(--fg-dim); }
+  .dt-reasons .r::before { content: '-> '; color: var(--fg); }
+
+  .dt-facts { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+
+  .dt-facts .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+
+  .dt-facts .k { color: var(--fg-dim); letter-spacing: 1px; white-space: nowrap; }
+
+  .dt-facts .v {
+    color: var(--fg);
+    text-align: right;
+    overflow-wrap: anywhere;
+    letter-spacing: 0.5px;
+  }
+
+  .dt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+  #dt-snipe { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  #dt-snipe:hover { color: var(--bg); filter: brightness(1.15); box-shadow: none; }
+
+  tbody tr[data-key] { cursor: pointer; }
+
+  /* ========== GATE MODAL ========== */
+  .gate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(3, 5, 3, 0.94);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .gate-overlay[hidden] { display: none; }
+
+  .gate-box {
+    width: min(520px, 100%);
+    border: 2px solid var(--red);
+    background: #0a0505;
+    padding: 26px 22px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(255, 51, 85, 0.25);
+  }
+
+  .gate-box h2 {
+    color: var(--red);
+    font-size: clamp(15px, 2.2vw, 20px);
+    letter-spacing: 2px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+    text-shadow: 0 0 12px rgba(255, 107, 127, 0.35);
+  }
+
+  .gate-box .detail,
+  .gate-box .gate-detail {
+    color: var(--fg-dim);
+    font-size: 12px;
+    letter-spacing: 1px;
+    line-height: 1.7;
+    margin-bottom: 18px;
+    word-break: break-all;
+  }
+
+  .gate-box .detail a,
+  .gate-box .gate-detail a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+  .gate-box .detail a:hover,
+  .gate-box .gate-detail a:hover { text-shadow: 0 0 8px var(--fg); }
+
+  .gate-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+  .gate-btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 11px 16px;
+    background: #070707;
+    color: var(--fg);
+    border: 1px solid var(--fg);
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  .gate-btn:hover:not(:disabled) {
+    background: var(--fg);
+    color: var(--bg);
+    box-shadow: 0 0 14px rgba(53, 224, 127, 0.22);
+  }
+
+  .gate-btn.danger { border-color: var(--red); color: var(--red); }
+  .gate-btn.danger:hover:not(:disabled) { background: var(--red); color: #fff; box-shadow: 0 0 14px rgba(255, 51, 85, 0.5); }
+  .gate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .gate-note {
+    margin-top: 14px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+  }
+
+  /* toast */
+  #toast {
+    position: fixed;
+    bottom: 54px;
+    left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--bg);
+    border: 1px solid var(--fg);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 9px 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 950;
+    box-shadow: 0 0 16px rgba(53, 224, 127, 0.35);
+  }
+
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ========== CRT UPGRADE ========== */
+  /* moving phosphor band */
+  .crt::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(180deg, transparent, rgba(53, 224, 127, 0.07), rgba(255, 255, 255, 0.03), transparent);
+    animation: crt-band 9s linear infinite;
+  }
+
+  @keyframes crt-band {
+    0% { top: -220px; }
+    100% { top: 100vh; }
+  }
+
+  /* rare micro-flicker like a real tube */
+  .app { animation: crt-flicker 7s steps(1) infinite; }
+
+  @keyframes crt-flicker {
+    0%, 97%, 100% { opacity: 1; }
+    98% { opacity: 0.94; }
+    99.5% { opacity: 1; }
+  }
+
+  /* phosphor glow around main panels */
+  .left, .right {
+    box-shadow: 0 0 26px rgba(53, 224, 127, 0.07), inset 0 0 70px rgba(53, 224, 127, 0.03);
+  }
+
+  .left:hover, .right:hover {
+    box-shadow: 0 0 34px rgba(53, 224, 127, 0.12), inset 0 0 70px rgba(53, 224, 127, 0.04);
+  }
+
+  .left, .right { transition: box-shadow 0.3s ease; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .crt::before, .app { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="crt" aria-hidden="true"></div>
+
+<!-- TOKEN GATE -->
+<div class="gate-overlay" id="gate" hidden>
+    <div class="gate-box">
+      <h2>ACCESS DENIED:<br>GENESIS PASS REQUIRED</h2>
+      <div class="gate-detail" id="gate-detail">
+        OPERATOR CLEARANCE LEVEL 0 // PASS CHECK ON 9 CHAINS
+      </div>
+    <div class="gate-actions">
+      <button type="button" class="gate-btn" id="btn-gate-connect">[ CONNECT WALLET ]</button>
+      <button type="button" class="gate-btn danger" id="btn-gate-demo" hidden>[ ENTER DEMO ]</button>
+    </div>
+    <div class="gate-note" id="gate-note">ERC-721 BALANCE CHECK VIA PUBLIC RPC // NO SIGNATURES</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="alpha-bar">VURA.TERMINAL // ALPHA</div>
+  <header>
+    <h1>VURA LIQUIDITY RADAR V1.0</h1>
+    <nav class="menu" aria-label="main menu">
+      <a href="/">[ HOME ]</a>
+      <a href="/terminal" class="active">[ RADAR ]</a>
+      <a href="/#gallery">[ GALLERY ]</a>
+      <a href="https://opensea.io/collection/vura-genesis-pass" target="_blank" rel="noopener">[ MINT ]</a>
+      <a href="/scanner">[ SCANNER ]</a>
+      <a href="https://x.com/0x_Vura" target="_blank" rel="noopener">[ X ]</a>
+    </nav>
+    <div class="live">
+      <span class="dot"></span>
+      <span id="header-status">LIVE // 9 CHAINS</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT -->
+    <aside class="left">
+      <div class="operator">
+        <span class="mini-skull" aria-hidden="true">&#9760;</span>
+        <div class="info">
+          <div id="operator-line">OPERATOR: <span id="operator-id">#---</span> <span id="operator-state">UNVERIFIED</span></div>
+          <div class="dim">LEVEL: <span id="operator-level">GUEST</span></div>
+          <div class="dim" id="operator-wallet">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="skull-wrap">
+        <div id="skull" class="skull-grid" aria-label="VURA logo"></div>
+      </div>
+
+      <div class="console" id="console" aria-label="system log">
+        <div class="line dim">[BOOT: VURA.RADAR v1.0...]</div>
+        <div class="line dim">[NETWORK STATUS: NOMINAL]</div>
+        <span class="caret" id="console-caret"></span>
+      </div>
+    </aside>
+
+    <!-- RIGHT -->
+    <section class="right">
+      <div class="right-head">
+        <div class="title">MULTI-CHAIN LIQUIDITY RADAR</div>
+        <div class="metrics">
+          <span id="scan-label">SCANNING 9 NETWORKS</span>
+          <span class="dot"></span>
+          <span id="last-update">--:--:--</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>CHN</th>
+              <th>POOL</th>
+              <th>PAIR</th>
+              <th>AGE</th>
+              <th>LIQUIDITY</th>
+              <th>VOL 24H</th>
+              <th>AUDIT</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="pool-body">
+            <tr><td colspan="8" class="empty-row">INITIALIZING CROSS-CHAIN FEED...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="stats">
+      <div class="item"><span class="label">RUGS PREVENTED:</span><span class="val bad" id="stat-rugs">0</span></div>
+      <div class="item"><span class="label">VALUE TRACKED:</span><span class="val" id="stat-tvl">$0</span></div>
+      <div class="item"><span class="label">POOLS SEEN:</span><span class="val" id="stat-pools">0</span></div>
+      <div class="item"><span class="label">NEW / MIN:</span><span class="val" id="stat-npm">0</span></div>
+    </div>
+    <div class="eq" id="eq" aria-hidden="true"></div>
+  </footer>
+</div>
+
+<div id="toast" role="status"></div>
+
+<!-- POOL INTEL -->
+<div class="detail-overlay" id="detail" hidden>
+  <div class="detail-box" role="dialog" aria-modal="true" aria-label="pool intel">
+    <div class="detail-head">
+      <span class="dt-title">[ POOL INTEL ]</span>
+      <span class="dt-pair" id="dt-pair">--</span>
+      <button type="button" class="mini-btn" id="dt-close" aria-label="Close">[X]</button>
+    </div>
+    <div class="detail-body">
+      <div class="dt-chart-wrap">
+        <div class="dt-chart-label" id="dt-chart-label">PRICE · 15M CANDLES</div>
+        <canvas id="dt-canvas" width="640" height="300"></canvas>
+        <div class="dt-chart-empty" id="dt-chart-empty">LOADING PRICE CHART...</div>
+      </div>
+      <div class="dt-side">
+        <div class="dt-verdict" id="dt-verdict">
+          <div class="v-head" id="dt-v-head">--</div>
+          <div class="v-src" id="dt-v-src"></div>
+        </div>
+        <div class="dt-reasons" id="dt-reasons"></div>
+        <div class="dt-facts" id="dt-facts"></div>
+        <div class="dt-actions">
+          <button type="button" class="mini-btn" id="dt-copy" data-act="copy">[COPY CA]</button>
+          <a class="mini-btn" id="dt-snipe" target="_blank" rel="noopener">[SNIPE]</a>
+          <a class="mini-btn" id="dt-gt" target="_blank" rel="noopener">[GECKOTERMINAL]</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ======================= CONFIG =======================
+  var CONFIG = {
+    DEMO_MODE: true,
+    GENESIS_PASS_CONTRACT: '', // TODO: Vura Genesis Pass ERC-721
+    POLL_MS: 20000,
+    FRESH_MS: 5 * 60 * 1000,
+    MAX_ROWS: 80,
+    MIN_LIQ_USD: 1500,
+    CURSOR_HIDE_MS: 5000
+  };
+
+  var CHAINS = [
+    { id: 'robinhood',    tag: '[RH]',  label: 'ROBINHOOD', gp: '4663',  rpc: 'https://rpc.mainnet.chain.robinhood.com', uni: '', weth: '0x0bd7d308f8e1639fab988df18a8011f41eacad73' },
+    { id: 'eth',         tag: '[ETH]',  label: 'ETHEREUM', gp: '1',     rpc: 'https://ethereum-rpc.publicnode.com', uni: 'ethereum', weth: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' },
+    { id: 'base',        tag: '[BASE]', label: 'BASE',     gp: '8453',  rpc: 'https://mainnet.base.org',           uni: 'base',     weth: '0x42000000000000000000000000000000000006' },
+    { id: 'polygon_pos', tag: '[POLY]', label: 'POLYGON',  gp: '137',   rpc: 'https://polygon-rpc.com',            uni: 'polygon',  weth: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270' },
+    { id: 'arbitrum',    tag: '[ARB]',  label: 'ARBITRUM', gp: '42161', rpc: 'https://arb1.arbitrum.io/rpc',       uni: 'arbitrum', weth: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1' },
+    { id: 'bsc',         tag: '[BSC]',  label: 'BSC',      gp: '56',    rpc: 'https://bsc-dataseed.binance.org',   uni: '',         weth: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c' },
+    { id: 'optimism',    tag: '[OP]',   label: 'OPTIMISM', gp: '10',    rpc: 'https://mainnet.optimism.io',        uni: 'optimism', weth: '0x4200000000000000000000000000000000000006' },
+    { id: 'avalanche',   tag: '[AVAX]', label: 'AVALANCHE',gp: '43114',  rpc: 'https://api.avax.network/ext/bc/C/rpc', uni: '',      weth: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7' },
+    { id: 'blast',       tag: '[BLAST]',label: 'BLAST',    gp: '81457',  rpc: 'https://rpc.blast.io',              uni: '',         weth: '0x4300000000000000000000000000000000000004' }
+  ];
+
+  var SKULL_MATRIX = [
+    [0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+    [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+    [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+    [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+    [0,1,1,1,0,0,0,1,1,1,1,0,0,0,1,1,1,1,1,0],
+    [0,1,1,1,0,0,0,1,1,1,1,0,0,0,1,1,1,1,1,0],
+    [0,1,1,1,0,0,0,1,1,1,1,0,0,0,1,1,1,1,1,0],
+    [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+    [0,0,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0,0],
+    [0,0,0,1,1,1,1,0,0,0,0,1,1,1,1,1,1,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0]
+  ];
+
+  var state = {
+    unlocked: false,
+    wallet: null,
+    pools: [],
+    seen: Object.create(null),
+    firstLoad: true,
+    timer: null,
+    fetching: false,
+    rugs: 0,
+    newTimestamps: [],
+    audits: Object.create(null),
+    auditInfo: Object.create(null),
+    chartCache: Object.create(null),
+    detailKey: ''
+  };
+
+  var audioCtx = null;
+
+  function $(id) { return document.getElementById(id); }
+
+  // ======================= SOUND =======================
+  function ensureAudio() {
+    if (audioCtx) return audioCtx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+    return audioCtx;
+  }
+
+  function beep() {
+    var ctx = ensureAudio();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    var t = ctx.currentTime;
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(740, t);
+    o.frequency.setValueAtTime(1180, t + 0.05);
+    o.frequency.setValueAtTime(980, t + 0.1);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.17);
+  }
+
+  // ======================= UTILS =======================
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function fmtClock(d) {
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+
+  function fmtAge(ms) {
+    if (!isFinite(ms) || ms < 0) ms = 0;
+    var s = Math.floor(ms / 1000);
+    if (s < 60) return s + 's';
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + 'm';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + 'h';
+    return Math.floor(h / 24) + 'd';
+  }
+
+  function fmtUsd(v) {
+    var n = parseFloat(v);
+    if (!isFinite(n)) return '-';
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    if (n >= 1) return '$' + n.toFixed(2);
+    if (n <= 0) return '-';
+    return '$' + n.toPrecision(3);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.classList.remove('show'); }, 1700);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); resolve(); }
+      catch (e) { reject(e); }
+      finally { document.body.removeChild(ta); }
+    });
+  }
+
+  // ======================= CONSOLE LOG =======================
+  function logLine(text, cls) {
+    var box = $('console');
+    var caret = $('console-caret');
+    var line = document.createElement('div');
+    line.className = 'line' + (cls ? ' ' + cls : '');
+    line.innerHTML = '<span class="ts">[' + fmtClock(new Date()) + ']</span> ' + esc(text);
+    box.insertBefore(line, caret);
+    while (box.querySelectorAll('.line').length > 80) {
+      box.removeChild(box.querySelector('.line'));
+    }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ======================= SKULL =======================
+  function renderSkull() {
+    var grid = $('skull');
+    var cols = SKULL_MATRIX[0].length;
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', var(--cell))';
+    var html = '';
+    for (var r = 0; r < SKULL_MATRIX.length; r++) {
+      for (var c = 0; c < cols; c++) {
+        html += SKULL_MATRIX[r][c] ? '<div class="cell on"></div>' : '<div class="cell"></div>';
+      }
+    }
+    grid.innerHTML = html;
+  }
+
+  function pulseSkull() {
+    var grid = $('skull');
+    grid.classList.add('pulse');
+    setTimeout(function () { grid.classList.remove('pulse'); }, 550);
+  }
+
+  // ======================= CURSOR HIDING =======================
+  var cursorTimer = null;
+  function armCursorHide() {
+    document.body.classList.remove('cursor-hidden');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(function () {
+      document.body.classList.add('cursor-hidden');
+    }, CONFIG.CURSOR_HIDE_MS);
+  }
+  window.addEventListener('mousemove', armCursorHide, { passive: true });
+  window.addEventListener('mousedown', armCursorHide, { passive: true });
+  window.addEventListener('keydown', armCursorHide, { passive: true });
+
+  // ======================= EQUALIZER =======================
+  function initEqualizer() {
+    var eq = $('eq');
+    var bars = 18;
+    for (var i = 0; i < bars; i++) {
+      eq.appendChild(document.createElement('i'));
+    }
+    var els = eq.querySelectorAll('i');
+    setInterval(function () {
+      for (var i = 0; i < els.length; i++) {
+        var h = 15 + Math.random() * 85;
+        els[i].style.height = h.toFixed(0) + '%';
+      }
+    }, 220);
+  }
+
+  // ======================= GATE =======================
+  function gateNote(msg) {
+    $('gate-note').textContent = msg;
+  }
+
+  function gateDetail(msg) {
+    $('gate-detail').innerHTML = msg;
+  }
+
+  function setOperator(verified) {
+    if (state.wallet) {
+      var idNum = 0;
+      for (var i = 2; i < state.wallet.length && i < 10; i++) {
+        idNum = (idNum * 16 + parseInt(state.wallet[i], 16)) % 333;
+      }
+      $('operator-id').textContent = '#' + String(idNum + 1).padStart(3, '0');
+      var wEl = $('operator-wallet');
+      if (wEl) wEl.textContent = shortWallet(state.wallet);
+    }
+    $('operator-state').textContent = verified ? 'VERIFIED' : 'UNVERIFIED';
+    $('operator-state').style.color = verified ? 'var(--fg)' : 'var(--red)';
+    $('operator-level').textContent = verified ? 'GENESIS' : 'GUEST';
+  }
+
+  function unlockRadar(reason) {
+    state.unlocked = true;
+    $('gate').hidden = true;
+    ensureAudio();
+    if (reason === 'demo') {
+      gateNote('DEMO MODE // CONTRACT CHECK BYPASSED');
+    } else if (reason === 'wallet-demo') {
+      gateNote('WALLET LINKED // DEMO CHANNEL');
+    }
+    setOperator(reason !== 'denied');
+    logLine('ACCESS GRANTED // RADAR ONLINE', 'dim');
+    startRadar();
+    armCursorHide();
+  }
+
+  function showDenied(msg) {
+    $('gate').hidden = false;
+    $('btn-gate-connect').disabled = false;
+    gateDetail(msg ||
+      'OPERATOR CLEARANCE LEVEL 0 // NO PASS DETECTED ON ' + CHAINS.length + ' CHAINS<br><br>' +
+      '<a href="https://opensea.io/collection/vura-genesis-pass" target="_blank" rel="noopener">[ MINT GENESIS PASS ]</a>');
+  }
+
+  function erc721Balance(rpc, owner) {
+    var addr = owner.toLowerCase().replace(/^0x/, '');
+    var data = '0x70a08231' + addr.padStart(64, '0');
+    return fetch(rpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: CONFIG.GENESIS_PASS_CONTRACT, data: data }, 'latest'] })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.error) throw new Error(j.error.message || 'rpc');
+      return BigInt(j.result || '0x0');
+    });
+  }
+
+  function verifyOnAllChains(wallet) {
+    gateNote('SCANNING ' + CHAINS.length + ' CHAINS FOR GENESIS PASS...');
+    var checks = CHAINS.map(function (ch) {
+      return erc721Balance(ch.rpc, wallet)
+        .then(function (bal) { return { chain: ch, bal: bal }; })
+        .catch(function () { return { chain: ch, bal: null }; });
+    });
+    return Promise.all(checks).then(function (results) {
+      for (var i = 0; i < results.length; i++) {
+        if (results[i].bal !== null && results[i].bal > 0n) {
+          return results[i].chain;
+        }
+      }
+      return null;
+    });
+  }
+
+  function shortWallet(a) {
+    return a ? a.slice(0, 6) + '...' + a.slice(-4) : '';
+  }
+
+  function connectGate() {
+    var btn = $('btn-gate-connect');
+    btn.disabled = true;
+    gateNote('REQUESTING ACCOUNT...');
+
+    if (!window.ethereum) {
+      btn.disabled = false;
+      gateDetail(
+        'NO WALLET DETECTED.<br>INSTALL METAMASK OR RABBY, THEN RETRY.<br><br>' +
+        '<a href="https://metamask.io/download/" target="_blank" rel="noopener">[ GET METAMASK ]</a>');
+      return;
+    }
+
+    window.ethereum.request({ method: 'eth_requestAccounts' })
+      .then(function (accounts) {
+        if (!accounts || !accounts.length) throw new Error('rejected');
+        state.wallet = accounts[0];
+        var short = shortWallet(state.wallet);
+        logLine('WALLET LINKED: ' + short, 'dim');
+
+        if (!CONFIG.GENESIS_PASS_CONTRACT) {
+          if (CONFIG.DEMO_MODE) {
+            gateDetail('WALLET LINKED: <b>' + short + '</b><br>PASS CHECK SKIPPED // DEMO CHANNEL<br>RADAR WILL OPEN...');
+            gateNote('CONNECTED // AUTHORIZING...');
+            setTimeout(function () { unlockRadar('wallet-demo'); }, 500);
+            return;
+          }
+          gateDetail('WALLET LINKED: ' + short + '<br>GATE NOT CONFIGURED: GENESIS_PASS_CONTRACT EMPTY.');
+          gateNote('SET CONTRACT OR DEMO_MODE=TRUE');
+          btn.disabled = false;
+          return;
+        }
+
+        return verifyOnAllChains(state.wallet).then(function (chain) {
+          btn.disabled = false;
+          if (chain) {
+            logLine('PASS FOUND ON ' + chain.label + ' // CLEARANCE: GENESIS');
+            unlockRadar('wallet');
+          } else {
+            showDenied('WALLET: ' + short + '<br>NO GENESIS PASS ON ' + CHAINS.length + ' CHAINS<br><br>' +
+              '<a href="https://opensea.io/collection/vura-genesis-pass" target="_blank" rel="noopener">[ MINT GENESIS PASS ]</a>');
+          }
+        });
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        gateNote('CONNECT FAILED: ' + (err && err.message ? err.message : 'REJECTED'));
+      });
+  }
+
+  // ======================= MULTI-CHAIN FEED =======================
+  function extractPool(chain, item) {
+    var a = item.attributes || {};
+    var rel = item.relationships || {};
+    var baseId = rel.base_token && rel.base_token.data && rel.base_token.data.id
+      ? rel.base_token.data.id : '';
+    var m = baseId.match(/0x[a-fA-F0-9]{40}/);
+    var dexId = rel.dex && rel.dex.data && rel.dex.data.id ? rel.dex.data.id : '';
+    var quoteId = rel.quote_token && rel.quote_token.data && rel.quote_token.data.id
+      ? rel.quote_token.data.id : '';
+    var qm = quoteId.match(/0x[a-fA-F0-9]{40}/);
+    return {
+      key: chain.id + ':' + (a.address || ''),
+      chn: chain,
+      poolAddr: a.address || '',
+      tokenAddr: m ? m[0] : '',
+      quoteAddr: qm ? qm[0] : chain.weth,
+      name: a.name || '???/???',
+      createdAt: a.pool_created_at ? new Date(a.pool_created_at) : null,
+      liq: parseFloat(a.reserve_in_usd) || 0,
+      vol: parseFloat(a.volume_usd && a.volume_usd.h24) || 0,
+      dex: dexId.replace(/-/g, ' ').toUpperCase(),
+      isNew: false
+    };
+  }
+
+  function fetchChain(chain) {
+    var url = 'https://api.geckoterminal.com/api/v2/networks/' + chain.id + '/new_pools';
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) {
+        if (r.status === 429) {
+          logLine('[RATE LIMIT: ' + chain.label + ' DEFERRED]', 'dim');
+          return { data: [] };
+        }
+        if (!r.ok) throw new Error(chain.label + ' HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (json) {
+        return (json.data || [])
+          .map(function (item) { return extractPool(chain, item); })
+          .filter(function (p) { return p.liq >= CONFIG.MIN_LIQ_USD; });
+      })
+      .catch(function (err) {
+        if (err && err.name === 'TypeError') {
+          logLine('[RATE LIMIT: ' + chain.label + ' DEFERRED]', 'dim');
+        } else {
+          logLine('[FEED ERROR: ' + err.message + ']', 'alert');
+        }
+        return [];
+      });
+  }
+
+  function quickAudit(pool) {
+    if (pool.liq >= 10000) return 'pass';
+    if (pool.liq >= 1000) return 'risk';
+    return 'rug';
+  }
+
+  function mergeAndRender() {
+    state.pools.sort(function (a, b) {
+      var ta = a.createdAt ? a.createdAt.getTime() : 0;
+      var tb = b.createdAt ? b.createdAt.getTime() : 0;
+      return tb - ta;
+    });
+    state.pools = state.pools.slice(0, CONFIG.MAX_ROWS);
+    renderRows();
+    updateStats();
+    $('last-update').textContent = fmtClock(new Date());
+  }
+
+  function ingest(results) {
+    var all = [];
+    for (var i = 0; i < results.length; i++) {
+      if (results[i]) all = all.concat(results[i]);
+    }
+
+    var newCount = 0;
+    for (var j = 0; j < all.length; j++) {
+      var p = all[j];
+      if (!state.firstLoad && !state.seen[p.key]) {
+        p.isNew = true;
+        newCount++;
+        state.newTimestamps.push(Date.now());
+        logLine('[NEW POOL: ' + p.chn.tag + ' ' + p.name + ' ' + fmtUsd(p.liq) + ']');
+      }
+      state.seen[p.key] = 1;
+    }
+
+    for (var k = 0; k < all.length; k++) {
+      if (all[k].createdAt && (Date.now() - all[k].createdAt.getTime()) <= CONFIG.FRESH_MS) {
+        all[k].isNew = true;
+      }
+    }
+
+    // merge with existing so partially-fetched cycle keeps old data
+    var merged = state.pools.slice();
+    for (var m = 0; m < all.length; m++) {
+      var found = false;
+      for (var n = 0; n < merged.length; n++) {
+        if (merged[n].key === all[m].key) { merged[n] = all[m]; found = true; break; }
+      }
+      if (!found) merged.push(all[m]);
+    }
+    state.pools = merged;
+
+    if (!state.firstLoad && newCount > 0) {
+      beep();
+      pulseSkull();
+      logLine('[ALERT: ' + newCount + ' NEW SIGNAL(S) DETECTED]', 'alert');
+      toast('NEW SIGNAL x' + newCount);
+    }
+
+    mergeAndRender();
+  }
+
+  function fetchAll() {
+    if (state.fetching) return;
+    state.fetching = true;
+    $('scan-label').textContent = 'POLLING ' + CHAINS.length + ' NETWORKS...';
+
+    // staggered sequential fetch to respect GeckoTerminal 30 req/min
+    var idx = 0;
+    var results = new Array(CHAINS.length);
+
+    function next() {
+      if (idx >= CHAINS.length) {
+        ingest(results);
+        state.firstLoad = false;
+        $('scan-label').textContent = 'SCANNING ' + CHAINS.length + ' NETWORKS';
+        state.fetching = false;
+        return;
+      }
+      var i = idx++;
+      fetchChain(CHAINS[i]).then(function (res) {
+        results[i] = res;
+        // incremental render as each chain lands
+        ingest(results);
+        setTimeout(next, 700);
+      });
+    }
+
+    next();
+  }
+
+  function startRadar() {
+    if (state.timer) return;
+    fetchAll();
+    state.timer = setInterval(fetchAll, CONFIG.POLL_MS);
+  }
+
+  // ======================= RENDER TABLE =======================
+  function renderRows() {
+    var body = $('pool-body');
+    if (!state.pools.length) {
+      body.innerHTML = '<tr><td colspan="8" class="empty-row">AWAITING FIRST CROSS-CHAIN SIGNAL...</td></tr>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < state.pools.length; i++) {
+      var p = state.pools[i];
+      var ageMs = p.createdAt ? Date.now() - p.createdAt.getTime() : Infinity;
+      var pairParts = p.name.split('/');
+      var pair = esc(pairParts[0]) + '/' + esc(pairParts[1] || '?');
+      var dex = p.dex || 'DEX';
+
+      var auditKey = p.key;
+      var aState = state.audits[auditKey];
+      var auditHtml;
+      if (aState === 'pass') auditHtml = '<span class="badge">[PASS]</span>';
+      else if (aState === 'rug') auditHtml = '<span class="badge rug">[RUG]</span>';
+      else if (aState === 'risk') auditHtml = '<span class="badge rug">[RISK]</span>';
+      else {
+        var q = quickAudit(p);
+        auditHtml = '<span class="badge pending" data-act="audit" data-key="' + esc(auditKey) + '" title="Click for GoPlus audit">[' + q.toUpperCase() + ']</span>';
+      }
+
+      var swapUrl;
+      if (p.chn.uni) {
+        swapUrl = 'https://app.uniswap.org/swap?chain=' + p.chn.uni +
+          '&inputCurrency=' + p.tokenAddr + '&outputCurrency=' + p.quoteAddr;
+      } else if (p.chn.id === 'bsc') {
+        swapUrl = 'https://pancakeswap.finance/swap?inputCurrency=' + p.tokenAddr +
+          '&outputCurrency=' + p.quoteAddr;
+      } else if (p.chn.id === 'robinhood') {
+        swapUrl = 'https://www.geckoterminal.com/robinhood/pools/' + (p.poolAddr || '');
+      } else {
+        var dsChain = p.chn.id === 'polygon_pos' ? 'polygon' : p.chn.id;
+        swapUrl = 'https://dexscreener.com/' + dsChain + '/' + (p.poolAddr || p.tokenAddr);
+      }
+
+      html += '<tr' + (p.isNew ? ' class="new-row"' : '') + ' data-key="' + esc(p.key) + '">';
+      html += '<td class="chn">' + p.chn.tag + '</td>';
+      html += '<td class="pool">' + esc(dex) + '</td>';
+      html += '<td class="pair">' + pair + '</td>';
+      html += '<td class="age" data-born="' + (p.createdAt ? p.createdAt.getTime() : '') + '">' + fmtAge(ageMs) + '</td>';
+      html += '<td class="liq">' + fmtUsd(p.liq) + '</td>';
+      html += '<td class="vol">' + fmtUsd(p.vol) + '</td>';
+      html += '<td>' + auditHtml + '</td>';
+      html += '<td><div class="acts">' +
+        '<button type="button" class="mini-btn" data-act="copy" data-ca="' + esc(p.tokenAddr) + '">[COPY]</button>' +
+        '<a class="mini-btn" target="_blank" rel="noopener" href="' + esc(swapUrl) + '">[SNIPE]</a>' +
+        '</div></td>';
+      html += '</tr>';
+    }
+    body.innerHTML = html;
+  }
+
+  function updateAges() {
+    var cells = $('pool-body').querySelectorAll('td.age[data-born]');
+    for (var i = 0; i < cells.length; i++) {
+      var born = cells[i].getAttribute('data-born');
+      if (!born) { cells[i].textContent = '--'; continue; }
+      cells[i].textContent = fmtAge(Date.now() - parseInt(born, 10));
+    }
+  }
+
+  // ======================= STATS =======================
+  function updateStats() {
+    var tvl = 0;
+    var cutoff = Date.now() - 60000;
+    state.newTimestamps = state.newTimestamps.filter(function (t) { return t >= cutoff; });
+    for (var i = 0; i < state.pools.length; i++) tvl += state.pools[i].liq;
+    $('stat-rugs').textContent = String(state.rugs);
+    $('stat-tvl').textContent = fmtUsd(tvl);
+    $('stat-pools').textContent = String(state.pools.length);
+    $('stat-npm').textContent = String(state.newTimestamps.length);
+  }
+
+  // ======================= GOPLUS AUDIT =======================
+  function runAudit(key, el) {
+    var pool = null;
+    for (var i = 0; i < state.pools.length; i++) {
+      if (state.pools[i].key === key) { pool = state.pools[i]; break; }
+    }
+    if (!pool || !pool.tokenAddr) return;
+
+    el.textContent = '[....]';
+    var url = 'https://api.gopluslabs.io/api/v1/token_security/' + pool.chn.gp +
+      '?contract_addresses=' + pool.tokenAddr.toLowerCase();
+
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        var result = json.result && json.result[pool.tokenAddr.toLowerCase()];
+        var verdict;
+        var info;
+        if (!result) {
+          verdict = quickAudit(pool) === 'pass' ? 'pass' : 'risk';
+          info = { src: 'estimate', note: 'token not found - quick estimate' };
+        } else {
+          var honeypot = result.is_honeypot === '1';
+          var cannotSell = result.cannot_sell_all === '1';
+          var buyTax = parseFloat(result.buy_tax || 0);
+          var sellTax = parseFloat(result.sell_tax || 0);
+          verdict = (honeypot || cannotSell || sellTax > 0.1 || buyTax > 0.1) ? 'rug' : 'pass';
+          info = { src: 'goplus', honeypot: honeypot, cannotSell: cannotSell, buyTax: buyTax, sellTax: sellTax };
+        }
+        state.audits[key] = verdict;
+        state.auditInfo[key] = info;
+        if (verdict === 'rug') {
+          state.rugs++;
+          logLine('[ALERT: RUG FLAG // ' + pool.name + ' // ' + pool.chn.tag + ']', 'alert');
+        } else {
+          logLine('[AUDIT PASS // ' + pool.name + ' // ' + pool.chn.tag + ']', 'dim');
+        }
+        updateStats();
+        renderRows();
+        if (state.detailKey === key) openDetail(key);
+      })
+      .catch(function () {
+        el.textContent = '[ERR]';
+        setTimeout(function () { renderRows(); }, 1200);
+      });
+  }
+
+  // ======================= POOL INTEL (CHART + VERDICT) =======================
+  function findPool(key) {
+    for (var i = 0; i < state.pools.length; i++) {
+      if (state.pools[i].key === key) return state.pools[i];
+    }
+    return null;
+  }
+
+  function shortAddr(a) { return a ? a.slice(0, 6) + '...' + a.slice(-4) : '--'; }
+
+  function swapUrlFor(p) {
+    if (p.chn.uni) {
+      return 'https://app.uniswap.org/swap?chain=' + p.chn.uni +
+        '&inputCurrency=' + p.tokenAddr + '&outputCurrency=' + p.quoteAddr;
+    }
+    if (p.chn.id === 'bsc') {
+      return 'https://pancakeswap.finance/swap?inputCurrency=' + p.tokenAddr +
+        '&outputCurrency=' + p.quoteAddr;
+    }
+    if (p.chn.id === 'robinhood') {
+      return 'https://www.geckoterminal.com/robinhood/pools/' + (p.poolAddr || '');
+    }
+    var dsChain = p.chn.id === 'polygon_pos' ? 'polygon' : p.chn.id;
+    return 'https://dexscreener.com/' + dsChain + '/' + (p.poolAddr || p.tokenAddr);
+  }
+
+  function fmtPrice(v) {
+    if (v >= 1000) return '$' + v.toFixed(0);
+    if (v >= 1) return '$' + v.toFixed(2);
+    if (v >= 0.0001) return '$' + v.toFixed(6);
+    return '$' + v.toPrecision(3);
+  }
+
+  function verdictData(p) {
+    var v = state.audits[p.key] || quickAudit(p);
+    var info = state.auditInfo[p.key];
+    var src = info
+      ? (info.src === 'goplus' ? 'SOURCE: GOPLUS ON-CHAIN AUDIT' : 'SOURCE: ' + info.note)
+      : 'ESTIMATED FROM LIQUIDITY // CLICK BADGE TO RUN FULL SCAN';
+    var reasons = [];
+    if (p.liq >= 10000) reasons.push('LIQUIDITY ' + fmtUsd(p.liq) + ' // HEALTHY DEPTH');
+    else if (p.liq >= 1000) reasons.push('LIQUIDITY ' + fmtUsd(p.liq) + ' // THIN // SLIPPAGE LIKELY');
+    else reasons.push('LIQUIDITY ' + fmtUsd(p.liq) + ' // DANGEROUSLY LOW');
+    if (p.createdAt) {
+      var age = Date.now() - p.createdAt.getTime();
+      reasons.push('POOL AGE ' + fmtAge(age) + (age < 300000 ? ' // BRAND NEW // ELEVATED RISK' : ' // WINDOW ESTABLISHED'));
+    } else {
+      reasons.push('POOL AGE UNKNOWN');
+    }
+    if (info && info.src === 'goplus') {
+      if (info.honeypot) reasons.push('HONEYPOT: YES // SELLS LIKELY BLOCKED');
+      if (info.cannotSell) reasons.push('CANNOT SELL ALL: FLAGGED');
+      reasons.push('BUY TAX ' + Math.round(info.buyTax * 100) + '% / SELL TAX ' + Math.round(info.sellTax * 100) + '%');
+      if (!info.honeypot && !info.cannotSell && info.buyTax <= 0.1 && info.sellTax <= 0.1) {
+        reasons.push('NO HONEYPOT / TAX RED FLAGS');
+      }
+    }
+    var head, cls;
+    if (v === 'pass') { head = 'NO MAJOR ISSUES'; cls = 'ok'; }
+    else if (v === 'risk') { head = 'ELEVATED RISK // BE CAREFUL'; cls = 'warn'; }
+    else { head = 'LIKELY SCAM // AVOID'; cls = 'bad'; }
+    return { v: v, head: head, cls: cls, src: src, reasons: reasons };
+  }
+
+  function openDetail(key) {
+    var p = findPool(key);
+    if (!p) return;
+    state.detailKey = key;
+
+    var vd = verdictData(p);
+    $('dt-pair').textContent = p.chn.tag + ' ' + p.name + ' // ' + p.dex;
+    var vEl = $('dt-verdict');
+    vEl.className = 'dt-verdict ' + vd.cls;
+    $('dt-v-head').textContent = vd.head;
+    $('dt-v-src').textContent = vd.src;
+    $('dt-reasons').innerHTML = vd.reasons.map(function (r) {
+      return '<div class="r">' + esc(r) + '</div>';
+    }).join('');
+
+    var ageMs = p.createdAt ? Date.now() - p.createdAt.getTime() : Infinity;
+    var facts = [
+      ['CHAIN', p.chn.label],
+      ['DEX', p.dex || 'DEX'],
+      ['AGE', fmtAge(ageMs)],
+      ['LIQUIDITY', fmtUsd(p.liq)],
+      ['VOL 24H', fmtUsd(p.vol)],
+      ['CONTRACT', shortAddr(p.tokenAddr)]
+    ];
+    $('dt-facts').innerHTML = facts.map(function (f) {
+      return '<div class="row"><span class="k">' + esc(f[0]) + '</span><span class="v">' + esc(f[1]) + '</span></div>';
+    }).join('');
+
+    $('dt-copy').setAttribute('data-ca', p.tokenAddr || '');
+    $('dt-snipe').href = swapUrlFor(p);
+    $('dt-gt').href = 'https://www.geckoterminal.com/' + p.chn.id + '/pools/' + (p.poolAddr || '');
+
+    $('detail').hidden = false;
+    loadChart(p);
+  }
+
+  function closeDetail() {
+    $('detail').hidden = true;
+    state.detailKey = '';
+  }
+
+  function loadChart(p) {
+    var empty = $('dt-chart-empty');
+    empty.hidden = false;
+    if (!p.poolAddr) { empty.textContent = 'NO POOL ADDRESS AVAILABLE'; return; }
+
+    var cached = state.chartCache[p.key];
+    if (cached && Date.now() - cached.t < 90000) {
+      if (cached.candles.length) {
+        empty.hidden = true;
+        drawChart(cached.candles);
+      } else {
+        empty.textContent = cached.err || 'NO PRICE DATA';
+      }
+      return;
+    }
+
+    empty.textContent = 'LOADING PRICE CHART...';
+    var url = 'https://api.geckoterminal.com/api/v2/networks/' + p.chn.id +
+      '/pools/' + p.poolAddr + '/ohlcv/minute?aggregate=15&limit=96';
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (json) {
+        var list = (json.data && json.data.attributes && json.data.attributes.ohlcv_list) || [];
+        var candles = [];
+        for (var i = 0; i < list.length; i++) {
+          candles.push({ t: list[i][0], o: list[i][1], h: list[i][2], l: list[i][3], c: list[i][4] });
+        }
+        candles.reverse();
+        state.chartCache[p.key] = { t: Date.now(), candles: candles };
+        if (!candles.length) {
+          empty.textContent = 'NO PRICE DATA FOR THIS POOL';
+          return;
+        }
+        empty.hidden = true;
+        drawChart(candles);
+      })
+      .catch(function (err) {
+        var em = (err && err.message) ? err.message : '?';
+        var msg = (/429/.test(em) || em === 'Failed to fetch' || em === 'NetworkError when attempting to fetch resource.')
+          ? 'CHART API IS RATE-LIMITED // TRY AGAIN IN A MINUTE'
+          : 'CHART UNAVAILABLE (' + em + ')';
+        state.chartCache[p.key] = { t: Date.now(), candles: [], err: msg };
+        empty.textContent = msg;
+      });
+  }
+
+  function drawChart(candles) {
+    var cv = $('dt-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var cssW = cv.clientWidth || 640;
+    var cssH = 300;
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var ctx = cv.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    var padR = 70, padB = 22, padT = 8, padL = 6;
+    var w = cssW - padR - padL;
+    var h = cssH - padB - padT;
+    var min = Infinity;
+    var max = -Infinity;
+    for (var i = 0; i < candles.length; i++) {
+      if (candles[i].l < min) min = candles[i].l;
+      if (candles[i].h > max) max = candles[i].h;
+    }
+    if (!(max > min)) { min = min || 0; max = min + 1; }
+    var range = max - min;
+
+    ctx.font = '10px "Courier New", monospace';
+    ctx.lineWidth = 1;
+
+    for (var g = 0; g <= 4; g++) {
+      var gy = Math.round(padT + (h * g) / 4) + 0.5;
+      ctx.strokeStyle = 'rgba(31, 122, 74, 0.35)';
+      ctx.beginPath();
+      ctx.moveTo(padL, gy);
+      ctx.lineTo(padL + w, gy);
+      ctx.stroke();
+      ctx.fillStyle = '#249e5d';
+      ctx.fillText(fmtPrice(max - (range * g) / 4), padL + w + 6, gy + 3);
+    }
+
+    var n = candles.length;
+    var step = w / n;
+    var cw = Math.max(2, Math.floor(step * 0.6));
+    for (var j = 0; j < n; j++) {
+      var c = candles[j];
+      var x = padL + j * step + step / 2;
+      var up = c.c >= c.o;
+      var col = up ? '#35e07f' : '#ff6b7f';
+      var yO = padT + h * (1 - (c.o - min) / range);
+      var yC = padT + h * (1 - (c.c - min) / range);
+      var yH = padT + h * (1 - (c.h - min) / range);
+      var yL = padT + h * (1 - (c.l - min) / range);
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x) + 0.5, yH);
+      ctx.lineTo(Math.round(x) + 0.5, yL);
+      ctx.stroke();
+      ctx.fillStyle = col;
+      var top = Math.min(yO, yC);
+      var bh = Math.max(1, Math.abs(yC - yO));
+      ctx.fillRect(x - cw / 2, top, cw, bh);
+    }
+
+    var last = candles[n - 1];
+    var ly = Math.round(padT + h * (1 - (last.c - min) / range)) + 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(234, 255, 242, 0.55)';
+    ctx.beginPath();
+    ctx.moveTo(padL, ly);
+    ctx.lineTo(padL + w, ly);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#249e5d';
+    var every = Math.ceil(n / 6);
+    for (var k = 0; k < n; k += every) {
+      var d = new Date(candles[k].t * 1000);
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      ctx.fillText(hh + ':' + mm, padL + k * step, cssH - 8);
+    }
+
+    $('dt-chart-label').textContent = 'PRICE · 15M CANDLES · LAST ' + fmtPrice(last.c);
+  }
+
+  // ======================= ACTIONS =======================
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act]');
+    if (t) {
+      var act = t.getAttribute('data-act');
+      if (act === 'copy') {
+        var ca = t.getAttribute('data-ca');
+        if (!ca) { toast('NO CA'); return; }
+        copyText(ca).then(function () { toast('CA COPIED'); })
+          .catch(function () { toast('COPY FAILED'); });
+      } else if (act === 'audit') {
+        runAudit(t.getAttribute('data-key'), t);
+      }
+      return;
+    }
+
+    if (e.target.closest('#dt-close') || e.target.id === 'detail') {
+      closeDetail();
+      return;
+    }
+
+    var row = e.target.closest('tr[data-key]');
+    if (row && !e.target.closest('a') && !e.target.closest('.mini-btn')) {
+      openDetail(row.getAttribute('data-key'));
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDetail();
+  });
+
+  // ======================= INIT =======================
+  function init() {
+    $('header-status').textContent = 'LIVE // ' + CHAINS.length + ' CHAINS';
+    $('scan-label').textContent = 'SCANNING ' + CHAINS.length + ' NETWORKS';
+    $('gate-detail').textContent = 'OPERATOR CLEARANCE LEVEL 0 // PASS CHECK ON ' + CHAINS.length + ' CHAINS';
+    renderSkull();
+    initEqualizer();
+    armCursorHide();
+
+    $('btn-gate-connect').addEventListener('click', connectGate);
+    $('btn-gate-demo').addEventListener('click', function () {
+      unlockRadar('demo');
+    });
+
+    if (CONFIG.DEMO_MODE) {
+      $('btn-gate-demo').hidden = false;
+    }
+    if (CONFIG.DEMO_MODE && !CONFIG.GENESIS_PASS_CONTRACT) {
+      gateDetail(
+        'NO PASS DETECTED // DEMO CHANNEL AVAILABLE<br>' +
+        'CONNECT WALLET TO VERIFY ON ' + CHAINS.length + ' CHAINS OR ENTER DEMO.');
+    }
+
+    logLine('FREE ACCESS // NO WALLET NEEDED', 'dim');
+    unlockRadar('demo');
+    logLine('[TIP: CLICK ANY ROW FOR POOL INTEL]', 'dim');
+
+    if (window.ethereum && window.ethereum.on) {
+      window.ethereum.on('accountsChanged', function (acc) {
+        if (acc && acc[0]) {
+          state.wallet = acc[0];
+          logLine('ACCOUNT SWITCH: ' + shortWallet(acc[0]), 'dim');
+          if (state.unlocked) {
+            var wEl = $('operator-wallet');
+            if (wEl) wEl.textContent = shortWallet(acc[0]);
+          }
+        } else {
+          state.wallet = null;
+          logLine('WALLET DISCONNECTED // FREE ACCESS CONTINUES', 'alert');
+        }
+      });
+    }
+
+    // live ages + stats
+    setInterval(function () {
+      if (!state.unlocked) return;
+      updateAges();
+      updateStats();
+    }, 1000);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

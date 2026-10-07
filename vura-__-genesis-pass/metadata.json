@@ -1,0 +1,6 @@
+{
+  "name": "VURA // Genesis Pass",
+  "description": "Vura Genesis Pass — 333 unique 1-bit passes on Robinhood + $VURA utility token. Alpha terminal, tokenomics, roadmap. Every pass is 1-bit. Every slot is yours.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
