@@ -75,6 +75,8 @@ function Waveform({ playing, seed }: { playing: boolean; seed: number }) {
     cx.clearRect(0, 0, w, h);
     cx.strokeStyle = "#fff";
     cx.lineWidth = 1;
+    cx.shadowBlur = playing ? 10 : 4;
+    cx.shadowColor = "rgba(255,255,255,.8)";
     cx.beginPath();
     const mid = h / 2, s = amps.current;
     for (let x = 0, i = 0; x < w && i < s.length; x += 3, i++) {
@@ -476,14 +478,41 @@ export function VplayApp() {
   const ctrl = "flex items-center justify-center w-9 h-8 border border-neutral-600 text-white hover:bg-white hover:text-black transition-colors focus:outline-none";
 
   return (
-    <div className="flex flex-col w-full bg-black text-white" style={{ minHeight: "100vh", background: "#000", fontFamily: "Helvetica Neue, Arial, sans-serif" }}>
+    <div className="flex flex-col w-full bg-black text-white" style={{ minHeight: "100vh", background: "#000", fontFamily: "Helvetica Neue, Arial, sans-serif", position: "relative", zIndex: 0 }}>
       <style>{`@keyframes vp-slide{to{transform:translateX(-50%)}}
-        @media (prefers-reduced-motion:reduce){.vp-track{animation:none!important}}`}</style>
+        @keyframes vp-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes vp-float{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,calc(-50% - 16px))}}
+        @keyframes vp-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes vp-orb{0%{transform:translate(0,0) scale(1)}33%{transform:translate(80px,-60px) scale(1.14)}66%{transform:translate(-60px,50px) scale(.92)}100%{transform:translate(0,0) scale(1)}}
+        @keyframes vp-breathe{0%,100%{opacity:.28}50%{opacity:.62}}
+        @keyframes vp-spin{to{transform:rotate(360deg)}}
+        .vp-glass{background:linear-gradient(165deg,rgba(255,255,255,.065),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(16px) saturate(130%);-webkit-backdrop-filter:blur(16px) saturate(130%);box-shadow:0 30px 70px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.09);border-radius:8px;transition:border-color .35s,box-shadow .35s}
+        .vp-glass:hover{border-color:rgba(255,255,255,.32);box-shadow:0 34px 80px rgba(0,0,0,.7),0 0 48px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.15)}
+        .vp-in{animation:vp-up .85s cubic-bezier(.16,1,.3,1) both}
+        .vp-btn-p{background:linear-gradient(180deg,#ffffff,#e2e2e2);color:#000;border:none;border-radius:6px;box-shadow:0 10px 30px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.95);transition:transform .25s,box-shadow .25s;font-weight:700}
+        .vp-btn-p:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 16px 44px rgba(255,255,255,.32)}
+        .vp-btn-s{border:1px solid rgba(255,255,255,.38);border-radius:6px;background:rgba(255,255,255,.035);transition:background .25s,color .25s,transform .25s,border-color .25s}
+        .vp-btn-s:hover{background:#fff;color:#000;transform:translateY(-2px);border-color:#fff}
+        .vp-grad{background:linear-gradient(92deg,#ffffff 15%,#9b9b9b 50%,#ffffff 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
+        .vp-glow{filter:drop-shadow(0 0 24px rgba(255,255,255,.5)) drop-shadow(0 0 80px rgba(255,255,255,.2))}
+        .vp-input{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
+        .vp-input:focus{border-color:rgba(255,255,255,.6);box-shadow:0 0 0 3px rgba(255,255,255,.09)}
+        .vp-input::placeholder{color:#6b6b6b}
+        @media (prefers-reduced-motion:reduce){.vp-track,.vp-in,.vp-glass{animation:none!important}}`}</style>
+
+      {/* Atmosphere: glow, orbs, grid, scanlines */}
+      <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-22%", left: "50%", transform: "translateX(-50%)", width: "86vw", height: "64vh", background: "radial-gradient(ellipse at center, rgba(255,255,255,.15), rgba(255,255,255,.045) 45%, transparent 72%)", filter: "blur(28px)", animation: "vp-breathe 10s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", width: 560, height: 560, top: "6%", left: "-9%", background: "radial-gradient(circle, rgba(255,255,255,.10), transparent 65%)", filter: "blur(46px)", animation: "vp-orb 28s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", width: 480, height: 480, bottom: "2%", right: "-7%", background: "radial-gradient(circle, rgba(255,255,255,.085), transparent 65%)", filter: "blur(52px)", animation: "vp-orb 34s ease-in-out infinite reverse" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px)", backgroundSize: "68px 68px", maskImage: "radial-gradient(ellipse 92% 72% at 50% 36%, #000 25%, transparent 76%)", WebkitMaskImage: "radial-gradient(ellipse 92% 72% at 50% 36%, #000 25%, transparent 76%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px)" }} />
+      </div>
 
       {/* Header */}
-      <header className="grid items-center px-6 border-b border-neutral-800" style={{ height: 64, gridTemplateColumns: "1fr auto 1fr", columnGap: 32 }}>
-        <div className="bg-white" style={{ height: 1, width: "100%" }} />
-        <div className="text-white text-center" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em" }}>
+      <header className="grid items-center px-6" style={{ height: 64, gridTemplateColumns: "1fr auto 1fr", columnGap: 32, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)", boxShadow: "0 12px 44px rgba(0,0,0,.55)" }}>
+        <div style={{ height: 1, width: "100%", background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.9))" }} />
+        <div className="vp-grad text-center" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em" }}>
           VURAFY
         </div>
         <nav className="flex items-center gap-5 text-sm uppercase tracking-wider justify-self-end">
@@ -507,33 +536,33 @@ export function VplayApp() {
       </header>
 
       {/* Hero */}
-      <main className="relative flex flex-col flex-1 items-center justify-center overflow-hidden px-6 py-8" style={{ minHeight: 340 }}>
+      <main className="relative flex flex-col flex-1 items-center justify-center overflow-hidden px-6 py-10" style={{ minHeight: 340 }}>
         <div className="relative flex items-center justify-center w-full">
-          <svg viewBox="0 0 320 330" className="absolute" style={{ width: 340, left: "50%", top: "50%", transform: "translate(-50%, -50%)", pointerEvents: "none" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
+          <svg viewBox="0 0 320 330" className="absolute vp-glow" style={{ width: 340, left: "50%", top: "50%", transform: "translate(-50%, -50%)", pointerEvents: "none", animation: "vp-float 9s ease-in-out infinite" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
             <path d="M10 0 L160 300 L310 0 L270 0 L160 220 L50 0 Z" />
             <path d="M70 0 L160 180 L250 0 L210 0 L160 100 L110 0 Z" />
           </svg>
 
           <div className="relative flex flex-row items-stretch gap-4" style={{ flexWrap: "nowrap", width: "100%", maxWidth: 760, minWidth: 0, zIndex: 1 }}>
           {/* cover */}
-          <div className="flex flex-col items-center justify-center gap-3 border border-neutral-700 overflow-hidden" style={{ background: "#0a0a0a", flex: "0 0 24%", position: "relative" }}>
+          <div className="flex flex-col items-center justify-center gap-3 overflow-hidden vp-glass vp-in" style={{ flex: "0 0 24%", position: "relative", animationDelay: ".05s" }}>
             {track.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={track.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <Logo className="w-16" />
+              <Logo className="w-16 vp-glow" />
             )}
-            <span className="text-xs text-neutral-400 tracking-wider absolute" style={{ ...MONO, bottom: 10, zIndex: 2, textShadow: "0 0 6px #000" }}>{track.symbol}</span>
+            <span className="text-xs tracking-wider absolute" style={{ ...MONO, bottom: 10, zIndex: 2, color: "#bdbdbd", letterSpacing: "0.2em", textShadow: "0 0 10px #000" }}>{track.symbol}</span>
           </div>
 
           {/* info */}
-          <div className="border border-neutral-700 p-5 relative" style={{ background: "#0a0a0a", flex: "1 1 0", minWidth: 0 }}>
+          <div className="p-5 relative vp-glass vp-in" style={{ flex: "1 1 0", minWidth: 0, animationDelay: ".16s" }}>
             <p className="uppercase tracking-wider m-0 mb-1" style={{ fontSize: 15 }}>
               <span className="text-neutral-400">Track:</span> <b style={{ fontWeight: 700 }}>{track.name}</b>
             </p>
             <p className="uppercase tracking-wider m-0 mb-1 flex items-baseline gap-2">
               <span className="text-neutral-400" style={{ fontSize: 15 }}>Artist:</span>
-              <span style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 800 }}>{track.artist}</span>
+              <span className="vp-grad" style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 800 }}>{track.artist}</span>
             </p>
             <p className="uppercase tracking-wider m-0" style={{ fontSize: 15 }}>
               <span className="text-neutral-400">Token:</span> <b style={{ fontWeight: 700 }}>{track.symbol}</b>
@@ -543,24 +572,24 @@ export function VplayApp() {
                 </a>
               )}
             </p>
-            <div className="flex justify-between gap-3 mt-4 pt-3 border-t border-neutral-700 uppercase text-neutral-400" style={{ fontSize: 11, letterSpacing: "0.04em" }}>
-              <div>Total shares:<div className="text-white" style={{ fontSize: 17 }}>{fmtBig(track.totalSupply)}</div></div>
-              <div>Price per share:<div className="text-white" style={{ fontSize: 17 }}>{isDemo ? `${track.priceEth} ETH` : `${fmtEth(track.priceEth)} ETH`}</div></div>
-              <div>Available:<div className="text-white" style={{ fontSize: 17 }}>{fmtTokens(track.available)}</div></div>
+            <div className="flex justify-between gap-3 mt-4 pt-3 border-t uppercase" style={{ fontSize: 11, letterSpacing: "0.04em", color: "#8f8f8f", borderColor: "rgba(255,255,255,.12)" }}>
+              <div>Total shares:<div className="vp-grad" style={{ fontSize: 17 }}>{fmtBig(track.totalSupply)}</div></div>
+              <div>Price per share:<div className="vp-grad" style={{ fontSize: 17 }}>{isDemo ? `${track.priceEth} ETH` : `${fmtEth(track.priceEth)} ETH`}</div></div>
+              <div>Available:<div className="vp-grad" style={{ fontSize: 17 }}>{fmtTokens(track.available)}</div></div>
             </div>
             <div className="mt-3 uppercase" style={{ fontSize: 10.5, letterSpacing: "0.14em", color: track.graduated ? "#ffffff" : "#8a8a8a" }}>
               {isDemo ? "demo data — launch a real track" : track.graduated ? "✓ graduated — trading in v4 pool" : `${(track.progress * 100).toFixed(1)}% → graduation (4.2 eth)`}
               {!isDemo && !track.graduated && (
-                <div style={{ height: 3, background: "#222", marginTop: 5 }}>
-                  <div style={{ height: 3, width: `${Math.min(100, track.progress * 100)}%`, background: "#ffffff" }} />
+                <div style={{ height: 4, background: "rgba(255,255,255,.09)", marginTop: 6, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: 4, width: `${Math.min(100, track.progress * 100)}%`, background: "linear-gradient(90deg,#7c7c7c,#fff)", boxShadow: "0 0 14px rgba(255,255,255,.85)", transition: "width .8s cubic-bezier(.16,1,.3,1)", borderRadius: 4 }} />
                 </div>
               )}
             </div>
           </div>
 
           {/* actions */}
-          <div className="flex flex-col justify-center gap-3 border border-neutral-700 p-4" style={{ background: "#0a0a0a", flex: "0 0 25%", minWidth: 0 }}>
-            <button onClick={openBuy} className="w-full bg-white text-black uppercase tracking-wider py-3 hover:bg-neutral-200 active:scale-95 transition" style={{ fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none" }}>
+          <div className="flex flex-col justify-center gap-3 p-4 vp-glass vp-in" style={{ flex: "0 0 25%", minWidth: 0, animationDelay: ".27s" }}>
+            <button onClick={openBuy} className="w-full uppercase tracking-wider py-3 vp-btn-p active:scale-95" style={{ fontSize: 12, cursor: "pointer" }}>
               {track.graduated && !isDemo ? "Trade on pons ↗" : "Purchase Shares"}
             </button>
             <button
@@ -568,25 +597,25 @@ export function VplayApp() {
                 if (!isDemo) window.open(`${EXPLORER}/address/${track.token}`, "_blank");
                 else say("appears after launch");
               }}
-              className="w-full border border-white uppercase tracking-wider py-3 px-2 hover:bg-white hover:text-black transition-colors"
-              style={{ fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }}
+              className="w-full uppercase tracking-wider py-3 px-2 vp-btn-s"
+              style={{ fontSize: 12, cursor: "pointer", color: "inherit" }}
             >
               View Track on Robinhood Chain
             </button>
-            <button onClick={() => setLaunchOpen(true)} className="w-full border border-neutral-600 uppercase tracking-wider py-2 hover:border-white transition-colors" style={{ fontSize: 11, cursor: "pointer", background: "none", color: "#8a8a8a" }}>
+            <button onClick={() => setLaunchOpen(true)} className="w-full uppercase tracking-wider py-2 vp-btn-s" style={{ fontSize: 11, cursor: "pointer", color: "#9a9a9a", borderColor: "rgba(255,255,255,.22)" }}>
               + Launch your track
             </button>
           </div>
           </div>
         </div>
 
-        <svg viewBox="0 0 74 52" style={{ width: 64, marginTop: 40, flex: "none" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
+        <svg viewBox="0 0 74 52" style={{ width: 64, marginTop: 40, flex: "none", animation: "vp-bob 3.2s ease-in-out infinite", filter: "drop-shadow(0 0 14px rgba(255,255,255,.55))" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
           <path d="M4 4 L37 47 L70 4" />
         </svg>
       </main>
 
       {/* Ticker */}
-      <div className="w-full overflow-hidden border-t border-b border-neutral-700 uppercase whitespace-nowrap py-3" style={{ ...MONO, fontSize: 13 }}>
+      <div className="w-full overflow-hidden uppercase whitespace-nowrap py-3" style={{ ...MONO, fontSize: 13, position: "relative", zIndex: 1, background: "linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015))", borderTop: "1px solid rgba(255,255,255,.12)", borderBottom: "1px solid rgba(255,255,255,.12)", maskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)" }}>
         <div className="vp-track inline-block" style={{ animation: "vp-slide 40s linear infinite" }}>
           {[0, 1, 2, 3].map((n) => (
             <span key={n}>
@@ -606,8 +635,10 @@ export function VplayApp() {
       </div>
 
       {/* Player */}
-      <Waveform playing={playing} seed={track.name.length * 977 + track.artist.length * 131 + 41} />
-      <footer className="grid items-center gap-4 px-6 pb-5 pt-3 uppercase tracking-wider text-neutral-400" style={{ ...MONO, fontSize: 11, gridTemplateColumns: "1fr auto 1fr" }}>
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <Waveform playing={playing} seed={track.name.length * 977 + track.artist.length * 131 + 41} />
+      </div>
+      <footer className="grid items-center gap-4 px-6 pb-5 pt-3 uppercase tracking-wider" style={{ ...MONO, fontSize: 11, gridTemplateColumns: "1fr auto 1fr", position: "relative", zIndex: 1, color: "#8f8f8f" }}>
         <div className="flex items-center gap-2 text-white">
           <button className={ctrl} onClick={() => { if (!playing) play(); }} aria-label="Play">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 3l15 9-15 9z" /></svg>
@@ -629,22 +660,22 @@ export function VplayApp() {
 
       {/* ===== BUY MODAL ===== */}
       {buyOpen && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,.8)", zIndex: 60 }} onClick={() => { setBuyOpen(false); setQuote(null); }}>
-          <div className="border border-white p-6" style={{ background: "#0a0a0a", width: 460, maxWidth: "calc(100vw - 40px)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="uppercase text-neutral-400" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em" }}>Purchase shares // curve buy</div>
-            <div className="uppercase" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{track.name} — {track.artist}</div>
+        <div className="fixed inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", zIndex: 60 }} onClick={() => { setBuyOpen(false); setQuote(null); }}>
+          <div className="vp-glass p-6" style={{ width: 460, maxWidth: "calc(100vw - 40px)", animation: "vp-up .45s cubic-bezier(.16,1,.3,1) both", background: "linear-gradient(165deg, rgba(20,20,20,.92), rgba(8,8,8,.94))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="uppercase" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em", color: "#8f8f8f" }}>Purchase shares // curve buy</div>
+            <div className="uppercase vp-grad" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{track.name} — {track.artist}</div>
 
-            <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>You pay (ETH)</div>
+            <div className="uppercase mb-1" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>You pay (ETH)</div>
             <div className="flex gap-2 mb-3">
               <input
                 value={ethIn}
                 onChange={(e) => setEthIn(e.target.value.replace(/[^0-9.]/g, ""))}
-                className="flex-1 bg-black text-white border border-neutral-700 px-3 py-2"
+                className="vp-input flex-1 px-3 py-2"
                 style={{ ...MONO, fontSize: 16 }}
                 inputMode="decimal"
               />
               {["0.01", "0.05", "0.1"].map((q) => (
-                <button key={q} className="border border-neutral-700 px-3 hover:bg-white hover:text-black transition-colors uppercase" style={{ ...MONO, fontSize: 11, cursor: "pointer", background: "none", color: "inherit" }} onClick={() => setEthIn(q)}>{q}</button>
+                <button key={q} className="vp-btn-s px-3 uppercase" style={{ ...MONO, fontSize: 11, cursor: "pointer" }} onClick={() => setEthIn(q)}>{q}</button>
               ))}
             </div>
 
@@ -668,12 +699,12 @@ export function VplayApp() {
             </div>
 
             <div className="flex gap-3 mt-5">
-              <button className="flex-1 border border-white py-3 uppercase hover:bg-white hover:text-black transition-colors" style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }} onClick={() => { setBuyOpen(false); setQuote(null); }}>Cancel</button>
-              <button className="flex-1 bg-white text-black py-3 uppercase hover:bg-neutral-200 transition-colors disabled:opacity-50" style={{ ...MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none" }} disabled={!quote || quoting || txPending || txMining} onClick={doBuy}>
+              <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => { setBuyOpen(false); setQuote(null); }}>Cancel</button>
+              <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!quote || quoting || txPending || txMining} onClick={doBuy}>
                 {!isConnected ? "Connect Wallet" : txPending || txMining ? "Confirming…" : "Confirm Purchase"}
               </button>
             </div>
-            <div className="uppercase text-neutral-500 mt-3 text-center" style={{ ...MONO, fontSize: 10 }}>
+            <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
               pons v2 curve · trade settles onchain · robinhood chain
             </div>
           </div>
@@ -682,10 +713,10 @@ export function VplayApp() {
 
       {/* ===== LAUNCH MODAL ===== */}
       {launchOpen && (
-        <div className="fixed inset-0 flex items-center justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,.8)", zIndex: 60 }} onClick={() => setLaunchOpen(false)}>
-          <div className="border border-white p-6" style={{ background: "#0a0a0a", width: 480, maxWidth: "calc(100vw - 40px)", margin: "30px 0" }} onClick={(e) => e.stopPropagation()}>
-            <div className="uppercase text-neutral-400" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em" }}>Launchpad // track = token</div>
-            <div className="uppercase" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Launch your track</div>
+        <div className="fixed inset-0 flex items-center justify-center overflow-y-auto" style={{ background: "rgba(0,0,0,.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", zIndex: 60 }} onClick={() => setLaunchOpen(false)}>
+          <div className="vp-glass p-6" style={{ width: 480, maxWidth: "calc(100vw - 40px)", margin: "30px 0", animation: "vp-up .45s cubic-bezier(.16,1,.3,1) both", background: "linear-gradient(165deg, rgba(20,20,20,.92), rgba(8,8,8,.94))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="uppercase" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em", color: "#8f8f8f" }}>Launchpad // track = token</div>
+            <div className="uppercase vp-grad" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Launch your track</div>
 
             {([["title", "Track title", "Cosmic Echo"], ["artist", "Artist name", "Vura"], ["symbol", `Symbol (auto: ${autoSymbol})`, ""]] as const).map(([key, label, ph]) => (
               <div key={key} className="mb-3">
@@ -694,7 +725,7 @@ export function VplayApp() {
                   value={form[key]}
                   placeholder={ph}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  className="w-full bg-black text-white border border-neutral-700 px-3 py-2"
+                  className="vp-input w-full px-3 py-2"
                   style={{ ...MONO, fontSize: 13 }}
                 />
               </div>
@@ -706,12 +737,12 @@ export function VplayApp() {
                   value={form.cover}
                   placeholder="https://.../cover.png"
                   onChange={(e) => setForm((f) => ({ ...f, cover: e.target.value }))}
-                  className="flex-1 min-w-0 bg-black text-white border border-neutral-700 px-3 py-2"
+                  className="vp-input flex-1 min-w-0 px-3 py-2"
                   style={{ ...MONO, fontSize: 13 }}
                 />
                 <button
-                  className="border border-neutral-600 px-3 uppercase hover:border-white transition-colors"
-                  style={{ ...MONO, fontSize: 11, cursor: "pointer", background: "none", color: "#8a8a8a" }}
+                  className="vp-btn-s px-3 uppercase"
+                  style={{ ...MONO, fontSize: 11, cursor: "pointer" }}
                   disabled={coverUp}
                   onClick={() => coverInput.current?.click()}
                 >
@@ -740,7 +771,7 @@ export function VplayApp() {
                 value={form.audio}
                 placeholder="https://.../track.mp3"
                 onChange={(e) => setForm((f) => ({ ...f, audio: e.target.value }))}
-                className="w-full bg-black text-white border border-neutral-700 px-3 py-2"
+                className="vp-input w-full px-3 py-2"
                 style={{ ...MONO, fontSize: 13 }}
               />
             </div>
@@ -749,7 +780,7 @@ export function VplayApp() {
               <input
                 value={form.tax}
                 onChange={(e) => setForm((f) => ({ ...f, tax: e.target.value.replace(/[^0-9]/g, "") }))}
-                className="w-full bg-black text-white border border-neutral-700 px-3 py-2"
+                className="vp-input w-full px-3 py-2"
                 style={{ ...MONO, fontSize: 13 }}
               />
             </div>
@@ -768,12 +799,12 @@ export function VplayApp() {
             )}
 
             <div className="flex gap-3 mt-5">
-              <button className="flex-1 border border-white py-3 uppercase hover:bg-white hover:text-black transition-colors" style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
-              <button className="flex-1 bg-white text-black py-3 uppercase hover:bg-neutral-200 transition-colors disabled:opacity-50" style={{ ...MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || !cfg} onClick={doLaunch}>
+              <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
+              <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || !cfg} onClick={doLaunch}>
                 {!isConnected ? "Connect Wallet" : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
               </button>
             </div>
-            <div className="uppercase text-neutral-500 mt-3 text-center" style={{ ...MONO, fontSize: 10 }}>
+            <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
               description format: vurafy | artist | audio: url — так каталог находит треки
             </div>
           </div>
@@ -782,10 +813,10 @@ export function VplayApp() {
 
       {/* ===== PORTFOLIO MODAL ===== */}
       {portfolioOpen && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,.8)", zIndex: 60 }} onClick={() => setPortfolioOpen(false)}>
-          <div className="border border-white p-6" style={{ background: "#0a0a0a", width: 520, maxWidth: "calc(100vw - 40px)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="uppercase text-neutral-400" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em" }}>My portfolio // track shares</div>
-            <div className="uppercase" style={{ fontSize: 22, fontWeight: 800, margin: "6px 0 14px" }}>
+        <div className="fixed inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", zIndex: 60 }} onClick={() => setPortfolioOpen(false)}>
+          <div className="vp-glass p-6" style={{ width: 520, maxWidth: "calc(100vw - 40px)", animation: "vp-up .45s cubic-bezier(.16,1,.3,1) both", background: "linear-gradient(165deg, rgba(20,20,20,.92), rgba(8,8,8,.94))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="uppercase" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em", color: "#8f8f8f" }}>My portfolio // track shares</div>
+            <div className="uppercase vp-grad" style={{ fontSize: 22, fontWeight: 800, margin: "6px 0 14px" }}>
               {address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "—"}
             </div>
             {!live ? (
@@ -807,8 +838,8 @@ export function VplayApp() {
               })
             )}
             <div className="flex gap-3 mt-5">
-              <button className="flex-1 border border-white py-3 uppercase hover:bg-white hover:text-black transition-colors" style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }} onClick={() => setPortfolioOpen(false)}>Close</button>
-              <button className="flex-1 bg-white text-black py-3 uppercase hover:bg-neutral-200 transition-colors" style={{ ...MONO, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none" }} onClick={() => { setPortfolioOpen(false); setLaunchOpen(true); }}>+ Launch track</button>
+              <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setPortfolioOpen(false)}>Close</button>
+              <button className="flex-1 py-3 uppercase vp-btn-p" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => { setPortfolioOpen(false); setLaunchOpen(true); }}>+ Launch track</button>
             </div>
           </div>
         </div>
@@ -817,8 +848,8 @@ export function VplayApp() {
       {/* Toast */}
       <div
         role="status"
-        className="fixed bg-white text-black px-4 py-2 uppercase transition-opacity"
-        style={{ ...MONO, fontSize: 11, letterSpacing: "0.08em", left: "50%", bottom: 24, transform: "translateX(-50%)", opacity: toast ? 1 : 0, pointerEvents: "none", zIndex: 70, maxWidth: "90vw", textAlign: "center" }}
+        className="fixed bg-white text-black px-5 py-2.5 uppercase transition-opacity"
+        style={{ ...MONO, fontSize: 11, letterSpacing: "0.08em", left: "50%", bottom: 24, transform: "translateX(-50%)", opacity: toast ? 1 : 0, pointerEvents: "none", zIndex: 70, maxWidth: "90vw", textAlign: "center", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,.65), 0 0 34px rgba(255,255,255,.25)" }}
       >
         {toast}
       </div>
