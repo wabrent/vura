@@ -9,15 +9,12 @@ import {
   discoverLaunches, loadTrack, quoteBuy, walletBalances, buildDescription, VPLAY_SOCIALS,
   type Track, type LaunchLog, type Quote,
 } from "./pons";
+import { buildDemoTracks } from "./demoCatalog";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
 const GREEN = "#00ff66";
 
-const DEMO_TRACKS: Track[] = [
-  { token: zeroAddress, curve: zeroAddress, deployer: zeroAddress, name: "Cosmic Echo", symbol: "CSMIC", logo: "", artist: "Vura", audio: "", priceEth: 0.1, totalSupply: 1_000_000_000n * 10n ** 18n, available: 450n * 10n ** 18n, progress: 0.42, graduated: false, creatorTaxBps: 0, isDemo: true },
-  { token: zeroAddress, curve: zeroAddress, deployer: zeroAddress, name: "Eclipse", symbol: "ECLPS", logo: "", artist: "Kora", audio: "", priceEth: 0.05, totalSupply: 1_000_000_000n * 10n ** 18n, available: 1_000_000_000n * 10n ** 18n, progress: 0.12, graduated: false, creatorTaxBps: 0, isDemo: true },
-  { token: zeroAddress, curve: zeroAddress, deployer: zeroAddress, name: "Galactic Soul", symbol: "GSL", logo: "", artist: "Orion", audio: "", priceEth: 0.08, totalSupply: 1_000_000_000n * 10n ** 18n, available: 820n * 10n ** 18n, progress: 0.66, graduated: false, creatorTaxBps: 0, isDemo: true },
-];
+const DEMO_TRACKS: Track[] = buildDemoTracks();
 
 const DEMO_TICKS = [
   "NEW LISTING: ECLIPSE BY KORA",
@@ -570,6 +567,9 @@ export function VplayApp() {
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })}>
             Gallery
           </button>
+          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
+            How
+          </a>
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => setLaunchOpen(true)}>
             Launchpad
           </button>
@@ -727,12 +727,15 @@ export function VplayApp() {
 
       {/* How it works */}
       <section className="px-6 pb-8 pt-3" style={{ position: "relative", zIndex: 1 }}>
-        <div className="uppercase vp-grad mb-4" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>How it works</div>
+        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
+          <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>How it works</div>
+          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, fontSize: 11, color: "#8f8f8f", textDecoration: "none" }}>подробнее →</a>
+        </div>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
           {[
-            { n: "01", t: "Connect", d: "Подключи кошелёк в шапке — сайт сам переключит на Robinhood Chain, даже если сети ещё нет." },
-            { n: "02", t: "Launch", d: "Загрузи обложку и аудио, назначь имя трека — за 0.0005 ETH токен появляется на кривой." },
-            { n: "03", t: "Trade", d: "Любой покупает доли трека на кривой; при 4.2 ETH трек градуируется в пул." },
+            { n: "01", t: "Connect", d: "Connect your wallet in the header — the site switches to Robinhood Chain for you, even if you don't have the network yet." },
+            { n: "02", t: "Launch", d: "Upload a cover and audio, name your track — for 0.0005 ETH the token goes live on the curve." },
+            { n: "03", t: "Trade", d: "Anyone can buy shares of the track on the curve; at 4.2 ETH the track graduates into the pool." },
           ].map((s, i) => (
             <div key={s.n} className="vp-glass vp-in p-5" style={{ animationDelay: `${i * 0.08}s` }}>
               <div className="vp-grad" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1 }}>{s.n}</div>
