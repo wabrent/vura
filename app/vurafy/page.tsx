@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { VplayApp } from "@/components/vplay/VplayApp";
+import { VurafyApp } from "@/components/vurafy/VurafyApp";
 
 export const metadata: Metadata = {
   title: "VURAFY // Track Tokenization Protocol",
@@ -7,6 +7,6 @@ export const metadata: Metadata = {
     "Tokenized music on Robinhood Chain. Tracks become shares — buy into artists, earn from every listen.",
 };
 
-export default function VplayPage() {
-  return <VplayApp />;
+export default function VurafyPage() {
+  return <VurafyApp />;
 }

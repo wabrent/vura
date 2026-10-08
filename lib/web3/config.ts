@@ -1,14 +1,17 @@
 // ============================================================================
-// Wagmi v2 config — injected (browser) wallet, multi-chain transports
+// Wagmi v2 config — injected (browser) wallet, Robinhood Chain only
 // ============================================================================
 
 import { createConfig, http } from "wagmi";
-import { arbitrum, base, bsc, mainnet } from "wagmi/chains";
 import { defineChain } from "viem";
 // NOTE: import `injected` from @wagmi/core directly — `wagmi/connectors` is a
 // barrel file that pulls in optional SDK connectors (Coinbase CDP etc.) whose
-// peer deps break `next build` when unused.
+// peer deps (`@x402/*`) are not installed and break `next build`.
+// `walletConnect` is deep-imported the same way: next.config.js aliases
+// `@wagmi/connectors/walletConnect` to the connector's own ESM file, so only
+// the WalletConnect connector (deps already present) enters the bundle.
 import { injected } from "@wagmi/core";
+import { walletConnect } from "@wagmi/connectors/walletConnect";
 
 // Robinhood Chain (pons v2 launch protocol lives here)
 export function rpcUrl(): string {
@@ -35,16 +38,16 @@ export const robinhood = defineChain({
   },
 });
 
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+
 export const wagmiConfig = createConfig({
-  // Chains relevant to the VURA ecosystem (BSC / Base / Arbitrum) + mainnet
-  // + Robinhood Chain for VuraPad launches
-  chains: [mainnet, bsc, base, arbitrum, robinhood],
-  connectors: [injected()],
+  chains: [robinhood],
+  connectors: [
+    injected(),
+    // mobile / no-extension browsers: QR on desktop, wallet deep-links on phones
+    ...(WC_PROJECT_ID ? [walletConnect({ projectId: WC_PROJECT_ID, showQrModal: true })] : []),
+  ],
   transports: {
-    [mainnet.id]: http(),
-    [bsc.id]: http(),
-    [base.id]: http(),
-    [arbitrum.id]: http(),
     [robinhood.id]: http(rpcUrl()),
   },
 });

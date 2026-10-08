@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
 import { Providers } from "@/components/web3/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VURA // ACCESS TERMINAL",
+  title: "VURAFY // Track Tokenization Protocol",
   description:
-    "Vura Genesis Pass — 333 1-bit passes on Robinhood. Intelligence terminal for the VURA ecosystem. vura.ink",
+    "Launch a track. Trade the curve. VURAFY tokenizes music on Robinhood Chain — vura.ink",
   icons: {
     icon: [
       { url: "/icon.png", type: "image/png", sizes: "64x64" },
@@ -24,9 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-[#0a0a0a] text-white font-sans antialiased">
-        <Providers>
-          <LayoutWrapper>{children}</LayoutWrapper>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,14 +1,22 @@
 # Dependencies
 node_modules/
 
+# Next.js build
+.next/
+*.tsbuildinfo
+
 # Logs
 *.log
 npm-debug.log*
 
 # Environment variables
-.env
-.env.local
-.env.production
+.env*
+
+# Vercel
+.vercel
+
+# Tooling / local
+.agents/
 
 # IDE
 .vscode/
@@ -20,22 +28,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Build output (not for static sites)
-# dist/
-# build/
-
 # Temporary files
 *.tmp
 .cache/
 
-.env.local
-.env
-.vercel
-.agents/
-.next/
-
 .env*
-
-# Temp / artifacts
-*.tsbuildinfo
-files (3)/

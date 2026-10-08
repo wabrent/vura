@@ -1,5 +1,5 @@
 // pons v2 integration — Robinhood Chain #4663
-// Factory: 0x7eD598...EC7e (same as /vurapad). Bonding curve → Uniswap v4 pool.
+// Factory: 0x7eD598...EC7e. Bonding curve → Uniswap v4 pool.
 import { parseAbi, parseAbiItem, createPublicClient, http, type Address } from "viem";
 import { robinhood, rpcUrl } from "@/lib/web3/config";
 
@@ -60,11 +60,11 @@ export const TOKEN_LAUNCHED = parseAbiItem(
 export function buildDescription(artist: string, audioUrl: string) {
   return `VURAFY | ${artist} | audio: ${audioUrl}`;
 }
-export function parseDescription(desc: string): { isVplay: boolean; artist: string; audio: string } {
+export function parseDescription(desc: string): { isVurafy: boolean; artist: string; audio: string } {
   const parts = desc.split("|").map((p) => p.trim());
-  if (parts[0] !== "VURAFY") return { isVplay: false, artist: "", audio: "" };
+  if (parts[0] !== "VURAFY") return { isVurafy: false, artist: "", audio: "" };
   return {
-    isVplay: true,
+    isVurafy: true,
     artist: parts[1] || "",
     audio: (parts[2] || "").replace(/^audio:\s*/i, ""),
   };
@@ -165,7 +165,7 @@ export async function loadTrack(l: LaunchLog): Promise<Track | null> {
         client.readContract({ address: FACTORY, abi: factoryAbi, functionName: "getLaunchedToken", args: [l.token] }).catch(() => null),
       ]);
     const parsed = parseDescription(desc as string);
-    if (!parsed.isVplay) return null;
+    if (!parsed.isVurafy) return null;
     const [qRes, tRes] = reserves as readonly [bigint, bigint];
     const priceEth = tRes > 0n ? Number(qRes) / Number(tRes) : 0;
     const thr = threshold as bigint;
@@ -223,17 +223,6 @@ export async function discoverLaunches(): Promise<LaunchLog[]> {
   return collected;
 }
 
-export async function discoverVplayTracks(): Promise<Track[]> {
-  const logs = await discoverLaunches();
-  const tracks: Track[] = [];
-  for (const l of logs) {
-    const t = await loadTrack(l);
-    if (t) tracks.push(t);
-    if (tracks.length >= 30) break;
-  }
-  return tracks;
-}
-
 export async function walletBalances(tokens: Address[], who: Address): Promise<Record<string, bigint>> {
   const out: Record<string, bigint> = {};
   await Promise.all(
@@ -248,4 +237,4 @@ export async function walletBalances(tokens: Address[], who: Address): Promise<R
   return out;
 }
 
-export const VPLAY_SOCIALS = { twitter: "", telegram: "", discord: "", website: "", farcaster: "" };
+export const VURAFY_SOCIALS = { twitter: "", telegram: "", discord: "", website: "", farcaster: "" };

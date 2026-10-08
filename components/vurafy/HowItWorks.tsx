@@ -51,7 +51,17 @@ export default function HowItWorks() {
         .hi-card ol{list-style:decimal}
         .hi-card li{margin:5px 0}
         .hi-card li::marker{color:#fff}
-        .hi-card code{background:rgba(255,255,255,.1);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#fff;font-size:.92em;white-space:nowrap}`}</style>
+        .hi-card code{background:rgba(255,255,255,.1);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#fff;font-size:.92em;white-space:nowrap}
+        @media (max-width:767px){
+          .hi-header{padding:0 14px!important}
+          .hi-header .hi-logo{font-size:14px!important;letter-spacing:.26em!important}
+          .hi-header nav{gap:10px!important;font-size:11px!important}
+          .hi-optional{display:none}
+          .hi-header .hi-p{padding:8px 12px!important}
+          .hi-body{grid-template-columns:1fr!important;gap:18px!important}
+          .hi-body aside{position:static!important;display:flex;gap:6px;overflow-x:auto;padding:8px!important}
+          .hi-body aside button{width:auto!important;white-space:nowrap;flex:none}
+        }`}</style>
 
       {/* ambient bg */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
@@ -60,10 +70,10 @@ export default function HowItWorks() {
       </div>
 
       {/* header */}
-      <header className="flex items-center justify-between px-6" style={{ height: 64, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)" }}>
-        <a href="/vurafy" className="hi-grad" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em", textDecoration: "none" }}>VURAFY</a>
+      <header className="flex items-center justify-between px-6 hi-header" style={{ height: 64, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)" }}>
+        <a href="/vurafy" className="hi-grad hi-logo" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em", textDecoration: "none" }}>VURAFY</a>
         <nav className="flex items-center gap-4 uppercase" style={{ ...MONO, fontSize: 12 }}>
-          <a href="/vurafy#gallery" className="hover:underline" style={{ color: "inherit", textDecoration: "none" }}>Gallery</a>
+          <a href="/vurafy#gallery" className="hover:underline hi-optional" style={{ color: "inherit", textDecoration: "none" }}>Gallery</a>
           <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "inherit", textDecoration: "none" }}>X ↗</a>
           <a href="/vurafy" className="hi-p px-4 py-2" style={{ color: "#000", textDecoration: "none" }}>Launch a track</a>
         </nav>
@@ -102,7 +112,7 @@ export default function HowItWorks() {
         </section>
 
         {/* sidebar + content */}
-        <section className="mx-auto px-6 pb-24" style={{ maxWidth: 1100, display: "grid", gap: 28, gridTemplateColumns: "minmax(180px, 220px) 1fr", alignItems: "start" }}>
+        <section className="mx-auto px-6 pb-24 hi-body" style={{ maxWidth: 1100, display: "grid", gap: 28, gridTemplateColumns: "minmax(180px, 220px) 1fr", alignItems: "start" }}>
           <aside className="hi-glass" style={{ position: "sticky", top: 88, padding: 10 }}>
             {SECTIONS.map((s) => (
               <button
@@ -167,7 +177,7 @@ export default function HowItWorks() {
             </Card>
 
             <Card id="faq" title="FAQ">
-              <Faq q="Do I need a crypto wallet?">Yes — a normal injected wallet (MetaMask, Rabby, etc.).</Faq>
+              <Faq q="Do I need a crypto wallet?">Yes — MetaMask, Rabby or any wallet. On desktop the site connects to your extension (or shows a QR code); on a phone it opens the wallet via WalletConnect deep-link.</Faq>
               <Faq q="Which network is this on?">Robinhood Chain, chainId 4663. The button in the header adds the network to your wallet in one click.</Faq>
               <Faq q="Where do I see my tokens?">In your wallet and in the My Portfolio section of the site.</Faq>
               <Faq q="Who controls the contracts?">No admin is needed: the factory and the curves are public pons v2 contracts, everything is verifiable in the explorer.</Faq>

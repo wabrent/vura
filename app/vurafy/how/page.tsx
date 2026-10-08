@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import HowItWorks from "@/components/vplay/HowItWorks";
+import HowItWorks from "@/components/vurafy/HowItWorks";
 
 export const metadata: Metadata = {
   title: "How it works // VURAFY",

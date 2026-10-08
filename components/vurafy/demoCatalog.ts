@@ -1,4 +1,4 @@
-import { zeroAddress, type Address } from "viem";
+﻿import { zeroAddress, type Address } from "viem";
 import type { Track } from "./pons";
 
 /**
@@ -21,10 +21,10 @@ export type DemoEntry = {
 };
 
 export const DEMO_CATALOG: DemoEntry[] = [
-  { name: "Cosmic Echo",   symbol: "CSMIC", artist: "Vura",  cover: "", audio: "", priceEth: 0.1,  progress: 0.42 },
+  { name: "Cosmic Echo",   symbol: "CSMIC", artist: "VURAFY",  cover: "", audio: "", priceEth: 0.1,  progress: 0.42 },
   { name: "Eclipse",       symbol: "ECLPS", artist: "Kora",  cover: "", audio: "", priceEth: 0.05, progress: 0.12 },
   { name: "Galactic Soul", symbol: "GSL",   artist: "Orion", cover: "", audio: "", priceEth: 0.08, progress: 0.66 },
-  { name: "Gold Skull",    symbol: "SKUL",  artist: "Vura",  cover: "", audio: "", priceEth: 0.04, progress: 0.31 },
+  { name: "Gold Skull",    symbol: "SKUL",  artist: "VURAFY",  cover: "", audio: "", priceEth: 0.04, progress: 0.31 },
   { name: "Dead Signal",   symbol: "DSIG",  artist: "Nova",  cover: "", audio: "", priceEth: 0.06, progress: 0.55 },
   { name: "Blockout",      symbol: "BLKO",  artist: "Rune",  cover: "", audio: "", priceEth: 0.03, progress: 0.18 },
 ];

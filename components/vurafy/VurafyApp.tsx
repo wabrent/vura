@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
@@ -6,7 +6,7 @@ import { parseEther, formatEther, formatUnits, toHex, zeroAddress, type Address 
 import { robinhood } from "@/lib/web3/config";
 import {
   FACTORY, EXPLORER, PONS_APP, factoryAbi, curveAbi,
-  discoverLaunches, loadTrack, quoteBuy, walletBalances, buildDescription, VPLAY_SOCIALS,
+  discoverLaunches, loadTrack, quoteBuy, walletBalances, buildDescription, VURAFY_SOCIALS,
   type Track, type LaunchLog, type Quote,
 } from "./pons";
 import { buildDemoTracks } from "./demoCatalog";
@@ -151,7 +151,7 @@ function Waveform({ playing, seed }: { playing: boolean; seed: number }) {
 
 type LaunchForm = { title: string; artist: string; symbol: string; cover: string; audio: string; tax: string };
 
-export function VplayApp() {
+export function VurafyApp() {
   const [tracks, setTracks] = useState<Track[]>(DEMO_TRACKS);
   const [logs, setLogs] = useState<LaunchLog[]>([]);
   const [live, setLive] = useState(false);
@@ -165,6 +165,7 @@ export function VplayApp() {
   const [buyOpen, setBuyOpen] = useState(false);
   const [launchOpen, setLaunchOpen] = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [ethIn, setEthIn] = useState("0.01");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -178,7 +179,7 @@ export function VplayApp() {
   const [balances, setBalances] = useState<Record<string, bigint>>({});
 
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
+  const { connect, connectors, isPending, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: chainSwitching } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: robinhood.id });
@@ -256,6 +257,9 @@ export function VplayApp() {
   useEffect(() => {
     if (launch.error) say(`launch error: ${String(launch.error).slice(0, 140)}`);
   }, [launch.error, say]);
+  useEffect(() => {
+    if (connectError) say(`connect error: ${String(connectError).slice(0, 140)}`);
+  }, [connectError, say]);
 
   /* ---------- audio ---------- */
   const playingRef = useRef(false);
@@ -375,7 +379,7 @@ export function VplayApp() {
       name: form.title.trim(),
       symbol: (form.symbol.trim() || autoSymbol).toUpperCase(),
       logo: localCover?.url || form.cover.trim(),
-      artist: form.artist.trim() || "VURA",
+      artist: form.artist.trim() || "VURAFY",
       audio: localAudio?.url || form.audio.trim(),
       priceEth: 0,
       totalSupply: 1_000_000_000n * 10n ** 18n,
@@ -397,9 +401,13 @@ export function VplayApp() {
 
   /* ---------- wallet ---------- */
   const connectWallet = () => {
-    const c = connectors[0];
+    const hasInjected = typeof window !== "undefined" && "ethereum" in window;
+    const c =
+      (hasInjected ? connectors.find((x) => x.type === "injected") : undefined) ??
+      connectors.find((x) => x.type === "walletConnect") ??
+      connectors[0];
     if (c) connect({ connector: c });
-    else say("no injected wallet found");
+    else say("no wallet found — open this page inside your wallet's browser");
   };
   const onWallet = () => {
     if (isConnected) { disconnect(); say("wallet disconnected"); return; }
@@ -526,7 +534,7 @@ export function VplayApp() {
             symbol: (form.symbol.trim() || autoSymbol).toUpperCase(),
             logo: form.cover.trim(),
             description: buildDescription(form.artist.trim(), form.audio.trim()),
-            socials: VPLAY_SOCIALS,
+            socials: VURAFY_SOCIALS,
             creatorFeeRecipient: address,
             creatorTaxBps: tax,
             buybackEnabled: false,
@@ -565,6 +573,46 @@ export function VplayApp() {
 
   const ctrl = "flex items-center justify-center w-9 h-8 border border-neutral-600 text-white hover:bg-white hover:text-black transition-colors focus:outline-none";
 
+  const closeMenu = () => setMenuOpen(false);
+  const navPanel = (
+    <>
+      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); loadCatalog(); }}>
+        Discover
+      </button>
+      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" }); }}>
+        Gallery
+      </button>
+      <a href="/vurafy/how" onClick={closeMenu} className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
+        How it works
+      </a>
+      <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" onClick={closeMenu} className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
+        X ↗
+      </a>
+      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); setLaunchOpen(true); }}>
+        Launchpad
+      </button>
+      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); openPortfolio(); }}>
+        My Portfolio
+      </button>
+      {wrongChain && (
+        <button
+          onClick={() => { closeMenu(); switchToRobinhood(); }}
+          className="border px-3 py-2 uppercase tracking-wider transition-colors"
+          style={{ ...MONO, fontSize: 12, cursor: "pointer", borderColor: "#ff3b5c", color: "#ff3b5c", background: "rgba(255,59,92,.08)" }}
+        >
+          {chainSwitching ? "Switching…" : "⚠ Robinhood Chain →"}
+        </button>
+      )}
+      <button
+        onClick={() => { closeMenu(); onWallet(); }}
+        className="border border-white px-3 py-2 uppercase tracking-wider hover:bg-white hover:text-black transition-colors"
+        style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }}
+      >
+        {isPending || txPending || txMining || launchWait.isLoading ? "Pending…" : isConnected && address ? `${address.slice(0, 6)}…${address.slice(-4)} ×` : "Connect Wallet"}
+      </button>
+    </>
+  );
+
   return (
     <div className="flex flex-col w-full bg-black text-white" style={{ minHeight: "100vh", background: "#000", fontFamily: "Helvetica Neue, Arial, sans-serif", position: "relative", zIndex: 0 }}>
       <style>{`@keyframes vp-slide{to{transform:translateX(-50%)}}
@@ -586,7 +634,22 @@ export function VplayApp() {
         .vp-input{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
         .vp-input:focus{border-color:rgba(255,255,255,.6);box-shadow:0 0 0 3px rgba(255,255,255,.09)}
         .vp-input::placeholder{color:#6b6b6b}
-        @media (prefers-reduced-motion:reduce){.vp-track,.vp-in,.vp-glass{animation:none!important}}`}</style>
+        @media (prefers-reduced-motion:reduce){.vp-track,.vp-in,.vp-glass{animation:none!important}}
+        .vp-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.38);border-radius:6px;background:rgba(255,255,255,.035);color:#fff;cursor:pointer}
+        @media (max-width:767px){
+          .vp-header{display:flex!important;justify-content:space-between;gap:12px;padding:0 16px!important}
+          .vp-hline,.vp-nav{display:none!important}
+          .vp-burger{display:flex}
+          .vp-menu{position:fixed;top:64px;left:0;right:0;display:flex;flex-direction:column;gap:2px;padding:12px 16px 16px;background:rgba(0,0,0,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.14);z-index:29}
+          .vp-menu button,.vp-menu a{width:100%;text-align:left;box-sizing:border-box;padding-top:11px;padding-bottom:11px}
+          .vp-hero{flex-direction:column}
+          .vp-hero .vp-cover{flex:none!important;width:100%;height:170px}
+          .vp-hero .vp-actions{flex:none!important;width:100%}
+          .vp-footer{grid-template-columns:1fr!important;justify-items:center;gap:10px}
+          .vp-footer .vp-fitem{text-align:center!important}
+          .vp-input{font-size:16px!important}
+        }
+        @media (min-width:768px){.vp-menu{display:none}}`}</style>
 
       {/* Atmosphere: glow, orbs, grid, scanlines */}
       <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none", overflow: "hidden" }}>
@@ -598,48 +661,23 @@ export function VplayApp() {
       </div>
 
       {/* Header */}
-      <header className="grid items-center px-6" style={{ height: 64, gridTemplateColumns: "1fr auto 1fr", columnGap: 32, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)", boxShadow: "0 12px 44px rgba(0,0,0,.55)" }}>
-        <div style={{ height: 1, width: "100%", background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.9))" }} />
+      <header className="grid items-center px-6 vp-header" style={{ height: 64, gridTemplateColumns: "1fr auto 1fr", columnGap: 32, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)", boxShadow: "0 12px 44px rgba(0,0,0,.55)" }}>
+        <div className="vp-hline" style={{ height: 1, width: "100%", background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.9))" }} />
         <div className="vp-grad text-center" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em" }}>
           VURAFY
         </div>
-        <nav className="flex items-center gap-5 text-sm uppercase tracking-wider justify-self-end">
-          <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => loadCatalog()}>
-            Discover
-          </button>
-          <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })}>
-            Gallery
-          </button>
-          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
-            How it works
-          </a>
-          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
-            X ↗
-          </a>
-          <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => setLaunchOpen(true)}>
-            Launchpad
-          </button>
-          <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={openPortfolio}>
-            My Portfolio
-          </button>
-          {wrongChain && (
-            <button
-              onClick={switchToRobinhood}
-              className="border px-3 py-2 uppercase tracking-wider transition-colors"
-              style={{ ...MONO, fontSize: 12, cursor: "pointer", borderColor: "#ff3b5c", color: "#ff3b5c", background: "rgba(255,59,92,.08)" }}
-            >
-              {chainSwitching ? "Switching…" : "⚠ Robinhood Chain →"}
-            </button>
-          )}
-          <button
-            onClick={onWallet}
-            className="border border-white px-3 py-2 uppercase tracking-wider hover:bg-white hover:text-black transition-colors"
-            style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }}
-          >
-            {isPending || txPending || txMining || launchWait.isLoading ? "Pending…" : isConnected && address ? `${address.slice(0, 6)}…${address.slice(-4)} ×` : "Connect Wallet"}
-          </button>
+        <nav className="flex items-center gap-5 text-sm uppercase tracking-wider justify-self-end vp-nav">
+          {navPanel}
         </nav>
+        <button className="vp-burger" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((o) => !o)}>
+          {menuOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5L5 19" /></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          )}
+        </button>
       </header>
+      {menuOpen && <div className="vp-menu">{navPanel}</div>}
 
       {/* Hero */}
       <main className="relative flex flex-col flex-1 items-center justify-center overflow-hidden px-6 py-10" style={{ minHeight: 340 }}>
@@ -649,9 +687,9 @@ export function VplayApp() {
             <path d="M70 0 L160 180 L250 0 L210 0 L160 100 L110 0 Z" />
           </svg>
 
-          <div className="relative flex flex-row items-stretch gap-4" style={{ flexWrap: "nowrap", width: "100%", maxWidth: 760, minWidth: 0, zIndex: 1 }}>
+          <div className="relative flex flex-row items-stretch gap-4 vp-hero" style={{ flexWrap: "nowrap", width: "100%", maxWidth: 760, minWidth: 0, zIndex: 1 }}>
           {/* cover */}
-          <div className="flex flex-col items-center justify-center gap-3 overflow-hidden vp-glass vp-in" style={{ flex: "0 0 24%", position: "relative", animationDelay: ".05s" }}>
+          <div className="flex flex-col items-center justify-center gap-3 overflow-hidden vp-glass vp-in vp-cover" style={{ flex: "0 0 24%", position: "relative", animationDelay: ".05s" }}>
             {track.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={track.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
@@ -694,7 +732,7 @@ export function VplayApp() {
           </div>
 
           {/* actions */}
-          <div className="flex flex-col justify-center gap-3 p-4 vp-glass vp-in" style={{ flex: "0 0 25%", minWidth: 0, animationDelay: ".27s" }}>
+          <div className="flex flex-col justify-center gap-3 p-4 vp-glass vp-in vp-actions" style={{ flex: "0 0 25%", minWidth: 0, animationDelay: ".27s" }}>
             <button onClick={openBuy} className="w-full uppercase tracking-wider py-3 vp-btn-p active:scale-95" style={{ fontSize: 12, cursor: "pointer" }}>
               {track.graduated && !isDemo ? "Trade on pons ↗" : "Purchase Shares"}
             </button>
@@ -721,7 +759,7 @@ export function VplayApp() {
       </main>
 
       {/* Stats */}
-      <section className="grid px-6 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, position: "relative", zIndex: 1 }}>
+      <section className="grid px-6 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, position: "relative", zIndex: 1 }}>
         {[
           { k: "Tracks", v: String(tracks.length) },
           { k: "Artists", v: String(new Set(tracks.map((t) => t.artist)).size) },
@@ -816,8 +854,8 @@ export function VplayApp() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <Waveform playing={playing} seed={track.name.length * 977 + track.artist.length * 131 + 41} />
       </div>
-      <footer className="grid items-center gap-4 px-6 pb-5 pt-3 uppercase tracking-wider" style={{ ...MONO, fontSize: 11, gridTemplateColumns: "1fr auto 1fr", position: "relative", zIndex: 1, color: "#8f8f8f" }}>
-        <div className="flex items-center gap-2 text-white">
+      <footer className="grid items-center gap-4 px-6 pb-5 pt-3 uppercase tracking-wider vp-footer" style={{ ...MONO, fontSize: 11, gridTemplateColumns: "1fr auto 1fr", position: "relative", zIndex: 1, color: "#8f8f8f" }}>
+        <div className="flex items-center gap-2 text-white vp-fitem">
           <button className={ctrl} onClick={() => { if (!playing) play(); }} aria-label="Play">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 3l15 9-15 9z" /></svg>
           </button>
@@ -832,11 +870,11 @@ export function VplayApp() {
           </button>
           <span className="ml-3" style={{ fontSize: 13, letterSpacing: "0.22em" }}>{playing ? "Pause" : "Play"}</span>
         </div>
-        <div className="text-center">
+        <div className="text-center vp-fitem">
           VURAFY // Track Tokenization Protocol // Robinhood Chain //{" "}
           <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#fff", textDecoration: "none" }}>X ↗</a>
         </div>
-        <div className="text-right">24-bit // 48kHz // {track.name}</div>
+        <div className="text-right vp-fitem">24-bit // 48kHz // {track.name}</div>
       </footer>
 
       {/* ===== BUY MODAL ===== */}
@@ -899,7 +937,7 @@ export function VplayApp() {
             <div className="uppercase" style={{ ...MONO, fontSize: 12, letterSpacing: "0.2em", color: "#8f8f8f" }}>Launchpad // track = token</div>
             <div className="uppercase vp-grad" style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Launch your track</div>
 
-            {([["title", "Track title", "Cosmic Echo"], ["artist", "Artist name", "Vura"], ["symbol", `Symbol (auto: ${autoSymbol})`, ""]] as const).map(([key, label, ph]) => (
+            {([["title", "Track title", "Cosmic Echo"], ["artist", "Artist name", "VURAFY"], ["symbol", `Symbol (auto: ${autoSymbol})`, ""]] as const).map(([key, label, ph]) => (
               <div key={key} className="mb-3">
                 <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>{label}</div>
                 <input
