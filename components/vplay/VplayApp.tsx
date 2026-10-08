@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { parseEther, formatEther, formatUnits, toHex, zeroAddress, type Address } from "viem";
 import { robinhood } from "@/lib/web3/config";
 import {
@@ -142,9 +142,10 @@ export function VplayApp() {
   const [cfg, setCfg] = useState<{ id: bigint; fee: bigint; maxTax: number; can: boolean } | null>(null);
   const [balances, setBalances] = useState<Record<string, bigint>>({});
 
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain, isPending: chainSwitching } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: robinhood.id });
   const { writeContract, data: txHash, isPending: txPending, error: txError } = useWriteContract();
   const { isLoading: txMining, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash });
@@ -330,6 +331,17 @@ export function VplayApp() {
     if (isConnected) { disconnect(); say("wallet disconnected"); return; }
     connectWallet();
   };
+  const wrongChain = isConnected && chainId !== undefined && chainId !== robinhood.id;
+  const switchToRobinhood = () => {
+    say("switching to Robinhood Chain…");
+    switchChain(
+      { chainId: robinhood.id },
+      {
+        onSuccess: () => say("Robinhood Chain connected ✓"),
+        onError: (e) => say(`switch failed: ${e.message.slice(0, 80)}`),
+      },
+    );
+  };
   useEffect(() => {
     if (isConnected && address) say(`wallet: ${address.slice(0, 6)}…${address.slice(-4)}`);
   }, [isConnected, address, say]);
@@ -362,6 +374,7 @@ export function VplayApp() {
 
   const doBuy = () => {
     if (!isConnected) { connectWallet(); return; }
+    if (wrongChain) { switchToRobinhood(); return; }
     if (!quote || !address) return;
     const minOut = (quote.tokensOut * 90n) / 100n;
     writeContract({
@@ -418,6 +431,7 @@ export function VplayApp() {
 
   const doLaunch = async () => {
     if (!isConnected || !address || !publicClient) { connectWallet(); return; }
+    if (wrongChain) { switchToRobinhood(); return; }
     if (!form.title.trim() || !form.artist.trim()) { say("title and artist are required"); return; }
     if (!cfg || !cfg.can) { say("launching is closed for this wallet"); return; }
     try {
@@ -525,6 +539,15 @@ export function VplayApp() {
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={openPortfolio}>
             My Portfolio
           </button>
+          {wrongChain && (
+            <button
+              onClick={switchToRobinhood}
+              className="border px-3 py-2 uppercase tracking-wider transition-colors"
+              style={{ ...MONO, fontSize: 12, cursor: "pointer", borderColor: "#ff3b5c", color: "#ff3b5c", background: "rgba(255,59,92,.08)" }}
+            >
+              {chainSwitching ? "Switching…" : "⚠ Robinhood Chain →"}
+            </button>
+          )}
           <button
             onClick={onWallet}
             className="border border-white px-3 py-2 uppercase tracking-wider hover:bg-white hover:text-black transition-colors"
@@ -701,7 +724,7 @@ export function VplayApp() {
             <div className="flex gap-3 mt-5">
               <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => { setBuyOpen(false); setQuote(null); }}>Cancel</button>
               <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!quote || quoting || txPending || txMining} onClick={doBuy}>
-                {!isConnected ? "Connect Wallet" : txPending || txMining ? "Confirming…" : "Confirm Purchase"}
+                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : txPending || txMining ? "Confirming…" : "Confirm Purchase"}
               </button>
             </div>
             <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
@@ -801,7 +824,7 @@ export function VplayApp() {
             <div className="flex gap-3 mt-5">
               <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
               <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || !cfg} onClick={doLaunch}>
-                {!isConnected ? "Connect Wallet" : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
+                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
               </button>
             </div>
             <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
