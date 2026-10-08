@@ -66,6 +66,7 @@ function CoverArt({ seed, symbol }: { seed: string; symbol: string }) {
 }
 
 function fmtEth(p: number) {
+  if (p <= 0) return "0";
   if (p >= 0.01) return p.toFixed(4);
   if (p >= 0.000001) return p.toFixed(6);
   return p.toExponential(2);
@@ -170,6 +171,9 @@ export function VplayApp() {
   const [form, setForm] = useState<LaunchForm>({ title: "", artist: "", symbol: "", cover: "", audio: "", tax: "200" });
   const [coverUp, setCoverUp] = useState(false);
   const coverInput = useRef<HTMLInputElement>(null);
+  const [localCover, setLocalCover] = useState<{ url: string; name: string } | null>(null);
+  const [localAudio, setLocalAudio] = useState<{ url: string; name: string } | null>(null);
+  const autoplayRef = useRef(false);
   const [cfg, setCfg] = useState<{ id: bigint; fee: bigint; maxTax: number; can: boolean } | null>(null);
   const [balances, setBalances] = useState<Record<string, bigint>>({});
 
@@ -351,6 +355,45 @@ export function VplayApp() {
     }
   };
   useEffect(() => () => { stopSynth(); audioRef.current?.pause(); if (timer.current) window.clearTimeout(timer.current); }, []);
+
+  // autoplay once after a locally added track becomes the current one
+  useEffect(() => {
+    if (autoplayRef.current && tracks.length > 0) {
+      autoplayRef.current = false;
+      play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks, sel]);
+
+  /* ---------- local demo track (no wallet, no tx) ---------- */
+  const addLocalTrack = () => {
+    if (!form.title.trim()) { say("track title is required"); return; }
+    const t: Track = {
+      token: zeroAddress,
+      curve: zeroAddress,
+      deployer: zeroAddress,
+      name: form.title.trim(),
+      symbol: (form.symbol.trim() || autoSymbol).toUpperCase(),
+      logo: localCover?.url || form.cover.trim(),
+      artist: form.artist.trim() || "VURA",
+      audio: localAudio?.url || form.audio.trim(),
+      priceEth: 0,
+      totalSupply: 1_000_000_000n * 10n ** 18n,
+      available: 1_000_000_000n * 10n ** 18n,
+      progress: 0,
+      graduated: false,
+      creatorTaxBps: 0,
+      isDemo: true,
+    };
+    setTracks((prev) => [t, ...prev]);
+    setSel(0);
+    autoplayRef.current = true;
+    setLaunchOpen(false);
+    setForm({ title: "", artist: "", symbol: "", cover: "", audio: "", tax: "200" });
+    setLocalCover(null);
+    setLocalAudio(null);
+    say("Track loaded locally (Demo Mode)");
+  };
 
   /* ---------- wallet ---------- */
   const connectWallet = () => {
@@ -693,7 +736,7 @@ export function VplayApp() {
       <section id="gallery" className="px-6 pt-8 pb-4" style={{ position: "relative", zIndex: 1 }}>
         <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
           <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>Gallery // track covers</div>
-          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>жми на обложку — трек появится в плеере</div>
+          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>click a cover to load the track into the player</div>
         </div>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
           {tracks.map((t, i) => (
@@ -729,7 +772,7 @@ export function VplayApp() {
       <section className="px-6 pb-8 pt-3" style={{ position: "relative", zIndex: 1 }}>
         <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
           <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>How it works</div>
-          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, fontSize: 11, color: "#8f8f8f", textDecoration: "none" }}>подробнее →</a>
+          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, fontSize: 11, color: "#8f8f8f", textDecoration: "none" }}>read more →</a>
         </div>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
           {[
@@ -863,7 +906,7 @@ export function VplayApp() {
               </div>
             ))}
             <div className="mb-3">
-              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Cover — URL (ipfs/http) или файл</div>
+              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Cover — URL (ipfs/http) or file</div>
               <div className="flex gap-2">
                 <input
                   value={form.cover}
@@ -892,7 +935,27 @@ export function VplayApp() {
                   e.target.value = "";
                 }}
               />
-              {form.cover && (
+              <div className="uppercase text-neutral-500 mt-2 mb-1" style={{ ...MONO, fontSize: 10 }}>Cover file — free demo mode</div>
+              <input
+                type="file"
+                accept="image/*"
+                className="vp-input w-full px-3 py-2"
+                style={{ ...MONO, fontSize: 12, color: "#fff" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setLocalCover({ url: URL.createObjectURL(f), name: f.name });
+                  e.target.value = "";
+                }}
+              />
+              {localCover && (
+                <div className="flex items-center gap-2 mt-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={localCover.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", border: "1px solid #404040" }} />
+                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{localCover.name}</span>
+                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => setLocalCover(null)}>×</button>
+                </div>
+              )}
+              {!localCover && form.cover && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={form.cover} src={form.cover} alt="cover preview" style={{ width: 72, height: 72, objectFit: "cover", marginTop: 8, border: "1px solid #404040" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }} />
               )}
@@ -906,9 +969,27 @@ export function VplayApp() {
                 className="vp-input w-full px-3 py-2"
                 style={{ ...MONO, fontSize: 13 }}
               />
+              <div className="uppercase text-neutral-500 mt-2 mb-1" style={{ ...MONO, fontSize: 10 }}>Audio file — free demo mode</div>
+              <input
+                type="file"
+                accept="audio/*"
+                className="vp-input w-full px-3 py-2"
+                style={{ ...MONO, fontSize: 12, color: "#fff" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setLocalAudio({ url: URL.createObjectURL(f), name: f.name });
+                  e.target.value = "";
+                }}
+              />
+              {localAudio && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{localAudio.name}</span>
+                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => setLocalAudio(null)}>×</button>
+                </div>
+              )}
             </div>
             <div className="mb-3">
-              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Creator tax on trades, bps (max {cfg ? cfg.maxTax / 100 : "—"}%) — автор получает % с каждой сделки</div>
+              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Creator tax on trades, bps (max {cfg ? cfg.maxTax / 100 : "—"}%) — artist earns % on every trade</div>
               <input
                 value={form.tax}
                 onChange={(e) => setForm((f) => ({ ...f, tax: e.target.value.replace(/[^0-9]/g, "") }))}
@@ -931,13 +1012,18 @@ export function VplayApp() {
             )}
 
             <div className="flex gap-3 mt-5">
+              <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer", color: "inherit" }} onClick={addLocalTrack}>
+                Add Track (Free Demo)
+              </button>
+            </div>
+            <div className="flex gap-3 mt-3">
               <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
               <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || !cfg} onClick={doLaunch}>
-                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
+                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch on Chain (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
               </button>
             </div>
             <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
-              description format: vurafy | artist | audio: url — так каталог находит треки
+              description format: vurafy | artist | audio: url — that&apos;s how the catalog finds tracks
             </div>
           </div>
         </div>

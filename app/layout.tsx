@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     "Vura Genesis Pass — 333 1-bit passes on Robinhood. Intelligence terminal for the VURA ecosystem. vura.ink",
   icons: {
     icon: [
+      { url: "/icon.png", type: "image/png", sizes: "64x64" },
       { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", sizes: "any" },
     ],

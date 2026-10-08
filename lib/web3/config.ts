@@ -11,6 +11,13 @@ import { defineChain } from "viem";
 import { injected } from "@wagmi/core";
 
 // Robinhood Chain (pons v2 launch protocol lives here)
+export function rpcUrl(): string {
+  // browser → same-origin proxy (avoids duplicate Access-Control-Allow-Origin
+  // headers the public RPC currently sends, which browsers reject)
+  if (typeof window !== "undefined") return `${window.location.origin}/api/rpc`;
+  return "https://rpc.mainnet.chain.robinhood.com/";
+}
+
 export const robinhood = defineChain({
   id: 4663,
   name: "Robinhood Chain",
@@ -38,7 +45,7 @@ export const wagmiConfig = createConfig({
     [bsc.id]: http(),
     [base.id]: http(),
     [arbitrum.id]: http(),
-    [robinhood.id]: http("https://rpc.mainnet.chain.robinhood.com"),
+    [robinhood.id]: http(rpcUrl()),
   },
 });
 

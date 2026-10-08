@@ -1,13 +1,13 @@
 // pons v2 integration — Robinhood Chain #4663
 // Factory: 0x7eD598...EC7e (same as /vurapad). Bonding curve → Uniswap v4 pool.
 import { parseAbi, parseAbiItem, createPublicClient, http, type Address } from "viem";
-import { robinhood } from "@/lib/web3/config";
+import { robinhood, rpcUrl } from "@/lib/web3/config";
 
 export const FACTORY = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" as Address;
 export const EXPLORER = "https://robinhoodchain.blockscout.com";
 export const PONS_APP = "https://www.ponsfamily.com/launchpad";
 
-export const client = createPublicClient({ chain: robinhood, transport: http() });
+export const client = createPublicClient({ chain: robinhood, transport: http(rpcUrl()) });
 
 export const factoryAbi = parseAbi([
   "struct Socials { string twitter; string telegram; string discord; string website; string farcaster; }",

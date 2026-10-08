@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FACTORY, EXPLORER } from "./pons";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
 
@@ -13,12 +12,10 @@ const SECTIONS = [
   { id: "grad", label: "Graduation" },
   { id: "trade", label: "Buy & sell" },
   { id: "faq", label: "FAQ" },
-  { id: "contract", label: "Contract" },
 ];
 
 export default function HowItWorks() {
   const [active, setActive] = useState("what");
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -34,14 +31,6 @@ export default function HowItWorks() {
     });
     return () => obs.disconnect();
   }, []);
-
-  const copyFactory = async () => {
-    try {
-      await navigator.clipboard.writeText(FACTORY);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch { /* noop */ }
-  };
 
   const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
@@ -87,8 +76,8 @@ export default function HowItWorks() {
             Launch a track.<br />Trade the curve.
           </h1>
           <p style={{ fontSize: 16, lineHeight: 1.7, color: "#b5b5b5", maxWidth: 640, margin: 0 }}>
-            VURAFY — это launchpad для музыки поверх pons v2. Токен, кривая и пул — контракты pons на Robinhood Chain;
-            трек несёт в них обложку, имя артиста и ссылку на аудио.
+            VURAFY is a music launchpad built on top of pons v2. The token, the curve and the pool are pons
+            contracts on Robinhood Chain; the track carries its cover, artist name and audio link into them.
           </p>
           <div className="flex gap-3" style={{ marginTop: 26, flexWrap: "wrap" }}>
             <a href="/vurafy" className="hi-p px-5 py-3 uppercase" style={{ ...MONO, fontSize: 13, color: "#000", textDecoration: "none" }}>Launch a track</a>
@@ -132,67 +121,56 @@ export default function HowItWorks() {
 
           <div className="flex flex-col gap-5" style={{ minWidth: 0 }}>
             <Card id="what" title="What this is">
-              <p>VURAFY не изобретает свой блокчейн: каждый запуск вызывает живую фабрику pons v2 на Robinhood Chain. Токен, bonding-curve и выпуск в Uniswap v4 pool — это pons.</p>
-              <p>Что добавляет VURAFY — <b>смысл трека</b>: в описание токена on-chain пишется <code>VURAFY | artist | audio: url</code>, а обложка и имя попадают в ленту и галерею сайта. Любой может зайти и запустить свой трек.</p>
+              <p>VURAFY does not run its own blockchain: every launch calls the live pons v2 factory on Robinhood Chain. The token, the bonding curve and the Uniswap v4 pool — all of it is pons.</p>
+              <p>What VURAFY adds is the <b>meaning of a track</b>: the token description on-chain stores <code>VURAFY | artist | audio: url</code>, and the cover and name show up in the site feed and gallery. Anyone can connect and launch their own track.</p>
             </Card>
 
             <Card id="token" title="Track token">
-              <p>Каждый трек — отдельный ERC-20 с фиксированным supply <b>1,000,000,000</b>. Покупая, ты берёшь долю трека на кривой; цена растёт с каждым покупателем.</p>
-              <p>Артист может взять creator tax (в %, bps) — процент с каждой сделки автоматически идёт ему. Символ токена — короткий тикер трека (CSMIC, ECLPS…).</p>
+              <p>Each track is its own ERC-20 with a fixed supply of <b>1,000,000,000</b>. By buying in, you take a share of the track on the curve; the price rises with every buyer.</p>
+              <p>An artist can set a creator tax (%, bps) — a cut of every trade that goes to them automatically. The token symbol is the track&apos;s short ticker (CSMIC, ECLPS…).</p>
             </Card>
 
             <Card id="launch" title="Launch">
-              <p>Открой <b>Launchpad</b> в шапке сайта и заполни:</p>
+              <p>Open <b>Launchpad</b> in the header and fill in:</p>
               <ul>
-                <li>имя трека и артиста (символ подставится сам);</li>
-                <li>обложку — URL или файл прямо с диска (грузится на хостинг сайта);</li>
-                <li>ссылку на аудио (mp3) — плеер сайта будет её играть;</li>
-                <li>creator tax — сколько % получать с каждой сделки.</li>
+                <li>track title and artist (the symbol is generated for you);</li>
+                <li>cover art — a URL or a file straight from your disk (uploaded to the site&apos;s host);</li>
+                <li>audio link (mp3) — the site player will play it;</li>
+                <li>creator tax — the % you earn on every trade.</li>
               </ul>
-              <p>Одна транзакция: <b>0.0005 ETH</b> launch fee + газ. Сразу после подтверждения трек появляется в ленте и торгуется.</p>
+              <p>One transaction: <b>0.0005 ETH</b> launch fee + gas. As soon as it confirms, the track appears in the feed and starts trading.</p>
             </Card>
 
             <Card id="fees" title="Fees">
               <ul>
-                <li><b>Launch fee — 0.0005 ETH</b> при создании (идёт протоколу pons).</li>
-                <li><b>Curve fee</b> — комиссия кривой на каждую покупку/продажу.</li>
-                <li><b>Creator tax</b> — твой процент с каждой сделки (до максимума конфига).</li>
-                <li><b>Snipe tax</b> — повышенный налог на первых покупателей сразу после лаунча.</li>
+                <li><b>Launch fee — 0.0005 ETH</b> at creation (goes to the pons protocol).</li>
+                <li><b>Curve fee</b> — the curve&apos;s fee on every buy and sell.</li>
+                <li><b>Creator tax</b> — your cut of every trade (up to the config maximum).</li>
+                <li><b>Snipe tax</b> — an extra tax on the first buyers right after launch.</li>
               </ul>
             </Card>
 
             <Card id="grad" title="Graduation">
-              <p>Когда на кривой собрано <b>4.2 ETH</b>, трек градуируется: ликвидность переносится в Uniswap v4 pool, кривая закрывается, трек начинает торговаться как обычный токен.</p>
-              <p>Прогресс до градуации виден на карточке трека (полоска под обложкой).</p>
+              <p>When <b>4.2 ETH</b> has been raised on the curve, the track graduates: liquidity moves into a Uniswap v4 pool, the curve closes, and the track trades like a regular token.</p>
+              <p>Progress to graduation is shown on the track card (the bar under the cover).</p>
             </Card>
 
             <Card id="trade" title="Buy & sell">
               <ol>
-                <li>Connect wallet (сайт сам переключит сеть).</li>
-                <li>Выбери трек в галерее, жми <b>Purchase Shares</b>.</li>
-                <li>Введи сумму ETH — котировка покажет, сколько токенов получишь.</li>
-                <li>Подтверди в кошельке: защита от проскальзывания 10%.</li>
+                <li>Connect your wallet (the site switches the network for you).</li>
+                <li>Pick a track in the gallery, hit <b>Purchase Shares</b>.</li>
+                <li>Enter an ETH amount — the quote shows how many tokens you get.</li>
+                <li>Confirm in your wallet: 10% slippage protection.</li>
               </ol>
-              <p>Продажа — через <b>My Portfolio</b> или на ponsfamily, если трек уже градуировался.</p>
+              <p>Selling goes through <b>My Portfolio</b>, or on ponsfamily if the track already graduated.</p>
             </Card>
 
             <Card id="faq" title="FAQ">
-              <Faq q="Нужен ли криптокошелёк?">Да, обычный инжект-кошелёк (MetaMask, Rabby и т.п.).</Faq>
-              <Faq q="В какой сети всё работает?">Robinhood Chain, chainId 4663. Кнопка в шапке добавит сеть в кошелёк одним кликом.</Faq>
-              <Faq q="Где видно мои токены?">В кошельке и в разделе My Portfolio на сайте.</Faq>
-              <Faq q="Кто контролирует контракты?">Никакой «админ» не нужен: фабрика и кривые — публичные контракты pons v2, всё проверяется в обозревателе.</Faq>
-              <Faq q="Что происходит с музыкой?">Ссылка на mp3 лежит в описании токена on-chain — плеер сайта про неё и играет. Хостинг аудио выбирает артист.</Faq>
-            </Card>
-
-            <Card id="contract" title="Contract">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="uppercase" style={{ ...MONO, fontSize: 12, color: "#8f8f8f" }}>pons v2 factory</span>
-                <a href={`${EXPLORER}/address/${FACTORY}`} target="_blank" rel="noreferrer" className="uppercase" style={{ ...MONO, fontSize: 12, color: "#fff" }}>Explorer ↗</a>
-              </div>
-              <button onClick={copyFactory} className="hi-s mt-3 w-full text-left px-3 py-3" style={{ ...MONO, fontSize: 12.5, cursor: "pointer", color: "inherit", wordBreak: "break-all" }}>
-                {copied ? "copied ✓" : FACTORY}
-              </button>
-              <p style={{ marginBottom: 0 }}>Это единственный контракт, через который идут все запуски. Проверяй адрес здесь, прежде чем доверять зеркалу сайта.</p>
+              <Faq q="Do I need a crypto wallet?">Yes — a normal injected wallet (MetaMask, Rabby, etc.).</Faq>
+              <Faq q="Which network is this on?">Robinhood Chain, chainId 4663. The button in the header adds the network to your wallet in one click.</Faq>
+              <Faq q="Where do I see my tokens?">In your wallet and in the My Portfolio section of the site.</Faq>
+              <Faq q="Who controls the contracts?">No admin is needed: the factory and the curves are public pons v2 contracts, everything is verifiable in the explorer.</Faq>
+              <Faq q="What happens to the music?">The mp3 link lives in the token description on-chain — the site player plays it. The artist picks the audio host.</Faq>
             </Card>
           </div>
         </section>
