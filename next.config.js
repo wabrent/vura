@@ -12,12 +12,7 @@ const nextConfig = {
       beforeFiles: [
         { source: "/", destination: "/vurafy" },
       ],
-      afterFiles: [
-        { source: "/terminal", destination: "/terminal.html" },
-        { source: "/app", destination: "/terminal.html" },
-        { source: "/gallery", destination: "/gallery.html" },
-        { source: "/mint", destination: "/mint.html" },
-      ],
+      afterFiles: [],
       fallback: [],
     };
   },

@@ -74,7 +74,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
           {/* VURA emblem (Genesis Pass #001) */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/genesis/1.png"
+            src="/icon.png"
             alt="VURA emblem"
             width={104}
             height={104}
