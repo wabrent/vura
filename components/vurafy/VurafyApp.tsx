@@ -14,6 +14,7 @@ import { fetchAudiusTracks } from "./audius";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
 const GREEN = "#00ff66";
+const CATALOG_TARGET = 50; // Audius trending feed size (on-chain launches take priority)
 
 const DEMO_TRACKS: Track[] = buildDemoTracks();
 
@@ -198,7 +199,7 @@ export function VurafyApp() {
     const run = ++catalogRunRef.current;
     setLoading(true);
     // fast path: paint the Audius feed while the factory scan runs in the background
-    const audiusP = fetchAudiusTracks(6).catch(() => [] as Track[]);
+    const audiusP = fetchAudiusTracks(CATALOG_TARGET).catch(() => [] as Track[]);
     audiusP.then((a) => {
       if (a.length > 0 && catalogRunRef.current === run) {
         setTracks(a);
@@ -221,10 +222,10 @@ export function VurafyApp() {
       const audius = await audiusP;
       if (catalogRunRef.current !== run) return;
       if (tks.length > 0) {
-        // on-chain launches first, Audius trending fills the feed up to 6
+        // on-chain launches first, Audius trending fills the feed up to CATALOG_TARGET
         const fill = audius
           .filter((a) => !tks.some((t) => t.name === a.name))
-          .slice(0, Math.max(0, 6 - tks.length));
+          .slice(0, Math.max(0, CATALOG_TARGET - tks.length));
         setTracks([...tks, ...fill]);
         setLogs(paired);
         setLive(true);
@@ -351,15 +352,22 @@ export function VurafyApp() {
   const play = () => {
     playingRef.current = true;
     setPlaying(true);
+    stopSynth();
     if (track.audio) {
       if (audioRef.current?.dataset.url !== track.audio) {
+        // stop the previous stream before switching — only one track may sound at a time
+        audioRef.current?.pause();
         const a = new Audio(track.audio);
         a.loop = true;
         a.dataset.url = track.audio;
         audioRef.current = a;
       }
       audioRef.current.play().catch(() => startSynth());
-    } else startSynth();
+    } else {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      startSynth();
+    }
   };
   const pause = () => {
     playingRef.current = false;
@@ -373,6 +381,7 @@ export function VurafyApp() {
     stepRef.current = 0;
     audioRef.current?.pause();
     audioRef.current = null;
+    stopSynth();
     if (playingRef.current) {
       const t = tracks[n];
       if (t?.audio) {
@@ -716,11 +725,10 @@ export function VurafyApp() {
           <div className="relative flex flex-row items-stretch gap-4 vp-hero" style={{ flexWrap: "nowrap", width: "100%", maxWidth: 760, minWidth: 0, zIndex: 1 }}>
           {/* cover */}
           <div className="flex flex-col items-center justify-center gap-3 overflow-hidden vp-glass vp-in vp-cover" style={{ flex: "0 0 24%", position: "relative", animationDelay: ".05s" }}>
-            {track.logo ? (
+            {track.logo ? <CoverArt seed={`${track.name}-${track.symbol}`} symbol={track.symbol} /> : <Logo className="w-16 vp-glow" />}
+            {track.logo && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={track.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <Logo className="w-16 vp-glow" />
             )}
             <span className="text-xs tracking-wider absolute" style={{ ...MONO, bottom: 10, zIndex: 2, color: "#bdbdbd", letterSpacing: "0.2em", textShadow: "0 0 10px #000" }}>{track.symbol}</span>
           </div>
@@ -818,13 +826,15 @@ export function VurafyApp() {
               style={{ padding: 0, cursor: "pointer", animationDelay: `${(i % 8) * 0.05}s`, outline: sel === i ? "1px solid rgba(255,255,255,.85)" : "none", outlineOffset: 2 }}
             >
               <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden" }}>
-                {t.logo ? (
+                <CoverArt seed={`${t.name}-${t.symbol}`} symbol={t.symbol} />
+                {t.logo && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.logo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                ) : (
-                  <CoverArt seed={`${t.name}-${t.symbol}`} symbol={t.symbol} />
+                  <img src={t.logo} alt="" loading="lazy" decoding="async" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 )}
                 <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", top: 8, left: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)", letterSpacing: "0.12em" }}>{t.symbol}</span>
+                {sel === i && playing && (
+                  <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", top: 8, right: 8, padding: "2px 6px", background: "rgba(0,0,0,.78)", border: "1px solid rgba(255,255,255,.85)", letterSpacing: "0.12em", animation: "vp-bob 1.4s ease-in-out infinite" }}>▶ playing</span>
+                )}
                 <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", bottom: 8, right: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)" }}>{fmtEth(t.priceEth)} ETH</span>
               </div>
               <div className="px-3 py-2">
