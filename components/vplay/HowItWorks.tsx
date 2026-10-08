@@ -64,6 +64,7 @@ export default function HowItWorks() {
         <a href="/vurafy" className="hi-grad" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em", textDecoration: "none" }}>VURAFY</a>
         <nav className="flex items-center gap-4 uppercase" style={{ ...MONO, fontSize: 12 }}>
           <a href="/vurafy#gallery" className="hover:underline" style={{ color: "inherit", textDecoration: "none" }}>Gallery</a>
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "inherit", textDecoration: "none" }}>X ↗</a>
           <a href="/vurafy" className="hi-p px-4 py-2" style={{ color: "#000", textDecoration: "none" }}>Launch a track</a>
         </nav>
       </header>
@@ -177,7 +178,8 @@ export default function HowItWorks() {
       </main>
 
       <footer className="px-6 pb-8 text-center uppercase" style={{ ...MONO, fontSize: 11, color: "#6f6f6f", position: "relative", zIndex: 1, letterSpacing: "0.14em" }}>
-        VURAFY // Track Tokenization Protocol // Robinhood Chain
+        VURAFY // Track Tokenization Protocol // Robinhood Chain //{" "}
+        <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#fff", textDecoration: "none" }}>X ↗</a>
       </footer>
     </div>
   );

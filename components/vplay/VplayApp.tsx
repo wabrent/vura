@@ -613,6 +613,9 @@ export function VplayApp() {
           <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
             How
           </a>
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
+            X ↗
+          </a>
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => setLaunchOpen(true)}>
             Launchpad
           </button>
@@ -829,7 +832,10 @@ export function VplayApp() {
           </button>
           <span className="ml-3" style={{ fontSize: 13, letterSpacing: "0.22em" }}>{playing ? "Pause" : "Play"}</span>
         </div>
-        <div className="text-center">VURAFY // Track Tokenization Protocol // Robinhood Chain</div>
+        <div className="text-center">
+          VURAFY // Track Tokenization Protocol // Robinhood Chain //{" "}
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#fff", textDecoration: "none" }}>X ↗</a>
+        </div>
         <div className="text-right">24-bit // 48kHz // {track.name}</div>
       </footer>
 
