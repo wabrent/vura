@@ -219,8 +219,8 @@ export async function discoverLaunches(): Promise<LaunchLog[]> {
     if (from === BigInt(0)) break;
     to = from - BigInt(1);
   }
-  collected.reverse(); // старые → новые
-  return collected;
+  collected.reverse(); // новые → старые
+  return collected.slice(0, TARGET_LOGS);
 }
 
 export async function walletBalances(tokens: Address[], who: Address): Promise<Record<string, bigint>> {

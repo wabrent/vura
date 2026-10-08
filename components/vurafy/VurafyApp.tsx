@@ -10,17 +10,12 @@ import {
   type Track, type LaunchLog, type Quote,
 } from "./pons";
 import { buildDemoTracks } from "./demoCatalog";
+import { fetchAudiusTracks } from "./audius";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
 const GREEN = "#00ff66";
 
 const DEMO_TRACKS: Track[] = buildDemoTracks();
-
-const DEMO_TICKS = [
-  "NEW LISTING: ECLIPSE BY KORA",
-  "COSMIC ECHO PRICE: 0.1 ETH (+2%)",
-  "TOP GAINER: GALACTIC SOUL",
-];
 
 function mulberry32(a: number) {
   return function () {
@@ -175,6 +170,7 @@ export function VurafyApp() {
   const [localCover, setLocalCover] = useState<{ url: string; name: string } | null>(null);
   const [localAudio, setLocalAudio] = useState<{ url: string; name: string } | null>(null);
   const autoplayRef = useRef(false);
+  const catalogRunRef = useRef(0);
   const [cfg, setCfg] = useState<{ id: bigint; fee: bigint; maxTax: number; can: boolean } | null>(null);
   const [balances, setBalances] = useState<Record<string, bigint>>({});
 
@@ -199,30 +195,60 @@ export function VurafyApp() {
 
   /* ---------- catalog ---------- */
   const loadCatalog = useCallback(async () => {
+    const run = ++catalogRunRef.current;
     setLoading(true);
+    // fast path: paint the Audius feed while the factory scan runs in the background
+    const audiusP = fetchAudiusTracks(6).catch(() => [] as Track[]);
+    audiusP.then((a) => {
+      if (a.length > 0 && catalogRunRef.current === run) {
+        setTracks(a);
+        setLogs([]);
+        setLive(false);
+        setSel(0);
+      }
+    });
     try {
       const lgs = await discoverLaunches();
       const tks: Track[] = [];
       const paired: LaunchLog[] = [];
+      let processed = 0;
       for (const l of lgs) {
+        if (tks.length >= 30 || processed >= 60) break;
+        processed += 1;
         const t = await loadTrack(l);
         if (t) { tks.push(t); paired.push(l); }
-        if (tks.length >= 30) break;
       }
+      const audius = await audiusP;
+      if (catalogRunRef.current !== run) return;
       if (tks.length > 0) {
-        setTracks(tks);
+        // on-chain launches first, Audius trending fills the feed up to 6
+        const fill = audius
+          .filter((a) => !tks.some((t) => t.name === a.name))
+          .slice(0, Math.max(0, 6 - tks.length));
+        setTracks([...tks, ...fill]);
         setLogs(paired);
         setLive(true);
         setSel(0);
-      } else {
+      } else if (audius.length === 0) {
         setTracks(DEMO_TRACKS);
         setLogs([]);
         setLive(false);
       }
+      // else: Audius feed already painted by the fast path above
     } catch {
-      say("rpc error — demo data");
+      const audius = await audiusP;
+      if (catalogRunRef.current !== run) return;
+      if (audius.length > 0) {
+        say("catalog loaded from audius");
+      } else {
+        setTracks(DEMO_TRACKS);
+        setLogs([]);
+        setLive(false);
+        say("catalog unavailable — demo data");
+      }
+    } finally {
+      if (catalogRunRef.current === run) setLoading(false);
     }
-    setLoading(false);
   }, [say]);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
@@ -563,13 +589,13 @@ export function VurafyApp() {
   };
 
   /* ---------- ticker ---------- */
-  const tickItems: { text: string; green?: boolean }[] = live
-    ? tracks.slice(0, 8).map((t) => ({
-        text: t.graduated
-          ? `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — GRADUATED · ${fmtEth(t.priceEth)} ETH`
-          : `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — ${(t.progress * 100).toFixed(0)}% TO POOL · ${fmtEth(t.priceEth)} ETH`,
-      }))
-    : DEMO_TICKS.map((text) => ({ text }));
+  const tickItems: { text: string; green?: boolean }[] = tracks.slice(0, 8).map((t, i) => ({
+    text: t.isDemo
+      ? `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — ${fmtEth(t.priceEth)} ETH${i === 0 ? " (+2%)" : ""}`
+      : t.graduated
+        ? `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — GRADUATED · ${fmtEth(t.priceEth)} ETH`
+        : `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — ${(t.progress * 100).toFixed(0)}% TO POOL · ${fmtEth(t.priceEth)} ETH${i === 0 ? " (+2%)" : ""}`,
+  }));
 
   const ctrl = "flex items-center justify-center w-9 h-8 border border-neutral-600 text-white hover:bg-white hover:text-black transition-colors focus:outline-none";
 
@@ -722,7 +748,7 @@ export function VurafyApp() {
               <div>Available:<div className="vp-grad" style={{ fontSize: 17 }}>{fmtTokens(track.available)}</div></div>
             </div>
             <div className="mt-3 uppercase" style={{ fontSize: 10.5, letterSpacing: "0.14em", color: track.graduated ? "#ffffff" : "#8a8a8a" }}>
-              {isDemo ? "demo data — launch a real track" : track.graduated ? "✓ graduated — trading in v4 pool" : `${(track.progress * 100).toFixed(1)}% → graduation (4.2 eth)`}
+              {isDemo ? (track.audio ? "audius stream — launch yours to trade onchain" : "demo data — launch a real track") : track.graduated ? "✓ graduated — trading in v4 pool" : `${(track.progress * 100).toFixed(1)}% → graduation (4.2 eth)`}
               {!isDemo && !track.graduated && (
                 <div style={{ height: 4, background: "rgba(255,255,255,.09)", marginTop: 6, borderRadius: 4, overflow: "hidden" }}>
                   <div style={{ height: 4, width: `${Math.min(100, track.progress * 100)}%`, background: "linear-gradient(90deg,#7c7c7c,#fff)", boxShadow: "0 0 14px rgba(255,255,255,.85)", transition: "width .8s cubic-bezier(.16,1,.3,1)", borderRadius: 4 }} />
@@ -777,13 +803,17 @@ export function VurafyApp() {
       <section id="gallery" className="px-6 pt-8 pb-4" style={{ position: "relative", zIndex: 1 }}>
         <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
           <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>Gallery // track covers</div>
-          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>click a cover to load the track into the player</div>
+          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>click a cover to play — trending electronic via audius</div>
         </div>
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
           {tracks.map((t, i) => (
             <button
               key={`${t.symbol}-${i}`}
-              onClick={() => { setSel(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              onClick={() => {
+                if (i === sel) play();
+                else { autoplayRef.current = true; setSel(i); }
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
               className="vp-glass vp-in text-left overflow-hidden"
               style={{ padding: 0, cursor: "pointer", animationDelay: `${(i % 8) * 0.05}s`, outline: sel === i ? "1px solid rgba(255,255,255,.85)" : "none", outlineOffset: 2 }}
             >
