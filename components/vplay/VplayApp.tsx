@@ -34,6 +34,40 @@ function mulberry32(a: number) {
   };
 }
 
+function hash32(s: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+function CoverArt({ seed, symbol }: { seed: string; symbol: string }) {
+  const h = hash32(seed);
+  const rnd = mulberry32(h);
+  const hue = h % 360;
+  const gid = `vg${h}`;
+  const variant = h % 3;
+  const bars = Array.from({ length: 7 }, (_, i) => ({ x: 7 + i * 13, h: 14 + rnd() * 66 }));
+  const orbs = Array.from({ length: 4 }, () => ({ cx: 12 + rnd() * 76, cy: 12 + rnd() * 76, r: 8 + rnd() * 24, o: 0.05 + rnd() * 0.12 }));
+  const rays = Array.from({ length: 5 }, (_, i) => ({ y: i * 22 + 8, o: 0.06 + rnd() * 0.1 }));
+  return (
+    <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={`hsl(${hue},74%,46%)`} />
+          <stop offset="55%" stopColor={`hsl(${(hue + 34) % 360},68%,24%)`} />
+          <stop offset="100%" stopColor={`hsl(${(hue + 338) % 360},64%,13%)`} />
+        </linearGradient>
+      </defs>
+      <rect width="100" height="100" fill={`url(#${gid})`} />
+      {variant === 0 && orbs.map((o, i) => <circle key={i} cx={o.cx} cy={o.cy} r={o.r} fill="#fff" opacity={o.o} />)}
+      {variant === 1 && bars.map((b, i) => <rect key={i} x={b.x} y={94 - b.h} width="7" height={b.h} rx="2" fill="#fff" opacity={0.12 + rnd() * 0.22} />)}
+      {variant === 2 && rays.map((r, i) => <rect key={i} x={-10} y={r.y} width="120" height="6" fill="#fff" opacity={r.o} transform="rotate(-14 50 50)" />)}
+      <text x="50" y="57" textAnchor="middle" fontSize="30" fontWeight="800" fill="#fff" opacity="0.95" fontFamily="Helvetica, Arial, sans-serif" letterSpacing="1">{symbol.slice(0, 3)}</text>
+      <rect x="0.5" y="0.5" width="99" height="99" fill="none" stroke="rgba(255,255,255,.22)" />
+    </svg>
+  );
+}
+
 function fmtEth(p: number) {
   if (p >= 0.01) return p.toFixed(4);
   if (p >= 0.000001) return p.toFixed(6);
@@ -533,6 +567,9 @@ export function VplayApp() {
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => loadCatalog()}>
             Discover
           </button>
+          <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" })}>
+            Gallery
+          </button>
           <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => setLaunchOpen(true)}>
             Launchpad
           </button>
@@ -636,6 +673,75 @@ export function VplayApp() {
           <path d="M4 4 L37 47 L70 4" />
         </svg>
       </main>
+
+      {/* Stats */}
+      <section className="grid px-6 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, position: "relative", zIndex: 1 }}>
+        {[
+          { k: "Tracks", v: String(tracks.length) },
+          { k: "Artists", v: String(new Set(tracks.map((t) => t.artist)).size) },
+          { k: "Graduated", v: String(tracks.filter((t) => t.graduated).length) },
+          { k: "Launch fee", v: cfg ? `${formatEther(cfg.fee)} ETH` : "0.0005 ETH" },
+        ].map((s, i) => (
+          <div key={s.k} className="vp-glass vp-in px-4 py-3 flex items-baseline justify-between gap-2" style={{ animationDelay: `${i * 0.06}s` }}>
+            <span className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>{s.k}</span>
+            <b className="vp-grad" style={{ fontSize: 22, fontWeight: 800 }}>{s.v}</b>
+          </div>
+        ))}
+      </section>
+
+      {/* Gallery — track covers */}
+      <section id="gallery" className="px-6 pt-8 pb-4" style={{ position: "relative", zIndex: 1 }}>
+        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
+          <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>Gallery // track covers</div>
+          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>жми на обложку — трек появится в плеере</div>
+        </div>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
+          {tracks.map((t, i) => (
+            <button
+              key={`${t.symbol}-${i}`}
+              onClick={() => { setSel(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              className="vp-glass vp-in text-left overflow-hidden"
+              style={{ padding: 0, cursor: "pointer", animationDelay: `${(i % 8) * 0.05}s`, outline: sel === i ? "1px solid rgba(255,255,255,.85)" : "none", outlineOffset: 2 }}
+            >
+              <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden" }}>
+                {t.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.logo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                ) : (
+                  <CoverArt seed={`${t.name}-${t.symbol}`} symbol={t.symbol} />
+                )}
+                <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", top: 8, left: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)", letterSpacing: "0.12em" }}>{t.symbol}</span>
+                <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", bottom: 8, right: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)" }}>{fmtEth(t.priceEth)} ETH</span>
+              </div>
+              <div className="px-3 py-2">
+                <div className="truncate" style={{ fontWeight: 700, fontSize: 13 }}>{t.name}</div>
+                <div className="truncate uppercase" style={{ ...MONO, fontSize: 10, color: "#9a9a9a", letterSpacing: "0.1em" }}>{t.artist}</div>
+                <div style={{ height: 3, background: "rgba(255,255,255,.12)", marginTop: 7 }}>
+                  <div style={{ height: "100%", width: `${Math.round(t.progress * 100)}%`, background: "linear-gradient(90deg,#fff,#9b9b9b)" }} />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="px-6 pb-8 pt-3" style={{ position: "relative", zIndex: 1 }}>
+        <div className="uppercase vp-grad mb-4" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>How it works</div>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
+          {[
+            { n: "01", t: "Connect", d: "Подключи кошелёк в шапке — сайт сам переключит на Robinhood Chain, даже если сети ещё нет." },
+            { n: "02", t: "Launch", d: "Загрузи обложку и аудио, назначь имя трека — за 0.0005 ETH токен появляется на кривой." },
+            { n: "03", t: "Trade", d: "Любой покупает доли трека на кривой; при 4.2 ETH трек градуируется в пул." },
+          ].map((s, i) => (
+            <div key={s.n} className="vp-glass vp-in p-5" style={{ animationDelay: `${i * 0.08}s` }}>
+              <div className="vp-grad" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1 }}>{s.n}</div>
+              <div className="uppercase" style={{ ...MONO, fontSize: 13, letterSpacing: "0.2em", margin: "10px 0 8px" }}>{s.t}</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: "#b5b5b5" }}>{s.d}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Ticker */}
       <div className="w-full overflow-hidden uppercase whitespace-nowrap py-3" style={{ ...MONO, fontSize: 13, position: "relative", zIndex: 1, background: "linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015))", borderTop: "1px solid rgba(255,255,255,.12)", borderBottom: "1px solid rgba(255,255,255,.12)", maskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)" }}>
