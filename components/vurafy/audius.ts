@@ -14,6 +14,7 @@ type AudiusTrack = {
   title: string;
   artwork?: { "480x480"?: string; "150x150"?: string };
   user?: { name?: string };
+  play_count?: number;
 };
 
 function toTrack(t: AudiusTrack): Track | null {
@@ -35,6 +36,7 @@ function toTrack(t: AudiusTrack): Track | null {
     graduated: false,
     creatorTaxBps: 0,
     isDemo: true,
+    plays: t.play_count || 0,
   };
 }
 

@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { parseEther, formatEther, formatUnits, toHex, zeroAddress, type Address } from "viem";
 import { robinhood } from "@/lib/web3/config";
@@ -13,7 +13,6 @@ import { buildDemoTracks } from "./demoCatalog";
 import { fetchAudiusTracks } from "./audius";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
-const GREEN = "#00ff66";
 const CATALOG_TARGET = 50; // Audius trending feed size (on-chain launches take priority)
 
 const DEMO_TRACKS: Track[] = buildDemoTracks();
@@ -33,7 +32,7 @@ function hash32(s: string) {
   return h >>> 0;
 }
 
-function CoverArt({ seed, symbol }: { seed: string; symbol: string }) {
+const CoverArt = memo(function CoverArt({ seed, symbol }: { seed: string; symbol: string }) {
   const h = hash32(seed);
   const rnd = mulberry32(h);
   const hue = h % 360;
@@ -59,7 +58,7 @@ function CoverArt({ seed, symbol }: { seed: string; symbol: string }) {
       <rect x="0.5" y="0.5" width="99" height="99" fill="none" stroke="rgba(255,255,255,.22)" />
     </svg>
   );
-}
+});
 
 function fmtEth(p: number) {
   if (p <= 0) return "0";
@@ -86,63 +85,180 @@ function Logo({ className = "", stroke = 4 }: { className?: string; stroke?: num
   );
 }
 
-function Waveform({ playing, seed }: { playing: boolean; seed: number }) {
+function BgWaves({ playing }: { playing: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const phase = useRef(0);
-  const amps = useRef<number[]>([]);
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
 
-  const draw = useCallback(() => {
+  useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
-    const cx = cv.getContext("2d");
-    if (!cx) return;
-    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cx.clearRect(0, 0, w, h);
-    cx.strokeStyle = "#fff";
-    cx.lineWidth = 1;
-    cx.shadowBlur = playing ? 10 : 4;
-    cx.shadowColor = "rgba(255,255,255,.8)";
-    cx.beginPath();
-    const mid = h / 2, s = amps.current;
-    for (let x = 0, i = 0; x < w && i < s.length; x += 3, i++) {
-      const a = s[i];
-      const live = playing ? 0.55 + 0.45 * Math.sin(phase.current + i * 0.45 + a * 6) : 1;
-      const amp = a * live * h * 0.46;
-      cx.moveTo(x + 0.5, mid - amp);
-      cx.lineTo(x + 0.5, mid + amp);
-    }
-    cx.stroke();
-  }, [playing]);
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    const RM = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let mx = 0.5, my = 0.5, energy = 0, raf = 0;
+    let P: { x: number; y: number; s: number; v: number; o: number }[] = [];
+    const size = () => {
+      const r = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1 : 1.5);
+      cv.width = Math.round(window.innerWidth * r);
+      cv.height = Math.round(window.innerHeight * r);
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+      P = Array.from({ length: Math.round(window.innerWidth / 16) }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        s: Math.random() * 1.8 + 0.4,
+        v: Math.random() * 0.25 + 0.05,
+        o: Math.random() * 6,
+      }));
+    };
+    const onMove = (e: PointerEvent) => {
+      mx = e.clientX / window.innerWidth;
+      my = e.clientY / window.innerHeight;
+    };
+    const bg = (t: number) => {
+      energy += ((playingRef.current ? 1 : 0) - energy) * 0.03;
+      const w = window.innerWidth, h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      for (let l = 0; l < 8; l++) {
+        ctx.beginPath();
+        const base = h * (0.12 + l * 0.11);
+        const amp = 18 + l * 7 + energy * 28;
+        const f = 0.004 + l * 0.0007;
+        for (let x = 0; x <= w; x += 8) {
+          const y = base + Math.sin(x * f + t / 1700 + l) * amp + Math.sin(x * f * 2.3 - t / 2300) * amp * 0.4 + ((my - 0.5) * 44 * (l - 3)) / 3;
+          if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.strokeStyle = `hsla(0,0%,78%,${0.06 + l * 0.012 + energy * 0.06})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      for (const p of P) {
+        p.y -= p.v * (1 + energy * 2.5);
+        if (p.y < -5) { p.y = h + 5; p.x = Math.random() * w; }
+        ctx.fillStyle = `hsla(0,0%,88%,${0.25 + 0.3 * Math.sin(t / 700 + p.o)})`;
+        ctx.fillRect(p.x + (mx - 0.5) * p.s * 16, p.y, p.s, p.s);
+      }
+    };
+    let frame = 0;
+    const loop = (t: number) => {
+      if (!RM && frame++ % 2 === 0) bg(t);
+      raf = requestAnimationFrame(loop);
+    };
+    size();
+    window.addEventListener("resize", size);
+    window.addEventListener("pointermove", onMove);
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", size);
+      window.removeEventListener("pointermove", onMove);
+    };
+  }, []);
+
+  return (
+    <>
+      <div className="aur" aria-hidden><i /><i /><i /></div>
+      <canvas ref={ref} id="bg" aria-hidden />
+      <div className="grain" aria-hidden />
+    </>
+  );
+}
+
+function DockWave({ seed, playing, prog, onSeek }: { seed: number; playing: boolean; prog: number; onSeek: (ratio: number) => void }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const amps = useRef<number[]>([]);
+  const playingRef = useRef(playing);
+  const progRef = useRef(prog);
+  playingRef.current = playing;
+  progRef.current = prog;
+  const dirtyRef = useRef(true);
 
   useEffect(() => {
-    const w = ref.current?.clientWidth || 1200;
+    dirtyRef.current = true;
+  }, [seed, playing, prog]);
+
+  useEffect(() => {
     const rnd = mulberry32(seed);
-    const peaks = [0.08, 0.17, 0.26, 0.36, 0.45, 0.5, 0.56, 0.64, 0.74, 0.83, 0.92];
-    const n = Math.ceil(w / 3);
-    const s: number[] = new Array(n);
-    for (let i = 0; i < n; i++) {
-      const p = i / n;
-      let env = 0.05;
-      peaks.forEach((c) => { env += Math.exp(-Math.pow((p - c) * 20, 2)) * (0.4 + rnd() * 0.6); });
-      s[i] = Math.min(1, env) * (0.35 + 0.65 * rnd());
-    }
-    amps.current = s;
-    draw();
-  }, [seed, draw]);
+    amps.current = Array.from({ length: 220 }, () => 0.25 + 0.75 * Math.abs(rnd() * Math.sin(rnd() * 6)));
+  }, [seed]);
 
   useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
     let raf = 0;
-    const loop = () => { phase.current += 0.18; draw(); raf = requestAnimationFrame(loop); };
-    if (playing) loop(); else draw();
-    const onResize = () => draw();
+    const onResize = () => { dirtyRef.current = true; };
     window.addEventListener("resize", onResize);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", onResize); };
-  }, [playing, draw]);
+    const draw = (t: number) => {
+      if (!playingRef.current && !dirtyRef.current) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      dirtyRef.current = false;
+      const r = Math.min(window.devicePixelRatio || 1, 2);
+      const w = cv.clientWidth, h = cv.clientHeight;
+      if (cv.width !== Math.round(w * r)) { cv.width = Math.round(w * r); cv.height = Math.round(h * r); }
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const s = amps.current;
+      if (!s.length) return;
+      const bw = w / s.length;
+      const g = ctx.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, "#fff");
+      g.addColorStop(1, "#8a8a94");
+      for (let i = 0; i < s.length; i++) {
+        let v = s[i] || 0.4;
+        if (playingRef.current) v *= 0.7 + 0.3 * Math.sin(t / 160 + i * 0.5);
+        ctx.fillStyle = i / s.length < progRef.current ? g : "#24242e";
+        const bh = Math.max(v * h, 2);
+        ctx.fillRect(i * bw, (h - bh) / 2, Math.max(bw - 1.5, 1), bh);
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [seed]);
 
-  return <canvas ref={ref} className="block w-full" style={{ height: 112 }} aria-hidden="true" />;
+  return (
+    <canvas
+      ref={ref}
+      className="dockwave"
+      aria-label="Track waveform, click to seek"
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        onSeek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+      }}
+    />
+  );
+}
+
+function CurveSvg({ p }: { p: number }) {
+  let d = "M0,120";
+  for (let j = 0; j <= 40; j++) {
+    const x = j / 40;
+    d += ` L${(x * 400).toFixed(1)},${(120 - 105 * (0.8 * x * x + 0.2 * x)).toFixed(1)}`;
+  }
+  const mx = p * 400;
+  const my = 120 - 105 * (0.8 * p * p + 0.2 * p);
+  return (
+    <svg className="curve" viewBox="0 0 400 130" width="100%" role="img" aria-label="Stream progress">
+      <defs>
+        <linearGradient id="cg" x1="0" x2="1">
+          <stop offset="0" stopColor="var(--acc)" />
+          <stop offset="1" stopColor="var(--acc2)" />
+        </linearGradient>
+      </defs>
+      <path d={`${d} L400,120Z`} fill="var(--acc)" opacity="0.08" />
+      <path className="l" pathLength={1} d={d} fill="none" stroke="url(#cg)" strokeWidth={3} />
+      <line x1={mx} y1={my} x2={mx} y2={120} stroke="var(--mute)" strokeDasharray="3" />
+      <circle className="p" cx={mx} cy={my} r={5} fill="var(--acc)" />
+      <circle cx={mx} cy={my} r={5} fill="var(--acc)" />
+    </svg>
+  );
 }
 
 type LaunchForm = { title: string; artist: string; symbol: string; cover: string; audio: string; tax: string };
@@ -154,6 +270,8 @@ export function VurafyApp() {
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [pos, setPos] = useState({ p: 0, t: 0, d: 0 });
+  const [tab, setTab] = useState<"trending" | "az">("trending");
   const [toast, setToast] = useState("");
   const timer = useRef<number | null>(null);
 
@@ -166,10 +284,9 @@ export function VurafyApp() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [form, setForm] = useState<LaunchForm>({ title: "", artist: "", symbol: "", cover: "", audio: "", tax: "200" });
-  const [coverUp, setCoverUp] = useState(false);
-  const coverInput = useRef<HTMLInputElement>(null);
-  const [localCover, setLocalCover] = useState<{ url: string; name: string } | null>(null);
-  const [localAudio, setLocalAudio] = useState<{ url: string; name: string } | null>(null);
+  const [coverFile, setCoverFile] = useState<{ file: File; url: string } | null>(null);
+  const [audioFile, setAudioFile] = useState<{ file: File; url: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const autoplayRef = useRef(false);
   const catalogRunRef = useRef(0);
   const [cfg, setCfg] = useState<{ id: bigint; fee: bigint; maxTax: number; can: boolean } | null>(null);
@@ -275,6 +392,9 @@ export function VurafyApp() {
     if (launchWait.isSuccess) {
       say("track launched on pons ✓ — indexing…");
       setLaunchOpen(false);
+      setForm({ title: "", artist: "", symbol: "", cover: "", audio: "", tax: "200" });
+      setCoverFile(null);
+      setAudioFile(null);
       loadCatalog();
     }
   }, [launchWait.isSuccess, loadCatalog, say]);
@@ -295,6 +415,7 @@ export function VurafyApp() {
   const actxRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastPosRef = useRef(0);
 
   const ensureCtx = () => {
     if (!actxRef.current) {
@@ -358,8 +479,17 @@ export function VurafyApp() {
         // stop the previous stream before switching — only one track may sound at a time
         audioRef.current?.pause();
         const a = new Audio(track.audio);
-        a.loop = true;
+        a.preload = "auto";
         a.dataset.url = track.audio;
+        // manual loop: iOS glitches when looping remote streams with loop=true
+        a.onended = () => { a.currentTime = 0; a.play().catch(() => {}); };
+        a.ontimeupdate = () => {
+          const now = performance.now();
+          if (now - lastPosRef.current < 200) return;
+          lastPosRef.current = now;
+          const d = isFinite(a.duration) ? a.duration : 0;
+          setPos({ p: d ? a.currentTime / d : 0, t: a.currentTime, d });
+        };
         audioRef.current = a;
       }
       audioRef.current.play().catch(() => startSynth());
@@ -378,6 +508,7 @@ export function VurafyApp() {
   const switchTrack = (next: number) => {
     const n = (next + tracks.length) % tracks.length;
     setSel(n);
+    setPos({ p: 0, t: 0, d: 0 });
     stepRef.current = 0;
     audioRef.current?.pause();
     audioRef.current = null;
@@ -386,14 +517,47 @@ export function VurafyApp() {
       const t = tracks[n];
       if (t?.audio) {
         const a = new Audio(t.audio);
-        a.loop = true;
+        a.preload = "auto";
         a.dataset.url = t.audio;
+        a.onended = () => { a.currentTime = 0; a.play().catch(() => {}); };
+        a.ontimeupdate = () => {
+          const now = performance.now();
+          if (now - lastPosRef.current < 200) return;
+          lastPosRef.current = now;
+          const d = isFinite(a.duration) ? a.duration : 0;
+          setPos({ p: d ? a.currentTime / d : 0, t: a.currentTime, d });
+        };
         audioRef.current = a;
         a.play().catch(() => startSynth());
       } else startSynth();
     }
   };
+  const seek = (ratio: number) => {
+    const a = audioRef.current;
+    if (a && isFinite(a.duration) && a.duration > 0) {
+      a.currentTime = ratio * a.duration;
+      setPos({ p: ratio, t: a.currentTime, d: a.duration });
+    }
+  };
   useEffect(() => () => { stopSynth(); audioRef.current?.pause(); if (timer.current) window.clearTimeout(timer.current); }, []);
+
+  // media session: browser tab / OS media popup shows the track instead of "Music"
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator) || !track) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.name,
+        artist: track.artist || "VURAFY",
+        album: "VURAFY // Track Tokenization Protocol",
+        artwork: track.logo ? [{ src: track.logo, sizes: "512x512" }] : [],
+      });
+      navigator.mediaSession.setActionHandler("play", () => play());
+      navigator.mediaSession.setActionHandler("pause", () => pause());
+      navigator.mediaSession.setActionHandler("nexttrack", () => switchTrack(sel + 1));
+      navigator.mediaSession.setActionHandler("previoustrack", () => switchTrack(sel - 1));
+    } catch { /* unsupported */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track, sel]);
 
   // autoplay once after a locally added track becomes the current one
   useEffect(() => {
@@ -404,6 +568,27 @@ export function VurafyApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks, sel]);
 
+  // keyboard: space — play/pause, ← → — switch track
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (playingRef.current) pause(); else play();
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        switchTrack(sel + 1);
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        switchTrack(sel - 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, tracks, playing]);
+
   /* ---------- local demo track (no wallet, no tx) ---------- */
   const addLocalTrack = () => {
     if (!form.title.trim()) { say("track title is required"); return; }
@@ -413,9 +598,9 @@ export function VurafyApp() {
       deployer: zeroAddress,
       name: form.title.trim(),
       symbol: (form.symbol.trim() || autoSymbol).toUpperCase(),
-      logo: localCover?.url || form.cover.trim(),
+      logo: coverFile?.url || form.cover.trim(),
       artist: form.artist.trim() || "VURAFY",
-      audio: localAudio?.url || form.audio.trim(),
+      audio: audioFile?.url || form.audio.trim(),
       priceEth: 0,
       totalSupply: 1_000_000_000n * 10n ** 18n,
       available: 1_000_000_000n * 10n ** 18n,
@@ -429,8 +614,10 @@ export function VurafyApp() {
     autoplayRef.current = true;
     setLaunchOpen(false);
     setForm({ title: "", artist: "", symbol: "", cover: "", audio: "", tax: "200" });
-    setLocalCover(null);
-    setLocalAudio(null);
+    if (coverFile) URL.revokeObjectURL(coverFile.url);
+    if (audioFile) URL.revokeObjectURL(audioFile.url);
+    setCoverFile(null);
+    setAudioFile(null);
     say("Track loaded locally (Demo Mode)");
   };
 
@@ -527,23 +714,21 @@ export function VurafyApp() {
 
   const autoSymbol = form.title.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8) || "TRACK";
 
-  const uploadCover = async (f: File) => {
-    if (f.size > 4 * 1024 * 1024) { say("cover: max 4MB"); return; }
-    setCoverUp(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const r = await fetch("/api/upload", { method: "POST", body: fd });
-      const j = (await r.json()) as { url?: string; error?: string };
-      if (!r.ok || !j.url) throw new Error(j.error || "upload failed");
-      const url: string = j.url;
-      setForm((p) => ({ ...p, cover: url }));
-      say("cover uploaded");
-    } catch (e) {
-      say(`cover upload failed: ${String((e as Error).message).slice(0, 90)}`);
-    } finally {
-      setCoverUp(false);
-    }
+  const pinFile = async (f: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", f);
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const j = (await r.json()) as { url?: string; error?: string };
+    if (!r.ok || !j.url) throw new Error(j.error || "upload failed");
+    return j.url;
+  };
+
+  const pickMedia = (kind: "cover" | "audio", f: File) => {
+    const max = kind === "cover" ? 4 * 1024 * 1024 : 4.4 * 1024 * 1024;
+    if (f.size > max) { say(`${kind}: max ${Math.round(max / 1024 / 1024)}MB`); return; }
+    const url = URL.createObjectURL(f);
+    const set = kind === "cover" ? setCoverFile : setAudioFile;
+    set((p) => { if (p) URL.revokeObjectURL(p.url); return { file: f, url }; });
   };
 
   const doLaunch = async () => {
@@ -551,7 +736,10 @@ export function VurafyApp() {
     if (wrongChain) { switchToRobinhood(); return; }
     if (!form.title.trim() || !form.artist.trim()) { say("title and artist are required"); return; }
     if (!cfg || !cfg.can) { say("launching is closed for this wallet"); return; }
+    if (!coverFile || !audioFile) { say("cover and audio files are required"); return; }
+    setUploading(true);
     try {
+      const [coverUrl, audioUrl] = await Promise.all([pinFile(coverFile.file), pinFile(audioFile.file)]);
       const pairToken = zeroAddress;
       const salt = toHex(crypto.getRandomValues(new Uint8Array(32)));
       const [expectedEconomics, fee] = await Promise.all([
@@ -567,8 +755,8 @@ export function VurafyApp() {
           {
             name: form.title.trim(),
             symbol: (form.symbol.trim() || autoSymbol).toUpperCase(),
-            logo: form.cover.trim(),
-            description: buildDescription(form.artist.trim(), form.audio.trim()),
+            logo: coverUrl,
+            description: buildDescription(form.artist.trim(), audioUrl),
             socials: VURAFY_SOCIALS,
             creatorFeeRecipient: address,
             creatorTaxBps: tax,
@@ -583,7 +771,9 @@ export function VurafyApp() {
         chainId: robinhood.id,
       });
     } catch (e) {
-      say(`launch failed: ${String(e).slice(0, 140)}`);
+      say(`launch failed: ${String((e as Error).message || e).slice(0, 140)}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -597,114 +787,207 @@ export function VurafyApp() {
     } else setBalances({});
   };
 
-  /* ---------- ticker ---------- */
-  const tickItems: { text: string; green?: boolean }[] = tracks.slice(0, 8).map((t, i) => ({
-    text: t.isDemo
-      ? `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — ${fmtEth(t.priceEth)} ETH${i === 0 ? " (+2%)" : ""}`
-      : t.graduated
-        ? `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — GRADUATED · ${fmtEth(t.priceEth)} ETH`
-        : `${t.name.toUpperCase()} BY ${t.artist.toUpperCase()} — ${(t.progress * 100).toFixed(0)}% TO POOL · ${fmtEth(t.priceEth)} ETH${i === 0 ? " (+2%)" : ""}`,
-  }));
+  /* ---------- derived feeds ---------- */
+  const tickLine = tracks
+    .slice(0, 12)
+    .map((t) => `${t.name} / ${t.artist} / ${fmtEth(t.priceEth)} ETH`)
+    .join("   ✦   ");
+  const tickSep = "\u00A0\u00A0\u00A0✦\u00A0\u00A0\u00A0";
 
-  const ctrl = "flex items-center justify-center w-9 h-8 border border-neutral-600 text-white hover:bg-white hover:text-black transition-colors focus:outline-none";
+  const mqPart = (k: string) =>
+    tracks.slice(0, 12).map((t, i) => (
+      <span key={`${k}-${i}`}>
+        <b>{t.name}</b> {fmtEth(t.priceEth)} ETH&nbsp;&nbsp;✦&nbsp;&nbsp;
+      </span>
+    ));
 
+  const mqEl = useMemo(
+    () => (
+      <div className="mq">
+        <div>{mqPart("a")}{mqPart("b")}</div>
+      </div>
+    ),
+    [tracks], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const topArtists = useMemo(() => {
+    const m = new Map<string, { artist: string; plays: number; img: string }>();
+    for (const t of tracks) {
+      const e = m.get(t.artist) ?? { artist: t.artist, plays: 0, img: "" };
+      e.plays += t.plays ?? 0;
+      if (!e.img) e.img = t.logo;
+      m.set(t.artist, e);
+    }
+    return [...m.values()].sort((a, b) => b.plays - a.plays).slice(0, 5);
+  }, [tracks]);
+
+  const artistsCount = useMemo(() => new Set(tracks.map((t) => t.artist)).size, [tracks]);
+  const graduatedCount = useMemo(() => tracks.filter((t) => t.graduated).length, [tracks]);
+
+  const view = useMemo(() => {
+    const idx = tracks.map((_, i) => i);
+    if (tab === "az") idx.sort((a, b) => (tracks[a].name < tracks[b].name ? -1 : 1));
+    return idx;
+  }, [tracks, tab]);
+
+  const liveLabel = loading
+    ? "Robinhood Chain / loading catalog…"
+    : live
+      ? `Robinhood Chain / ${tracks.length} tracks on pons v2`
+      : tracks.length
+        ? `Robinhood Chain / ${tracks.length} tracks via Audius`
+        : "Robinhood Chain";
+
+  const launchStatus = isDemo
+    ? track.audio
+      ? "audius stream — launch yours to trade onchain"
+      : "demo data — launch a real track"
+    : track.graduated
+      ? "✓ graduated — trading in v4 pool"
+      : `${(track.progress * 100).toFixed(1)}% → graduation (4.2 eth)`;
+
+  const fmtTime = (s: number) => {
+    if (!isFinite(s) || s <= 0) return "0:00";
+    const m = Math.floor(s / 60);
+    const ss = Math.floor(s % 60);
+    return `${m}:${String(ss).padStart(2, "0")}`;
+  };
+
+  /* ---------- navigation ---------- */
   const closeMenu = () => setMenuOpen(false);
-  const navPanel = (
+  const walletLabel =
+    isPending || txPending || txMining || launchWait.isLoading
+      ? "Pending…"
+      : isConnected && address
+        ? `${address.slice(0, 6)}…${address.slice(-4)} ×`
+        : "Connect wallet";
+
+  const navItems = (
     <>
-      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); loadCatalog(); }}>
-        Discover
-      </button>
-      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); document.getElementById("gallery")?.scrollIntoView({ behavior: "smooth" }); }}>
-        Gallery
-      </button>
-      <a href="/vurafy/how" onClick={closeMenu} className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
-        How it works
-      </a>
-      <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" onClick={closeMenu} className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
-        X ↗
-      </a>
-      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); setLaunchOpen(true); }}>
-        Launchpad
-      </button>
-      <button className="uppercase hover:underline" style={{ ...MONO, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer" }} onClick={() => { closeMenu(); openPortfolio(); }}>
-        My Portfolio
-      </button>
+      <a href="#tracks" onClick={closeMenu}>Discover</a>
+      <a href="#artists" onClick={closeMenu}>Artists</a>
+      <a href="/vurafy/how" onClick={closeMenu}>How it works</a>
+      <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" onClick={closeMenu}>X ↗</a>
+      <button onClick={() => { closeMenu(); setLaunchOpen(true); }}>Launchpad</button>
+      <button onClick={() => { closeMenu(); openPortfolio(); }}>Portfolio</button>
       {wrongChain && (
-        <button
-          onClick={() => { closeMenu(); switchToRobinhood(); }}
-          className="border px-3 py-2 uppercase tracking-wider transition-colors"
-          style={{ ...MONO, fontSize: 12, cursor: "pointer", borderColor: "#ff3b5c", color: "#ff3b5c", background: "rgba(255,59,92,.08)" }}
-        >
+        <button className="chain-warn" onClick={() => { closeMenu(); switchToRobinhood(); }}>
           {chainSwitching ? "Switching…" : "⚠ Robinhood Chain →"}
         </button>
       )}
-      <button
-        onClick={() => { closeMenu(); onWallet(); }}
-        className="border border-white px-3 py-2 uppercase tracking-wider hover:bg-white hover:text-black transition-colors"
-        style={{ ...MONO, fontSize: 12, cursor: "pointer", background: "none", color: "inherit" }}
-      >
-        {isPending || txPending || txMining || launchWait.isLoading ? "Pending…" : isConnected && address ? `${address.slice(0, 6)}…${address.slice(-4)} ×` : "Connect Wallet"}
-      </button>
+      <button className="btn" onClick={() => { closeMenu(); onWallet(); }}>{walletLabel}</button>
     </>
   );
 
+  /* ---------- 3d tilt ---------- */
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const onGridMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (reducedMotion()) return;
+    const el = (e.target as HTMLElement).closest(".card") as HTMLElement | null;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--ry", `${((e.clientX - r.left) / r.width - 0.5) * 10}deg`);
+    el.style.setProperty("--rx", `${-((e.clientY - r.top) / r.height - 0.5) * 10}deg`);
+  };
+  const onGridLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.querySelectorAll<HTMLElement>(".card").forEach((el) => {
+      el.style.setProperty("--rx", "0deg");
+      el.style.setProperty("--ry", "0deg");
+    });
+  };
+  const onStageMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (reducedMotion()) return;
+    const st = e.currentTarget.querySelector<HTMLElement>(".stage");
+    if (!st) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    st.style.setProperty("--ry", `${((e.clientX - r.left) / r.width - 0.5) * 18}deg`);
+    st.style.setProperty("--rx", `${-((e.clientY - r.top) / r.height - 0.5) * 14}deg`);
+  };
+  const onStageLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+    const st = e.currentTarget.querySelector<HTMLElement>(".stage");
+    st?.style.setProperty("--rx", "0deg");
+    st?.style.setProperty("--ry", "0deg");
+  };
+
+  // grid is memoized: stream position updates (several times a second) must not re-render 50 cards.
+  // `playing` is NOT a dep — the badge visibility is driven by a data-attribute on the wrapper
+  // (React bails out of the memoized subtree when only the attribute changes), otherwise every
+  // play/pause re-renders all cards and the UI visibly jumps on mobile.
+  const gridEl = useMemo(
+    () => (
+      <div className="tgrid" onMouseMove={onGridMove} onMouseLeave={onGridLeave}>
+        {view.map((i, vp) => {
+          const t = tracks[i];
+          const active = i === sel;
+          return (
+            <button
+              key={`${t.symbol}-${i}`}
+              className="card"
+              aria-current={active}
+              style={{ animationDelay: `${(vp % 12) * 60}ms` }}
+              // prevent iOS from scrolling the page to the focused button on tap (page "jumps")
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (active) play();
+                else {
+                  autoplayRef.current = true;
+                  setSel(i);
+                }
+              }}
+            >
+              <div className="thumb">
+                <CoverArt seed={`${t.name}-${t.symbol}`} symbol={t.symbol} />
+                {t.logo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={t.logo}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                )}
+                <span className="sym">{t.symbol}</span>
+                <span className="pbadge">{fmtEth(t.priceEth)} ETH</span>
+                {active && <span className="playing">▶ playing</span>}
+              </div>
+              <h3>{t.name}</h3>
+              <div className="art">{t.artist}</div>
+              <div className="row">
+                <span className="note">
+                  {t.graduated ? "✓ graduated" : t.isDemo ? "stream" : `${Math.round(t.progress * 100)}% → pool`}
+                </span>
+                <span className="note">{t.plays ? `${t.plays.toLocaleString("en-US")} plays` : ""}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    ),
+    [view, tracks, sel], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   return (
-    <div className="flex flex-col w-full bg-black text-white" style={{ minHeight: "100vh", background: "#000", fontFamily: "Helvetica Neue, Arial, sans-serif", position: "relative", zIndex: 0 }}>
-      <style>{`@keyframes vp-slide{to{transform:translateX(-50%)}}
-        @keyframes vp-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes vp-float{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,calc(-50% - 16px))}}
-        @keyframes vp-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-        @keyframes vp-orb{0%{transform:translate(0,0) scale(1)}33%{transform:translate(80px,-60px) scale(1.14)}66%{transform:translate(-60px,50px) scale(.92)}100%{transform:translate(0,0) scale(1)}}
-        @keyframes vp-breathe{0%,100%{opacity:.28}50%{opacity:.62}}
-        @keyframes vp-spin{to{transform:rotate(360deg)}}
+    <div style={{ position: "relative", zIndex: 0, minHeight: "100vh", paddingBottom: 170 }}>
+      <style>{`@keyframes vp-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
         .vp-glass{background:linear-gradient(165deg,rgba(255,255,255,.065),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(16px) saturate(130%);-webkit-backdrop-filter:blur(16px) saturate(130%);box-shadow:0 30px 70px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.09);border-radius:8px;transition:border-color .35s,box-shadow .35s}
         .vp-glass:hover{border-color:rgba(255,255,255,.32);box-shadow:0 34px 80px rgba(0,0,0,.7),0 0 48px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.15)}
-        .vp-in{animation:vp-up .85s cubic-bezier(.16,1,.3,1) both}
         .vp-btn-p{background:linear-gradient(180deg,#ffffff,#e2e2e2);color:#000;border:none;border-radius:6px;box-shadow:0 10px 30px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.95);transition:transform .25s,box-shadow .25s;font-weight:700}
         .vp-btn-p:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 16px 44px rgba(255,255,255,.32)}
         .vp-btn-s{border:1px solid rgba(255,255,255,.38);border-radius:6px;background:rgba(255,255,255,.035);transition:background .25s,color .25s,transform .25s,border-color .25s}
         .vp-btn-s:hover{background:#fff;color:#000;transform:translateY(-2px);border-color:#fff}
         .vp-grad{background:linear-gradient(92deg,#ffffff 15%,#9b9b9b 50%,#ffffff 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
-        .vp-glow{filter:drop-shadow(0 0 24px rgba(255,255,255,.5)) drop-shadow(0 0 80px rgba(255,255,255,.2))}
         .vp-input{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
         .vp-input:focus{border-color:rgba(255,255,255,.6);box-shadow:0 0 0 3px rgba(255,255,255,.09)}
-        .vp-input::placeholder{color:#6b6b6b}
-        @media (prefers-reduced-motion:reduce){.vp-track,.vp-in,.vp-glass{animation:none!important}}
-        .vp-burger{display:none;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.38);border-radius:6px;background:rgba(255,255,255,.035);color:#fff;cursor:pointer}
-        @media (max-width:767px){
-          .vp-header{display:flex!important;justify-content:space-between;gap:12px;padding:0 16px!important}
-          .vp-hline,.vp-nav{display:none!important}
-          .vp-burger{display:flex}
-          .vp-menu{position:fixed;top:64px;left:0;right:0;display:flex;flex-direction:column;gap:2px;padding:12px 16px 16px;background:rgba(0,0,0,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.14);z-index:29}
-          .vp-menu button,.vp-menu a{width:100%;text-align:left;box-sizing:border-box;padding-top:11px;padding-bottom:11px}
-          .vp-hero{flex-direction:column}
-          .vp-hero .vp-cover{flex:none!important;width:100%;height:170px}
-          .vp-hero .vp-actions{flex:none!important;width:100%}
-          .vp-footer{grid-template-columns:1fr!important;justify-items:center;gap:10px}
-          .vp-footer .vp-fitem{text-align:center!important}
-          .vp-input{font-size:16px!important}
-        }
-        @media (min-width:768px){.vp-menu{display:none}}`}</style>
+        .vp-input::placeholder{color:#6b6b6b}`}</style>
 
-      {/* Atmosphere: glow, orbs, grid, scanlines */}
-      <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: "-22%", left: "50%", transform: "translateX(-50%)", width: "86vw", height: "64vh", background: "radial-gradient(ellipse at center, rgba(255,255,255,.15), rgba(255,255,255,.045) 45%, transparent 72%)", filter: "blur(28px)", animation: "vp-breathe 10s ease-in-out infinite" }} />
-        <div style={{ position: "absolute", width: 560, height: 560, top: "6%", left: "-9%", background: "radial-gradient(circle, rgba(255,255,255,.10), transparent 65%)", filter: "blur(46px)", animation: "vp-orb 28s ease-in-out infinite" }} />
-        <div style={{ position: "absolute", width: 480, height: 480, bottom: "2%", right: "-7%", background: "radial-gradient(circle, rgba(255,255,255,.085), transparent 65%)", filter: "blur(52px)", animation: "vp-orb 34s ease-in-out infinite reverse" }} />
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px)", backgroundSize: "68px 68px", maskImage: "radial-gradient(ellipse 92% 72% at 50% 36%, #000 25%, transparent 76%)", WebkitMaskImage: "radial-gradient(ellipse 92% 72% at 50% 36%, #000 25%, transparent 76%)" }} />
-        <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px)" }} />
-      </div>
+      <BgWaves playing={playing} />
 
       {/* Header */}
-      <header className="grid items-center px-6 vp-header" style={{ height: 64, gridTemplateColumns: "1fr auto 1fr", columnGap: 32, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)", boxShadow: "0 12px 44px rgba(0,0,0,.55)" }}>
-        <div className="vp-hline" style={{ height: 1, width: "100%", background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.9))" }} />
-        <div className="vp-grad text-center" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em" }}>
-          VURAFY
-        </div>
-        <nav className="flex items-center gap-5 text-sm uppercase tracking-wider justify-self-end vp-nav">
-          {navPanel}
-        </nav>
-        <button className="vp-burger" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((o) => !o)}>
+      <header className="site-head">
+        <div className="disp logo">VURAFY</div>
+        <nav className="nav-main">{navItems}</nav>
+        <button className="burger" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((o) => !o)}>
           {menuOpen ? (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5L5 19" /></svg>
           ) : (
@@ -712,210 +995,252 @@ export function VurafyApp() {
           )}
         </button>
       </header>
-      {menuOpen && <div className="vp-menu">{navPanel}</div>}
+      {menuOpen && <div className="mnav">{navItems}</div>}
 
-      {/* Hero */}
-      <main className="relative flex flex-col flex-1 items-center justify-center overflow-hidden px-6 py-10" style={{ minHeight: 340 }}>
-        <div className="relative flex items-center justify-center w-full">
-          <svg viewBox="0 0 320 330" className="absolute vp-glow" style={{ width: 340, left: "50%", top: "50%", transform: "translate(-50%, -50%)", pointerEvents: "none", animation: "vp-float 9s ease-in-out infinite" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
-            <path d="M10 0 L160 300 L310 0 L270 0 L160 220 L50 0 Z" />
-            <path d="M70 0 L160 180 L250 0 L210 0 L160 100 L110 0 Z" />
-          </svg>
-
-          <div className="relative flex flex-row items-stretch gap-4 vp-hero" style={{ flexWrap: "nowrap", width: "100%", maxWidth: 760, minWidth: 0, zIndex: 1 }}>
-          {/* cover */}
-          <div className="flex flex-col items-center justify-center gap-3 overflow-hidden vp-glass vp-in vp-cover" style={{ flex: "0 0 24%", position: "relative", animationDelay: ".05s" }}>
-            {track.logo ? <CoverArt seed={`${track.name}-${track.symbol}`} symbol={track.symbol} /> : <Logo className="w-16 vp-glow" />}
-            {track.logo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={track.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            )}
-            <span className="text-xs tracking-wider absolute" style={{ ...MONO, bottom: 10, zIndex: 2, color: "#bdbdbd", letterSpacing: "0.2em", textShadow: "0 0 10px #000" }}>{track.symbol}</span>
-          </div>
-
-          {/* info */}
-          <div className="p-5 relative vp-glass vp-in" style={{ flex: "1 1 0", minWidth: 0, animationDelay: ".16s" }}>
-            <p className="uppercase tracking-wider m-0 mb-1" style={{ fontSize: 15 }}>
-              <span className="text-neutral-400">Track:</span> <b style={{ fontWeight: 700 }}>{track.name}</b>
+      <div className="wrap">
+        {/* Hero */}
+        <div className="hero">
+          <div>
+            <div className="live">{liveLabel}</div>
+            <h1 className="disp"><span><b>OWN THE</b></span><span><b>SOUND.</b></span></h1>
+            <p className="lead">
+              Every track is a token on a bonding curve. Buy shares in the music you believe in,
+              or launch your own track for 0.0005 ETH.
             </p>
-            <p className="uppercase tracking-wider m-0 mb-1 flex items-baseline gap-2">
-              <span className="text-neutral-400" style={{ fontSize: 15 }}>Artist:</span>
-              <span className="vp-grad" style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 800 }}>{track.artist}</span>
-            </p>
-            <p className="uppercase tracking-wider m-0" style={{ fontSize: 15 }}>
-              <span className="text-neutral-400">Token:</span> <b style={{ fontWeight: 700 }}>{track.symbol}</b>
-              {!isDemo && (
-                <a href={`${EXPLORER}/address/${track.token}`} target="_blank" rel="noopener" className="ml-3" style={{ color: "#ffffff", fontSize: 12, textDecoration: "underline" }}>
-                  {track.token.slice(0, 6)}…{track.token.slice(-4)} ↗
-                </a>
-              )}
-            </p>
-            <div className="flex justify-between gap-3 mt-4 pt-3 border-t uppercase" style={{ fontSize: 11, letterSpacing: "0.04em", color: "#8f8f8f", borderColor: "rgba(255,255,255,.12)" }}>
-              <div>Total shares:<div className="vp-grad" style={{ fontSize: 17 }}>{fmtBig(track.totalSupply)}</div></div>
-              <div>Price per share:<div className="vp-grad" style={{ fontSize: 17 }}>{isDemo ? `${track.priceEth} ETH` : `${fmtEth(track.priceEth)} ETH`}</div></div>
-              <div>Available:<div className="vp-grad" style={{ fontSize: 17 }}>{fmtTokens(track.available)}</div></div>
+            <div className="cta">
+              <button className="btn" onClick={openBuy}>Purchase shares</button>
+              <button className="btn out" onClick={() => setLaunchOpen(true)}>+ Launch your track</button>
             </div>
-            <div className="mt-3 uppercase" style={{ fontSize: 10.5, letterSpacing: "0.14em", color: track.graduated ? "#ffffff" : "#8a8a8a" }}>
-              {isDemo ? (track.audio ? "audius stream — launch yours to trade onchain" : "demo data — launch a real track") : track.graduated ? "✓ graduated — trading in v4 pool" : `${(track.progress * 100).toFixed(1)}% → graduation (4.2 eth)`}
-              {!isDemo && !track.graduated && (
-                <div style={{ height: 4, background: "rgba(255,255,255,.09)", marginTop: 6, borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{ height: 4, width: `${Math.min(100, track.progress * 100)}%`, background: "linear-gradient(90deg,#7c7c7c,#fff)", boxShadow: "0 0 14px rgba(255,255,255,.85)", transition: "width .8s cubic-bezier(.16,1,.3,1)", borderRadius: 4 }} />
-                </div>
-              )}
+            <div className="note" style={{ marginTop: 10, minHeight: 18 }}>
+              tip: space — play/pause · ← → — switch track · click a cover to listen
             </div>
           </div>
-
-          {/* actions */}
-          <div className="flex flex-col justify-center gap-3 p-4 vp-glass vp-in vp-actions" style={{ flex: "0 0 25%", minWidth: 0, animationDelay: ".27s" }}>
-            <button onClick={openBuy} className="w-full uppercase tracking-wider py-3 vp-btn-p active:scale-95" style={{ fontSize: 12, cursor: "pointer" }}>
-              {track.graduated && !isDemo ? "Trade on pons ↗" : "Purchase Shares"}
-            </button>
-            <button
-              onClick={() => {
-                if (!isDemo) window.open(`${EXPLORER}/address/${track.token}`, "_blank");
-                else say("appears after launch");
-              }}
-              className="w-full uppercase tracking-wider py-3 px-2 vp-btn-s"
-              style={{ fontSize: 12, cursor: "pointer", color: "inherit" }}
-            >
-              View Track on Robinhood Chain
-            </button>
-            <button onClick={() => setLaunchOpen(true)} className="w-full uppercase tracking-wider py-2 vp-btn-s" style={{ fontSize: 11, cursor: "pointer", color: "#9a9a9a", borderColor: "rgba(255,255,255,.22)" }}>
-              + Launch your track
-            </button>
-          </div>
-          </div>
-        </div>
-
-        <svg viewBox="0 0 74 52" style={{ width: 64, marginTop: 40, flex: "none", animation: "vp-bob 3.2s ease-in-out infinite", filter: "drop-shadow(0 0 14px rgba(255,255,255,.55))" }} fill="none" stroke="#fff" strokeWidth="5" aria-hidden="true">
-          <path d="M4 4 L37 47 L70 4" />
-        </svg>
-      </main>
-
-      {/* Stats */}
-      <section className="grid px-6 pb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, position: "relative", zIndex: 1 }}>
-        {[
-          { k: "Tracks", v: String(tracks.length) },
-          { k: "Artists", v: String(new Set(tracks.map((t) => t.artist)).size) },
-          { k: "Graduated", v: String(tracks.filter((t) => t.graduated).length) },
-          { k: "Launch fee", v: cfg ? `${formatEther(cfg.fee)} ETH` : "0.0005 ETH" },
-        ].map((s, i) => (
-          <div key={s.k} className="vp-glass vp-in px-4 py-3 flex items-baseline justify-between gap-2" style={{ animationDelay: `${i * 0.06}s` }}>
-            <span className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>{s.k}</span>
-            <b className="vp-grad" style={{ fontSize: 22, fontWeight: 800 }}>{s.v}</b>
-          </div>
-        ))}
-      </section>
-
-      {/* Gallery — track covers */}
-      <section id="gallery" className="px-6 pt-8 pb-4" style={{ position: "relative", zIndex: 1 }}>
-        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
-          <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>Gallery // track covers</div>
-          <div className="uppercase" style={{ ...MONO, fontSize: 11, color: "#8f8f8f" }}>click a cover to play — trending electronic via audius</div>
-        </div>
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
-          {tracks.map((t, i) => (
-            <button
-              key={`${t.symbol}-${i}`}
-              onClick={() => {
-                if (i === sel) play();
-                else { autoplayRef.current = true; setSel(i); }
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className="vp-glass vp-in text-left overflow-hidden"
-              style={{ padding: 0, cursor: "pointer", animationDelay: `${(i % 8) * 0.05}s`, outline: sel === i ? "1px solid rgba(255,255,255,.85)" : "none", outlineOffset: 2 }}
-            >
-              <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", overflow: "hidden" }}>
-                <CoverArt seed={`${t.name}-${t.symbol}`} symbol={t.symbol} />
-                {t.logo && (
+          <div className="stageWrap" onPointerMove={onStageMove} onPointerLeave={onStageLeave}>
+            <div className="stage" onClick={() => (playing ? pause() : play())}>
+              <div className={`vinyl${playing ? " on" : ""}`} />
+              <div className="cover">
+                <CoverArt seed={`${track.name}-${track.symbol}`} symbol={track.symbol} />
+                {track.logo && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.logo} alt="" loading="lazy" decoding="async" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <img key={track.logo} src={track.logo} alt="" className="swap" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 )}
-                <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", top: 8, left: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)", letterSpacing: "0.12em" }}>{t.symbol}</span>
-                {sel === i && playing && (
-                  <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", top: 8, right: 8, padding: "2px 6px", background: "rgba(0,0,0,.78)", border: "1px solid rgba(255,255,255,.85)", letterSpacing: "0.12em", animation: "vp-bob 1.4s ease-in-out infinite" }}>▶ playing</span>
-                )}
-                <span className="uppercase" style={{ ...MONO, fontSize: 10, position: "absolute", bottom: 8, right: 8, padding: "2px 6px", background: "rgba(0,0,0,.62)", border: "1px solid rgba(255,255,255,.3)" }}>{fmtEth(t.priceEth)} ETH</span>
               </div>
-              <div className="px-3 py-2">
-                <div className="truncate" style={{ fontWeight: 700, fontSize: 13 }}>{t.name}</div>
-                <div className="truncate uppercase" style={{ ...MONO, fontSize: 10, color: "#9a9a9a", letterSpacing: "0.1em" }}>{t.artist}</div>
-                <div style={{ height: 3, background: "rgba(255,255,255,.12)", marginTop: 7 }}>
-                  <div style={{ height: "100%", width: `${Math.round(t.progress * 100)}%`, background: "linear-gradient(90deg,#fff,#9b9b9b)" }} />
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="px-6 pb-8 pt-3" style={{ position: "relative", zIndex: 1 }}>
-        <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
-          <div className="uppercase vp-grad" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.14em" }}>How it works</div>
-          <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, fontSize: 11, color: "#8f8f8f", textDecoration: "none" }}>read more →</a>
-        </div>
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
-          {[
-            { n: "01", t: "Connect", d: "Connect your wallet in the header — the site switches to Robinhood Chain for you, even if you don't have the network yet." },
-            { n: "02", t: "Launch", d: "Upload a cover and audio, name your track — for 0.0005 ETH the token goes live on the curve." },
-            { n: "03", t: "Trade", d: "Anyone can buy shares of the track on the curve; at 4.2 ETH the track graduates into the pool." },
-          ].map((s, i) => (
-            <div key={s.n} className="vp-glass vp-in p-5" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="vp-grad" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1 }}>{s.n}</div>
-              <div className="uppercase" style={{ ...MONO, fontSize: 13, letterSpacing: "0.2em", margin: "10px 0 8px" }}>{s.t}</div>
-              <div style={{ fontSize: 13, lineHeight: 1.6, color: "#b5b5b5" }}>{s.d}</div>
             </div>
-          ))}
+          </div>
         </div>
-      </section>
 
-      {/* Ticker */}
-      <div className="w-full overflow-hidden uppercase whitespace-nowrap py-3" style={{ ...MONO, fontSize: 13, position: "relative", zIndex: 1, background: "linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015))", borderTop: "1px solid rgba(255,255,255,.12)", borderBottom: "1px solid rgba(255,255,255,.12)", maskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)" }}>
-        <div className="vp-track inline-block" style={{ animation: "vp-slide 40s linear infinite" }}>
-          {[0, 1, 2, 3].map((n) => (
-            <span key={n}>
-              {tickItems.map((t, i) => (
-                <span key={`${n}-${i}`}>
-                  <span className="mx-4 text-neutral-500">/</span>
-                  <span style={t.green ? { color: GREEN } : undefined}>
-                    {t.text.includes("(+2%)")
-                      ? <>{t.text.replace(" (+2%)", " ")}<span style={{ color: GREEN }}>(+2%)</span></>
-                      : t.text}
-                  </span>
-                </span>
-              ))}
-            </span>
-          ))}
+        {/* Outlined marquee */}
+        {mqEl}
+
+        {/* Now playing — glow panel */}
+        <div className="glow feat">
+          <div>
+            <span className="note">now playing</span>
+            <h2 className="disp">{track.name}</h2>
+            <div className="note">{track.artist}</div>
+            <div className="meta">
+              <div>
+                <b>{isDemo ? `${track.priceEth} ETH` : `${fmtEth(track.priceEth)} ETH`}</b>
+                <span className="note">price per share</span>
+              </div>
+              <div>
+                <b>{fmtTokens(track.available)}</b>
+                <span className="note">available</span>
+              </div>
+              <div>
+                <b>{track.symbol}</b>
+                <span className="note">token</span>
+              </div>
+            </div>
+            <div className="row">
+              <span>Launch status</span>
+              <span className="note">{launchStatus}</span>
+            </div>
+            <div className="bar"><i style={{ width: `${Math.min(100, track.progress * 100)}%` }} /></div>
+            <div className="cta" style={{ marginTop: 14 }}>
+              <button className="btn" onClick={openBuy}>
+                {track.graduated && !isDemo ? "Trade on pons ↗" : "Purchase shares"}
+              </button>
+              <button
+                className="btn out"
+                onClick={() => {
+                  if (!isDemo) window.open(`${EXPLORER}/address/${track.token}`, "_blank");
+                  else say("appears after launch");
+                }}
+              >
+                View on chain
+              </button>
+            </div>
+            {!isDemo && (
+              <a
+                href={`${EXPLORER}/address/${track.token}`}
+                target="_blank"
+                rel="noopener"
+                className="note"
+                style={{ display: "block", marginTop: 8 }}
+              >
+                {track.token.slice(0, 6)}…{track.token.slice(-4)} ↗
+              </a>
+            )}
+          </div>
+          <div>
+            <div className="row">
+              <span>Stream position</span>
+              <span className="note">{fmtTime(pos.t)} / {fmtTime(pos.d)}</span>
+            </div>
+            <CurveSvg p={pos.p} />
+            <div className="row" style={{ marginTop: 6 }}>
+              <span className="note">{playing ? "▶ live stream" : "⏸ paused"}</span>
+              <span className="note">{Math.round(pos.p * 100)}%</span>
+            </div>
+          </div>
         </div>
+
+        {/* Stats */}
+        <div className="stats">
+          <div className="stat"><span className="note">tracks</span><b>{tracks.length}</b></div>
+          <div className="stat"><span className="note">artists</span><b>{artistsCount}</b></div>
+          <div className="stat"><span className="note">graduated</span><b>{graduatedCount}</b></div>
+          <div className="stat"><span className="note">launch fee</span><b>{cfg ? `${formatEther(cfg.fee)} ETH` : "0.0005 ETH"}</b></div>
+        </div>
+
+        {/* Tracks */}
+        <section id="tracks">
+          <h2 className="disp t">TRACKS</h2>
+          <div className="tabs">
+            <button className="tab" aria-pressed={tab === "trending"} onPointerDown={(e) => e.preventDefault()} onClick={() => setTab("trending")}>Trending 24h</button>
+            <button className="tab" aria-pressed={tab === "az"} onPointerDown={(e) => e.preventDefault()} onClick={() => setTab("az")}>A–Z</button>
+          </div>
+          <div data-playing={playing}>{gridEl}</div>
+        </section>
+
+        {/* Top artists + launch */}
+        <section id="artists" className="two">
+          <div>
+            <h2 className="disp t">TOP ARTISTS</h2>
+            <div className="panel">
+              <ul className="lb">
+                {topArtists.map((o, i) => (
+                  <li key={o.artist}>
+                    <span className="note">#{i + 1}</span>
+                    <span className="av" style={o.img ? { backgroundImage: `url("${o.img}")` } : undefined} />
+                    <span style={{ color: "var(--ink)", fontSize: 13 }}>{o.artist}</span>
+                    <span className="note">{o.plays ? `${o.plays.toLocaleString("en-US")} plays` : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div id="launch">
+            <h2 className="disp t">LAUNCH YOUR TRACK</h2>
+            <div className="panel">
+              <div className="row"><span>Upload cover + audio, name your track</span><span className="note">vurafy app</span></div>
+              <div className="row"><span>Launch fee</span><span>{cfg ? `${formatEther(cfg.fee)} ETH` : "0.0005 ETH"}</span></div>
+              <div className="row"><span>Graduation</span><span>4.2 ETH → pool</span></div>
+              <div className="row"><span>Creator tax</span><span>{cfg ? `up to ${cfg.maxTax / 100}%` : "up to 20%"}</span></div>
+              <button className="btn" style={{ width: "100%", marginTop: 12 }} onClick={() => setLaunchOpen(true)}>
+                Open launchpad
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section id="how">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <h2 className="disp t">HOW IT WORKS</h2>
+            <a className="note" href="/vurafy/how" style={{ color: "var(--mute)" }}>read the full guide →</a>
+          </div>
+          <div className="steps">
+            {[
+              { n: "1", t: "CONNECT", d: "Connect your wallet. The site switches you to Robinhood Chain — even if you don't have the network yet." },
+              { n: "2", t: "LAUNCH", d: "Upload a cover and audio, name your track. For 0.0005 ETH the token goes live on the curve." },
+              { n: "3", t: "TRADE", d: "Anyone can buy shares of the track. At 4.2 ETH the track graduates into the pool." },
+            ].map((s) => (
+              <div className="panel" key={s.n}>
+                <div className="n">{s.n}</div>
+                <b>{s.t}</b>
+                <p>{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Verify and risks */}
+        <section id="risks">
+          <h2 className="disp t">VERIFY AND RISKS</h2>
+          <details className="risk">
+            <summary>Are track tokens a guaranteed investment?</summary>
+            <p>
+              No. Tokens trade on a bonding curve: the price falls as easily as it rises and you can
+              lose everything you put in. Nothing here is financial advice — verify every contract and
+              only spend what you can afford to lose.
+            </p>
+          </details>
+          <details className="risk">
+            <summary>Who controls the contracts?</summary>
+            <p>
+              Nobody, admin-wise. The factory, the curves and the pools are public pons v2 contracts on
+              Robinhood Chain (chainId 4663). Every address is verifiable in the explorer — the site
+              only calls them, it cannot move your funds.
+            </p>
+          </details>
+          <details className="risk">
+            <summary>Where does the audio live?</summary>
+            <p>
+              The mp3 link is stored in the token description on-chain (VURAFY | artist | audio: url)
+              and the artist picks the audio host. If a host goes down the link may stop working — the
+              token itself keeps trading.
+            </p>
+          </details>
+          <details className="risk">
+            <summary>What happens at graduation?</summary>
+            <p>
+              When 4.2 ETH has been raised, liquidity moves into a Uniswap v4 pool, the curve closes,
+              and the track trades like a regular token.
+            </p>
+          </details>
+          <details className="risk">
+            <summary>Do I need a crypto wallet?</summary>
+            <p>
+              Yes — MetaMask, Rabby or any wallet. On desktop the site connects your extension; on a
+              phone it opens your wallet through a WalletConnect deep-link. Switching to Robinhood
+              Chain takes one click.
+            </p>
+          </details>
+        </section>
+
+        <footer className="site-foot">
+          <span className="disp" style={{ letterSpacing: ".4em" }}>VURAFY</span>
+          <span className="note">
+            Track tokenization protocol // Robinhood Chain // catalog:{" "}
+            {live ? "pons v2 onchain + Audius trending" : "Audius trending electronic"}
+          </span>
+          <span className="note">
+            <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" style={{ color: "var(--ink)" }}>X ↗</a>
+          </span>
+        </footer>
       </div>
 
-      {/* Player */}
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <Waveform playing={playing} seed={track.name.length * 977 + track.artist.length * 131 + 41} />
+      {/* Dock player */}
+      <div className="dock">
+        <div className="tick"><div>{tickLine}{tickSep}{tickLine}{tickSep}</div></div>
+        <DockWave
+          seed={track.name.length * 977 + track.artist.length * 131 + 41}
+          playing={playing}
+          prog={pos.p}
+          onSeek={seek}
+        />
+        <div className="player">
+          <button className="ctl" onPointerDown={(e) => e.preventDefault()} onClick={() => switchTrack(sel - 1)} aria-label="Previous track">⏮</button>
+          <button className="ctl" onPointerDown={(e) => e.preventDefault()} onClick={() => (playing ? pause() : play())} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? "⏸" : "▶"}
+          </button>
+          <button className="ctl" onPointerDown={(e) => e.preventDefault()} onClick={() => switchTrack(sel + 1)} aria-label="Next track">⏭</button>
+          <span className="now">now: {track.name} by {track.artist}</span>
+          <span className="status">{sel + 1} / {tracks.length} · {fmtTime(pos.t)} / {fmtTime(pos.d)}</span>
+        </div>
       </div>
-      <footer className="grid items-center gap-4 px-6 pb-5 pt-3 uppercase tracking-wider vp-footer" style={{ ...MONO, fontSize: 11, gridTemplateColumns: "1fr auto 1fr", position: "relative", zIndex: 1, color: "#8f8f8f" }}>
-        <div className="flex items-center gap-2 text-white vp-fitem">
-          <button className={ctrl} onClick={() => { if (!playing) play(); }} aria-label="Play">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 3l15 9-15 9z" /></svg>
-          </button>
-          <button className={ctrl} onClick={() => { if (playing) pause(); }} aria-label="Pause">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 3h5v18H5zM14 3h5v18h-5z" /></svg>
-          </button>
-          <button className={ctrl} onClick={() => switchTrack(sel - 1)} aria-label="Previous">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 3h3v18H5zM21 3v18L9 12z" /></svg>
-          </button>
-          <button className={ctrl} onClick={() => switchTrack(sel + 1)} aria-label="Next">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 3h3v18h-3zM3 3l12 9L3 21z" /></svg>
-          </button>
-          <span className="ml-3" style={{ fontSize: 13, letterSpacing: "0.22em" }}>{playing ? "Pause" : "Play"}</span>
-        </div>
-        <div className="text-center vp-fitem">
-          VURAFY // Track Tokenization Protocol // Robinhood Chain //{" "}
-          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#fff", textDecoration: "none" }}>X ↗</a>
-        </div>
-        <div className="text-right vp-fitem">24-bit // 48kHz // {track.name}</div>
-      </footer>
 
       {/* ===== BUY MODAL ===== */}
       {buyOpen && (
@@ -990,85 +1315,48 @@ export function VurafyApp() {
               </div>
             ))}
             <div className="mb-3">
-              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Cover — URL (ipfs/http) or file</div>
-              <div className="flex gap-2">
+              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Cover image (.jpg/.png/.webp, max 4MB)</div>
+              <label className="filepick">
+                <span className="filepick-btn">{coverFile ? "Change" : "Choose image"}</span>
+                <span className="filepick-name">{coverFile ? coverFile.file.name : "no file chosen"}</span>
                 <input
-                  value={form.cover}
-                  placeholder="https://.../cover.png"
-                  onChange={(e) => setForm((f) => ({ ...f, cover: e.target.value }))}
-                  className="vp-input flex-1 min-w-0 px-3 py-2"
-                  style={{ ...MONO, fontSize: 13 }}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pickMedia("cover", f);
+                    e.target.value = "";
+                  }}
                 />
-                <button
-                  className="vp-btn-s px-3 uppercase"
-                  style={{ ...MONO, fontSize: 11, cursor: "pointer" }}
-                  disabled={coverUp}
-                  onClick={() => coverInput.current?.click()}
-                >
-                  {coverUp ? "..." : "Upload"}
-                </button>
-              </div>
-              <input
-                ref={coverInput}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadCover(f);
-                  e.target.value = "";
-                }}
-              />
-              <div className="uppercase text-neutral-500 mt-2 mb-1" style={{ ...MONO, fontSize: 10 }}>Cover file — free demo mode</div>
-              <input
-                type="file"
-                accept="image/*"
-                className="vp-input w-full px-3 py-2"
-                style={{ ...MONO, fontSize: 12, color: "#fff" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) setLocalCover({ url: URL.createObjectURL(f), name: f.name });
-                  e.target.value = "";
-                }}
-              />
-              {localCover && (
+              </label>
+              {coverFile && (
                 <div className="flex items-center gap-2 mt-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={localCover.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", border: "1px solid #404040" }} />
-                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{localCover.name}</span>
-                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => setLocalCover(null)}>×</button>
+                  <img src={coverFile.url} alt="" style={{ width: 72, height: 72, objectFit: "cover", border: "1px solid #404040" }} />
+                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{coverFile.file.name}</span>
+                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => { URL.revokeObjectURL(coverFile.url); setCoverFile(null); }}>×</button>
                 </div>
-              )}
-              {!localCover && form.cover && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={form.cover} src={form.cover} alt="cover preview" style={{ width: 72, height: 72, objectFit: "cover", marginTop: 8, border: "1px solid #404040" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }} />
               )}
             </div>
             <div className="mb-3">
-              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Audio URL (ipfs/http)</div>
-              <input
-                value={form.audio}
-                placeholder="https://.../track.mp3"
-                onChange={(e) => setForm((f) => ({ ...f, audio: e.target.value }))}
-                className="vp-input w-full px-3 py-2"
-                style={{ ...MONO, fontSize: 13 }}
-              />
-              <div className="uppercase text-neutral-500 mt-2 mb-1" style={{ ...MONO, fontSize: 10 }}>Audio file — free demo mode</div>
-              <input
-                type="file"
-                accept="audio/*"
-                className="vp-input w-full px-3 py-2"
-                style={{ ...MONO, fontSize: 12, color: "#fff" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) setLocalAudio({ url: URL.createObjectURL(f), name: f.name });
-                  e.target.value = "";
-                }}
-              />
-              {localAudio && (
+              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Audio file (.mp3/.wav, max 4MB)</div>
+              <label className="filepick">
+                <span className="filepick-btn">{audioFile ? "Change" : "Choose audio"}</span>
+                <span className="filepick-name">{audioFile ? audioFile.file.name : "no file chosen"}</span>
+                <input
+                  type="file"
+                  accept=".mp3,.wav,audio/mpeg,audio/wav"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pickMedia("audio", f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {audioFile && (
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{localAudio.name}</span>
-                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => setLocalAudio(null)}>×</button>
+                  <span className="truncate" style={{ ...MONO, fontSize: 11, color: "#9a9a9a" }}>{audioFile.file.name}</span>
+                  <button className="ml-auto" style={{ background: "none", border: "none", color: "#8f8f8f", cursor: "pointer", fontSize: 14 }} onClick={() => { URL.revokeObjectURL(audioFile.url); setAudioFile(null); }}>×</button>
                 </div>
               )}
             </div>
@@ -1102,8 +1390,8 @@ export function VurafyApp() {
             </div>
             <div className="flex gap-3 mt-3">
               <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
-              <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || !cfg} onClick={doLaunch}>
-                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch on Chain (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
+              <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || uploading || !cfg} onClick={doLaunch}>
+                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : uploading ? "Uploading media to IPFS…" : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch on Chain (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
               </button>
             </div>
             <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
@@ -1151,13 +1439,13 @@ export function VurafyApp() {
       <div
         role="status"
         className="fixed bg-white text-black px-5 py-2.5 uppercase transition-opacity"
-        style={{ ...MONO, fontSize: 11, letterSpacing: "0.08em", left: "50%", bottom: 24, transform: "translateX(-50%)", opacity: toast ? 1 : 0, pointerEvents: "none", zIndex: 70, maxWidth: "90vw", textAlign: "center", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,.65), 0 0 34px rgba(255,255,255,.25)" }}
+        style={{ ...MONO, fontSize: 11, letterSpacing: "0.08em", left: "50%", bottom: 96, transform: "translateX(-50%)", opacity: toast ? 1 : 0, pointerEvents: "none", zIndex: 70, maxWidth: "90vw", textAlign: "center", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,.65), 0 0 34px rgba(255,255,255,.25)" }}
       >
         {toast}
       </div>
 
       {loading && (
-        <div className="fixed uppercase" style={{ ...MONO, fontSize: 10, top: 70, left: 24, color: "#888888", letterSpacing: "0.2em", zIndex: 5 }}>
+        <div className="fixed uppercase note" style={{ top: 76, left: 24, letterSpacing: "0.2em", zIndex: 5 }}>
           indexing pons factory…
         </div>
       )}

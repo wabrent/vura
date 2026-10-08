@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
-
 const SECTIONS = [
   { id: "what", label: "What this is" },
   { id: "token", label: "Track token" },
@@ -16,6 +14,7 @@ const SECTIONS = [
 
 export default function HowItWorks() {
   const [active, setActive] = useState("what");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -32,105 +31,96 @@ export default function HowItWorks() {
     return () => obs.disconnect();
   }, []);
 
-  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  const go = (id: string) => {
+    setMenuOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
-    <div className="relative min-h-screen bg-black text-white" style={{ fontFamily: "Helvetica Neue, Arial, sans-serif" }}>
-      <style>{`.hi-up{animation:hi-up .6s cubic-bezier(.16,1,.3,1) both}
-        @keyframes hi-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
-        .hi-glass{background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(16px);box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08);border-radius:10px;transition:border-color .3s}
-        .hi-glass:hover{border-color:rgba(255,255,255,.3)}
-        .hi-grad{background:linear-gradient(92deg,#fff 15%,#9b9b9b 50%,#fff 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
-        .hi-p{background:linear-gradient(180deg,#fff,#e2e2e2);color:#000;border-radius:6px;font-weight:700;box-shadow:0 10px 30px rgba(255,255,255,.15);transition:transform .25s,box-shadow .25s}
-        .hi-p:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(255,255,255,.3)}
-        .hi-s{border:1px solid rgba(255,255,255,.38);border-radius:6px;background:rgba(255,255,255,.035);transition:background .25s,color .25s,transform .25s}
-        .hi-s:hover{background:#fff;color:#000;transform:translateY(-2px)}
-        .hi-nav{transition:background .25s,color .25s}
-        .hi-card ul,.hi-card ol{margin:8px 0;padding-left:22px}
-        .hi-card ul{list-style:disc}
-        .hi-card ol{list-style:decimal}
-        .hi-card li{margin:5px 0}
-        .hi-card li::marker{color:#fff}
-        .hi-card code{background:rgba(255,255,255,.1);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#fff;font-size:.92em;white-space:nowrap}
-        @media (max-width:767px){
-          .hi-header{padding:0 14px!important}
-          .hi-header .hi-logo{font-size:14px!important;letter-spacing:.26em!important}
-          .hi-header nav{gap:10px!important;font-size:11px!important}
-          .hi-optional{display:none}
-          .hi-header .hi-p{padding:8px 12px!important}
-          .hi-body{grid-template-columns:1fr!important;gap:18px!important}
-          .hi-body aside{position:static!important;display:flex;gap:6px;overflow-x:auto;padding:8px!important}
-          .hi-body aside button{width:auto!important;white-space:nowrap;flex:none}
-        }`}</style>
+    <div style={{ position: "relative", zIndex: 0, minHeight: "100vh", paddingBottom: 40 }}>
+      <div className="aur" aria-hidden><i /><i /><i /></div>
+      <div className="grain" aria-hidden />
 
-      {/* ambient bg */}
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-        <div style={{ position: "absolute", top: "-18%", left: "50%", transform: "translateX(-50%)", width: "80vw", height: "50vh", background: "radial-gradient(ellipse at center, rgba(255,255,255,.10), transparent 70%)", filter: "blur(40px)" }} />
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px)", backgroundSize: "68px 68px", maskImage: "radial-gradient(ellipse 90% 60% at 50% 20%, #000 20%, transparent 75%)", WebkitMaskImage: "radial-gradient(ellipse 90% 60% at 50% 20%, #000 20%, transparent 75%)" }} />
-      </div>
-
-      {/* header */}
-      <header className="flex items-center justify-between px-6 hi-header" style={{ height: 64, position: "sticky", top: 0, zIndex: 30, background: "rgba(0,0,0,.55)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,.12)" }}>
-        <a href="/vurafy" className="hi-grad hi-logo" style={{ letterSpacing: "0.5em", fontWeight: 300, fontSize: 18, paddingLeft: "0.5em", textDecoration: "none" }}>VURAFY</a>
-        <nav className="flex items-center gap-4 uppercase" style={{ ...MONO, fontSize: 12 }}>
-          <a href="/vurafy#gallery" className="hover:underline hi-optional" style={{ color: "inherit", textDecoration: "none" }}>Gallery</a>
-          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "inherit", textDecoration: "none" }}>X ↗</a>
-          <a href="/vurafy" className="hi-p px-4 py-2" style={{ color: "#000", textDecoration: "none" }}>Launch a track</a>
+      <header className="site-head">
+        <a href="/vurafy" className="disp logo" style={{ textDecoration: "none", color: "var(--ink)" }}>VURAFY</a>
+        <nav className="nav-main">
+          <a href="/vurafy#tracks">Discover</a>
+          <a href="/vurafy#artists">Artists</a>
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer">X ↗</a>
+          <a href="/vurafy" className="btn" style={{ textDecoration: "none" }}>Launch a track</a>
         </nav>
+        <button
+          className="burger"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          {menuOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l14 14M19 5L5 19" /></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          )}
+        </button>
       </header>
+      {menuOpen && (
+        <div className="mnav">
+          <a href="/vurafy#tracks" onClick={() => setMenuOpen(false)}>Discover</a>
+          <a href="/vurafy#artists" onClick={() => setMenuOpen(false)}>Artists</a>
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}>X ↗</a>
+          <a href="/vurafy" onClick={() => setMenuOpen(false)}>Launch a track</a>
+        </div>
+      )}
 
-      <main style={{ position: "relative", zIndex: 1 }}>
+      <main className="wrap" style={{ position: "relative", zIndex: 1 }}>
         {/* hero */}
-        <section className="mx-auto px-6" style={{ maxWidth: 1100, paddingTop: 72, paddingBottom: 40 }}>
-          <div className="uppercase" style={{ ...MONO, fontSize: 12, letterSpacing: "0.24em", color: "#8f8f8f" }}>How it works</div>
-          <h1 className="hi-grad hi-up" style={{ fontSize: "clamp(34px, 6vw, 64px)", fontWeight: 800, lineHeight: 1.05, margin: "14px 0 18px" }}>
-            Launch a track.<br />Trade the curve.
+        <section style={{ paddingTop: 48 }}>
+          <div className="note" style={{ letterSpacing: "0.24em", textTransform: "uppercase" }}>How it works</div>
+          <h1 className="disp" style={{ fontSize: "clamp(40px, 7vw, 84px)", lineHeight: 0.92, margin: "14px 0 18px" }}>
+            LAUNCH A TRACK.<br />
+            <span style={{ color: "transparent", WebkitTextStroke: "1.5px var(--ink)" }}>TRADE THE CURVE.</span>
           </h1>
-          <p style={{ fontSize: 16, lineHeight: 1.7, color: "#b5b5b5", maxWidth: 640, margin: 0 }}>
-            VURAFY is a music launchpad built on top of pons v2. The token, the curve and the pool are pons
-            contracts on Robinhood Chain; the track carries its cover, artist name and audio link into them.
+          <p className="lead" style={{ maxWidth: 640 }}>
+            VURAFY is a music launchpad built on top of pons v2. The token, the curve and the pool are
+            pons contracts on Robinhood Chain; the track carries its cover, artist name and audio link
+            into them.
           </p>
-          <div className="flex gap-3" style={{ marginTop: 26, flexWrap: "wrap" }}>
-            <a href="/vurafy" className="hi-p px-5 py-3 uppercase" style={{ ...MONO, fontSize: 13, color: "#000", textDecoration: "none" }}>Launch a track</a>
-            <a href="/vurafy#gallery" className="hi-s px-5 py-3 uppercase" style={{ ...MONO, fontSize: 13, color: "inherit", textDecoration: "none" }}>Explore gallery</a>
+          <div className="cta">
+            <a href="/vurafy" className="btn" style={{ textDecoration: "none" }}>Launch a track</a>
+            <a href="/vurafy#tracks" className="btn out" style={{ textDecoration: "none" }}>Explore tracks</a>
           </div>
 
           {/* steps */}
-          <div className="grid gap-4" style={{ marginTop: 48, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+          <div className="steps" style={{ marginTop: 44 }}>
             {[
-              { n: "01", t: "Connect", d: "Connect your wallet in the header — the site switches to Robinhood Chain for you, even if you don't have the network yet." },
-              { n: "02", t: "Launch", d: "Upload a cover and audio, name your track — for 0.0005 ETH the token goes live on the curve." },
-              { n: "03", t: "Trade", d: "Anyone can buy shares of the track on the curve; at 4.2 ETH the track graduates into the pool." },
-            ].map((s, i) => (
-              <div key={s.n} className="hi-glass hi-up p-5" style={{ animationDelay: `${i * 0.08}s` }}>
-                <div style={{ ...MONO, fontSize: 12, color: "#8f8f8f" }}>{s.n}</div>
-                <div className="hi-grad" style={{ fontSize: 22, fontWeight: 800, margin: "8px 0" }}>{s.t}</div>
-                <div style={{ fontSize: 13.5, lineHeight: 1.65, color: "#b5b5b5" }}>{s.d}</div>
+              { n: "1", t: "CONNECT", d: "Connect your wallet — the site switches to Robinhood Chain for you, even if you don't have the network yet." },
+              { n: "2", t: "LAUNCH", d: "Upload a cover and audio, name your track — for 0.0005 ETH the token goes live on the curve." },
+              { n: "3", t: "TRADE", d: "Anyone can buy shares of the track on the curve; at 4.2 ETH the track graduates into the pool." },
+            ].map((s) => (
+              <div className="panel" key={s.n}>
+                <div className="n">{s.n}</div>
+                <b>{s.t}</b>
+                <p>{s.d}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* sidebar + content */}
-        <section className="mx-auto px-6 pb-24 hi-body" style={{ maxWidth: 1100, display: "grid", gap: 28, gridTemplateColumns: "minmax(180px, 220px) 1fr", alignItems: "start" }}>
-          <aside className="hi-glass" style={{ position: "sticky", top: 88, padding: 10 }}>
+        <section className="hi-body" style={{ display: "grid", gap: 28, gridTemplateColumns: "minmax(180px, 220px) 1fr", alignItems: "start", paddingBottom: 60 }}>
+          <aside className="panel" style={{ position: "sticky", top: 88, padding: 10 }}>
             {SECTIONS.map((s) => (
               <button
                 key={s.id}
                 onClick={() => go(s.id)}
-                className="hi-nav w-full text-left uppercase px-3 py-2"
-                style={{
-                  ...MONO, fontSize: 12, cursor: "pointer", border: "none", borderRadius: 6,
-                  background: active === s.id ? "rgba(255,255,255,.12)" : "transparent",
-                  color: active === s.id ? "#fff" : "#8f8f8f",
-                }}
+                className="tab w-full text-left"
+                aria-pressed={active === s.id}
+                style={{ width: "100%", textAlign: "left", border: "none", borderRadius: 6, marginBottom: 4, background: active === s.id ? "var(--ink)" : "transparent", color: active === s.id ? "var(--bg)" : "var(--mute)" }}
               >
                 {s.label}
               </button>
             ))}
           </aside>
 
-          <div className="flex flex-col gap-5" style={{ minWidth: 0 }}>
+          <div className="flex flex-col gap-5" style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
             <Card id="what" title="What this is">
               <p>VURAFY does not run its own blockchain: every launch calls the live pons v2 factory on Robinhood Chain. The token, the bonding curve and the Uniswap v4 pool — all of it is pons.</p>
               <p>What VURAFY adds is the <b>meaning of a track</b>: the token description on-chain stores <code>VURAFY | artist | audio: url</code>, and the cover and name show up in the site feed and gallery. Anyone can connect and launch their own track.</p>
@@ -163,13 +153,13 @@ export default function HowItWorks() {
 
             <Card id="grad" title="Graduation">
               <p>When <b>4.2 ETH</b> has been raised on the curve, the track graduates: liquidity moves into a Uniswap v4 pool, the curve closes, and the track trades like a regular token.</p>
-              <p>Progress to graduation is shown on the track card (the bar under the cover).</p>
+              <p>Progress to graduation is shown on the track card and in the now-playing panel.</p>
             </Card>
 
             <Card id="trade" title="Buy & sell">
               <ol>
                 <li>Connect your wallet (the site switches the network for you).</li>
-                <li>Pick a track in the gallery, hit <b>Purchase Shares</b>.</li>
+                <li>Pick a track, hit <b>Purchase Shares</b>.</li>
                 <li>Enter an ETH amount — the quote shows how many tokens you get.</li>
                 <li>Confirm in your wallet: 10% slippage protection.</li>
               </ol>
@@ -187,19 +177,28 @@ export default function HowItWorks() {
         </section>
       </main>
 
-      <footer className="px-6 pb-8 text-center uppercase" style={{ ...MONO, fontSize: 11, color: "#6f6f6f", position: "relative", zIndex: 1, letterSpacing: "0.14em" }}>
-        VURAFY // Track Tokenization Protocol // Robinhood Chain //{" "}
-        <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#fff", textDecoration: "none" }}>X ↗</a>
+      <footer className="wrap site-foot">
+        <span className="disp" style={{ letterSpacing: ".4em" }}>VURAFY</span>
+        <span className="note">
+          Track tokenization protocol // Robinhood Chain //{" "}
+          <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" style={{ color: "var(--ink)" }}>X ↗</a>
+        </span>
       </footer>
+
+      <style>{`@media (max-width: 860px){
+          .hi-body{grid-template-columns:1fr!important}
+          .hi-body aside{position:static!important;display:flex;gap:6px;overflow-x:auto;padding:8px!important;flex-wrap:wrap}
+          .hi-body aside button{width:auto!important;white-space:nowrap;flex:none;margin-bottom:0!important}
+        }`}</style>
     </div>
   );
 }
 
 function Card({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <div id={id} className="hi-glass hi-card hi-up p-6" style={{ scrollMarginTop: 88 }}>
-      <div className="hi-grad" style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{title}</div>
-      <div style={{ fontSize: 14.5, lineHeight: 1.7, color: "#b5b5b5" }}>
+    <div id={id} className="panel" style={{ scrollMarginTop: 88, padding: 24 }}>
+      <div className="disp" style={{ fontSize: 22, marginBottom: 12 }}>{title}</div>
+      <div className="prose" style={{ fontSize: 14.5, lineHeight: 1.7, color: "var(--mute)" }}>
         {children}
       </div>
     </div>
@@ -209,7 +208,7 @@ function Card({ id, title, children }: { id: string; title: string; children: Re
 function Faq({ q, children }: { q: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ color: "#fff", fontWeight: 700, marginBottom: 4 }}>{q}</div>
+      <div style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 4 }}>{q}</div>
       <div>{children}</div>
     </div>
   );

@@ -86,6 +86,7 @@ export type Track = {
   graduated: boolean;
   creatorTaxBps: number;
   isDemo?: boolean;
+  plays?: number;        // play count (audius)
 };
 
 export type LaunchLog = {
