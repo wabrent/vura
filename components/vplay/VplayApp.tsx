@@ -611,7 +611,7 @@ export function VplayApp() {
             Gallery
           </button>
           <a href="/vurafy/how" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
-            How
+            How it works
           </a>
           <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" className="uppercase hover:underline" style={{ ...MONO, color: "inherit", fontSize: 14, textDecoration: "none" }}>
             X ↗
