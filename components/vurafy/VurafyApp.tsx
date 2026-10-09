@@ -308,6 +308,7 @@ export function VurafyApp() {
   const ptStage = useRef<"" | "approve" | "buy" | "sell">("");
   const [ptTrades, setPtTrades] = useState<TradePoint[]>([]);
   const [ptTradesTick, setPtTradesTick] = useState(0);
+  const [ptHolders, setPtHolders] = useState<number | null>(null);
 
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
@@ -734,6 +735,22 @@ export function VurafyApp() {
     const iv = window.setInterval(() => { void refresh(); }, 20000);
     return () => { cancelled = true; window.clearInterval(iv); };
   }, [ptCurve, ptTradesTick]);
+
+  useEffect(() => {
+    if (!ptCurve) return;
+    let cancelled = false;
+    const fetchHolders = async () => {
+      try {
+        const r = await fetch(`${EXPLORER}/api/v2/tokens/${PROJECT_TOKEN}/counters`);
+        const j = await r.json();
+        const h = Number(j?.token_holders_count);
+        if (!cancelled && isFinite(h)) setPtHolders(h);
+      } catch { /* noop */ }
+    };
+    void fetchHolders();
+    const iv = window.setInterval(() => { void fetchHolders(); }, 60000);
+    return () => { cancelled = true; window.clearInterval(iv); };
+  }, [ptCurve]);
 
   useEffect(() => {
     if (!pt) return;
@@ -1304,7 +1321,13 @@ export function VurafyApp() {
             </a>
           </div>
           <div style={{ margin: "16px 0 18px" }}>
-            <PriceChart trades={ptTrades} priceEth={pt?.priceEth ?? 0} totalSupply={pt?.totalSupply ?? 0n} />
+            <PriceChart
+              trades={ptTrades}
+              priceEth={pt?.priceEth ?? 0}
+              totalSupply={pt?.totalSupply ?? 0n}
+              holders={ptHolders}
+              creatorTaxBps={pt?.creatorTaxBps ?? 0}
+            />
           </div>
           <div className="two">
             <div className="glow">

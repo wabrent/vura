@@ -30,14 +30,25 @@ function fmtTime(t: number, full?: boolean) {
   });
 }
 
+function fmtSupply(v: number) {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return String(v);
+}
+
 export default function PriceChart({
   trades,
   priceEth,
   totalSupply,
+  holders,
+  creatorTaxBps,
 }: {
   trades: TradePoint[];
   priceEth: number;
   totalSupply: bigint;
+  holders: number | null;
+  creatorTaxBps: number;
 }) {
   const [range, setRange] = useState<RangeKey>("all");
   const [hover, setHover] = useState<number | null>(null);
@@ -94,6 +105,14 @@ export default function PriceChart({
   const last = pts.length > 0 ? pts[pts.length - 1] : null;
   const curY = model ? (priceEth > 0 ? model.y(priceEth) : last ? model.y(last.price) : null) : null;
   const mcapEth = totalSupply > 0n && priceEth > 0 ? (priceEth * Number(totalSupply)) / 1e18 : 0;
+  const supplyNum = totalSupply > 0n ? Number(totalSupply) / 1e18 : 0;
+  const stats: [string, string][] = [
+    ["Market cap", mcapEth > 0 ? `${mcapEth >= 10 ? mcapEth.toFixed(1) : mcapEth.toFixed(3)} ETH` : "…"],
+    ["Holders", holders === null ? "…" : String(holders)],
+    ["Trades", String(trades.length)],
+    ["Supply", supplyNum > 0 ? fmtSupply(supplyNum) : "…"],
+    ["Creator fee", `${creatorTaxBps / 100}%`],
+  ];
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const box = boxRef.current;
@@ -133,12 +152,17 @@ export default function PriceChart({
         .pc-tip .s-buy{color:${GREEN}}
         .pc-tip .s-sell{color:${RED}}
         .pc-x{display:flex;justify-content:space-between;margin-top:8px;font:10px var(--font-jb,"JetBrains Mono"),monospace;color:var(--mute)}
+        .pc-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+        .pc-stat span{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .pc-stat b{display:block;font:600 18px var(--font-jb,"JetBrains Mono"),monospace;color:var(--ink);white-space:nowrap}
         .pc-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);font-size:13px;letter-spacing:.04em}
         .pc-ranges{display:flex;gap:6px;margin:0}
         @media (max-width:760px){
           .pc-plot{height:210px}
           .pc-price{font-size:22px}
           .pc-delta{vertical-align:4px}
+          .pc-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 10px}
+          .pc-stat b{font-size:15px}
         }
       `}</style>
 
@@ -259,6 +283,15 @@ export default function PriceChart({
             <span key={i}>{fmtTime(t)}</span>
           )
         )}
+      </div>
+
+      <div className="pc-stats">
+        {stats.map(([k, v]) => (
+          <div key={k} className="pc-stat">
+            <span>{k}</span>
+            <b>{v}</b>
+          </div>
+        ))}
       </div>
     </div>
   );
