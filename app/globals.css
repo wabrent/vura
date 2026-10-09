@@ -777,6 +777,7 @@ nav button:hover {
 
 section {
   padding: 22px 0;
+  scroll-margin-top: 84px;
 }
 
 h2.t {

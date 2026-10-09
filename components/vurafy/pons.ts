@@ -4,8 +4,13 @@ import { parseAbi, parseAbiItem, createPublicClient, http, type Address } from "
 import { robinhood, rpcUrl } from "@/lib/web3/config";
 
 export const FACTORY = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" as Address;
+export const PROJECT_TOKEN = "0xd9aaee9863a9c2a8b96a626ba5f6de37e98541a4" as Address;
 export const EXPLORER = "https://robinhoodchain.blockscout.com";
 export const PONS_APP = "https://www.ponsfamily.com/launchpad";
+
+export function ipfsHttp(u: string) {
+  return u.startsWith("ipfs://") ? `https://gateway.pinata.cloud/ipfs/${u.slice(7)}` : u;
+}
 
 export const client = createPublicClient({ chain: robinhood, transport: http(rpcUrl()) });
 
@@ -36,6 +41,7 @@ export const curveAbi = parseAbi([
   "function creatorTaxBps() view returns (uint256)",
   "function currentSnipeTaxBps(address recipient) view returns (uint256)",
   "function buy(uint256 quoteIn, uint256 minTokensOut, address recipient) payable returns (uint256 tokensOut)",
+  "function sell(uint256 tokensIn, uint256 minQuoteOut, address recipient) returns (uint256 quoteOut)",
   "function pairToken() view returns (address)",
   "function isNativeQuote() view returns (bool)",
 ]);
@@ -48,6 +54,8 @@ export const tokenAbi = parseAbi([
   "function logo() view returns (string)",
   "function description() view returns (string)",
   "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 
 export const TOKEN_LAUNCHED = parseAbiItem(
@@ -148,6 +156,24 @@ function amountIn(outAmount: bigint, reserveIn: bigint, reserveOut: bigint) {
   return (outAmount * reserveIn) / (reserveOut - outAmount) + 1n;
 }
 
+export type QuoteSell = { quoteOut: bigint; feeBps: bigint; creatorTaxBps: bigint };
+
+export async function quoteSell(curve: Address, tokensIn: bigint): Promise<QuoteSell> {
+  const read = <T extends string>(functionName: T, args?: readonly unknown[]) =>
+    client.readContract({ address: curve, abi: curveAbi, functionName, args } as never);
+
+  const [reserves, feeBps, creatorTaxBps] = await Promise.all([
+    read("getReserves"),
+    read("feeBps"),
+    read("creatorTaxBps"),
+  ]);
+  const [quoteReserve, tokenReserve] = reserves as readonly [bigint, bigint];
+  const gross = amountOut(tokensIn, tokenReserve, quoteReserve);
+  const fee = (gross * (feeBps as bigint)) / BPS;
+  const tax = (gross * (creatorTaxBps as bigint)) / BPS;
+  return { quoteOut: gross - fee - tax, feeBps: feeBps as bigint, creatorTaxBps: creatorTaxBps as bigint };
+}
+
 /* ---------- track loading ---------- */
 export async function loadTrack(l: LaunchLog): Promise<Track | null> {
   try {
@@ -187,6 +213,76 @@ export async function loadTrack(l: LaunchLog): Promise<Track | null> {
       progress: prog,
       graduated: (graduated as boolean) || (lt ? lt.phase >= 2 : false),
       creatorTaxBps: lt ? Number(lt.creatorTaxBps) : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* ---------- project token ($VURAFY) ---------- */
+export type ProjectToken = {
+  token: Address;
+  curve: Address;
+  name: string;
+  symbol: string;
+  logo: string;
+  description: string;
+  priceEth: number;      // ETH за 1 токен
+  raised: bigint;        // realQuoteReserve
+  threshold: bigint;     // graduationThreshold
+  progress: number;      // 0..1
+  available: bigint;     // sellableTokens
+  totalSupply: bigint;
+  graduated: boolean;
+  phase: number;
+  feeBps: number;
+  creatorTaxBps: number;
+  balance: bigint;       // баланс владельца (0 если не передан)
+};
+
+export async function loadProjectToken(owner?: Address): Promise<ProjectToken | null> {
+  try {
+    const lt = (await client.readContract({
+      address: FACTORY, abi: factoryAbi, functionName: "getLaunchedToken", args: [PROJECT_TOKEN],
+    })) as { curve: Address; creatorTaxBps: number; phase: number; exists: boolean };
+    if (!lt.exists) return null;
+    const [name, symbol, logo, desc, totalSupply, reserves, sellable, raised, threshold, graduated, feeBps, balance] =
+      await Promise.all([
+        client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "name" }),
+        client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "symbol" }),
+        client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "logo" }).catch(() => ""),
+        client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "description" }),
+        client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "totalSupply" }),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "getReserves" }),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "sellableTokens" }),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "realQuoteReserve" }),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "graduationThreshold" }),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "graduated" }).catch(() => false),
+        client.readContract({ address: lt.curve, abi: curveAbi, functionName: "feeBps" }),
+        owner
+          ? client.readContract({ address: PROJECT_TOKEN, abi: tokenAbi, functionName: "balanceOf", args: [owner] })
+          : Promise.resolve(0n),
+      ]);
+    const [qRes, tRes] = reserves as readonly [bigint, bigint];
+    const thr = threshold as bigint;
+    return {
+      token: PROJECT_TOKEN,
+      curve: lt.curve,
+      name: name as string,
+      symbol: symbol as string,
+      logo: logo as string,
+      description: desc as string,
+      priceEth: tRes > 0n ? Number(qRes) / Number(tRes) : 0,
+      raised: raised as bigint,
+      threshold: thr,
+      progress: thr > 0n ? Math.min(1, Number(raised as bigint) / Number(thr)) : 0,
+      available: sellable as bigint,
+      totalSupply: totalSupply as bigint,
+      graduated: (graduated as boolean) || lt.phase >= 2,
+      phase: lt.phase,
+      feeBps: Number(feeBps),
+      creatorTaxBps: lt.creatorTaxBps,
+      balance: balance as bigint,
     };
   } catch {
     return null;

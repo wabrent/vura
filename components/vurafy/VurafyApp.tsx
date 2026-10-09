@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
-import { parseEther, formatEther, formatUnits, toHex, zeroAddress, type Address } from "viem";
+import { parseEther, formatEther, formatUnits, parseUnits, toHex, zeroAddress, type Address } from "viem";
 import { robinhood } from "@/lib/web3/config";
 import {
-  FACTORY, EXPLORER, PONS_APP, factoryAbi, curveAbi,
-  discoverLaunches, loadTrack, quoteBuy, walletBalances, buildDescription, VURAFY_SOCIALS,
-  type Track, type LaunchLog, type Quote,
+  FACTORY, EXPLORER, PONS_APP, PROJECT_TOKEN, factoryAbi, curveAbi, tokenAbi, ipfsHttp,
+  discoverLaunches, loadTrack, quoteBuy, quoteSell, loadProjectToken, walletBalances, buildDescription, VURAFY_SOCIALS,
+  type Track, type LaunchLog, type Quote, type ProjectToken,
 } from "./pons";
 import { buildDemoTracks } from "./demoCatalog";
 import { fetchAudiusTracks } from "./audius";
@@ -65,6 +65,10 @@ function fmtEth(p: number) {
   if (p >= 0.01) return p.toFixed(4);
   if (p >= 0.000001) return p.toFixed(6);
   return p.toExponential(2);
+}
+function fmtRaised(v: bigint) {
+  const n = Number(formatEther(v));
+  return n < 1e-6 ? "0" : fmtEth(n);
 }
 function fmtTokens(v: bigint) {
   const n = Number(formatUnits(v, 18));
@@ -287,10 +291,20 @@ export function VurafyApp() {
   const [coverFile, setCoverFile] = useState<{ file: File; url: string } | null>(null);
   const [audioFile, setAudioFile] = useState<{ file: File; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [upPct, setUpPct] = useState<number | null>(null);
   const autoplayRef = useRef(false);
   const catalogRunRef = useRef(0);
   const [cfg, setCfg] = useState<{ id: bigint; fee: bigint; maxTax: number; can: boolean } | null>(null);
   const [balances, setBalances] = useState<Record<string, bigint>>({});
+
+  /* ---------- $VURAFY trade panel ---------- */
+  const [pt, setPt] = useState<ProjectToken | null>(null);
+  const [ptSide, setPtSide] = useState<"buy" | "sell">("buy");
+  const [ptAmt, setPtAmt] = useState("0.01");
+  const [ptQuote, setPtQuote] = useState<{ out: bigint; min: bigint; spent: bigint } | null>(null);
+  const [ptQuoting, setPtQuoting] = useState(false);
+  const [ptBusy, setPtBusy] = useState<"approve" | "buy" | "sell" | null>(null);
+  const ptStage = useRef<"" | "approve" | "buy" | "sell">("");
 
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
@@ -385,9 +399,6 @@ export function VurafyApp() {
     return () => window.clearInterval(iv);
   }, [live, logs, sel]);
 
-  useEffect(() => {
-    if (txSuccess) { say("purchase confirmed onchain ✓"); setBuyOpen(false); setQuote(null); }
-  }, [txSuccess, say]);
   useEffect(() => {
     if (launchWait.isSuccess) {
       say("track launched on pons ✓ — indexing…");
@@ -680,6 +691,7 @@ export function VurafyApp() {
     if (!isConnected) { connectWallet(); return; }
     if (wrongChain) { switchToRobinhood(); return; }
     if (!quote || !address) return;
+    ptStage.current = "";
     const minOut = (quote.tokensOut * 90n) / 100n;
     writeContract({
       address: track.curve,
@@ -690,6 +702,129 @@ export function VurafyApp() {
       chainId: robinhood.id,
     });
   };
+
+  /* ---------- $VURAFY trade ---------- */
+  const loadPt = useCallback(async () => {
+    try {
+      const p = await loadProjectToken(address);
+      if (p) setPt(p);
+    } catch { /* noop */ }
+  }, [address]);
+
+  useEffect(() => { void loadPt(); }, [loadPt]);
+  useEffect(() => {
+    const iv = window.setInterval(() => { void loadPt(); }, 20000);
+    return () => window.clearInterval(iv);
+  }, [loadPt]);
+
+  useEffect(() => {
+    if (!pt) return;
+    let cancelled = false;
+    setPtQuoting(true);
+    const to = window.setTimeout(async () => {
+      try {
+        const v = parseFloat(ptAmt);
+        if (!v || v <= 0) { if (!cancelled) { setPtQuote(null); setPtQuoting(false); } return; }
+        if (ptSide === "buy") {
+          const q = await quoteBuy(pt.curve, parseEther(String(v)), address ?? zeroAddress);
+          if (!cancelled) { setPtQuote({ out: q.tokensOut, min: (q.tokensOut * 90n) / 100n, spent: q.spent }); setPtQuoting(false); }
+        } else {
+          const q = await quoteSell(pt.curve, parseUnits(String(v), 18));
+          if (!cancelled) { setPtQuote({ out: q.quoteOut, min: (q.quoteOut * 90n) / 100n, spent: 0n }); setPtQuoting(false); }
+        }
+      } catch {
+        if (!cancelled) { setPtQuote(null); setPtQuoting(false); }
+      }
+    }, 450);
+    return () => { cancelled = true; window.clearTimeout(to); };
+  }, [ptAmt, ptSide, pt, address]);
+
+  const doPtBuy = () => {
+    if (!isConnected) { connectWallet(); return; }
+    if (wrongChain) { switchToRobinhood(); return; }
+    if (!ptQuote || !address || !pt) return;
+    ptStage.current = "buy";
+    setPtBusy("buy");
+    writeContract({
+      address: pt.curve,
+      abi: curveAbi,
+      functionName: "buy",
+      args: [ptQuote.spent, ptQuote.min, address],
+      value: ptQuote.spent,
+      chainId: robinhood.id,
+    });
+  };
+
+  const doPtSell = async () => {
+    if (!isConnected) { connectWallet(); return; }
+    if (wrongChain) { switchToRobinhood(); return; }
+    if (!ptQuote || !address || !pt || !publicClient) return;
+    const tokensIn = parseUnits(ptAmt, 18);
+    try {
+      const allowance = (await publicClient.readContract({
+        address: PROJECT_TOKEN, abi: tokenAbi, functionName: "allowance", args: [address, pt.curve],
+      })) as bigint;
+      if (allowance >= tokensIn) {
+        ptStage.current = "sell";
+        setPtBusy("sell");
+        writeContract({
+          address: pt.curve, abi: curveAbi, functionName: "sell",
+          args: [tokensIn, ptQuote.min, address],
+          chainId: robinhood.id,
+        });
+      } else {
+        ptStage.current = "approve";
+        setPtBusy("approve");
+        writeContract({
+          address: PROJECT_TOKEN, abi: tokenAbi, functionName: "approve",
+          args: [pt.curve, tokensIn],
+          chainId: robinhood.id,
+        });
+      }
+    } catch {
+      ptStage.current = "";
+      setPtBusy(null);
+      say("allowance check failed — try again");
+    }
+  };
+
+  const doPtSellRef = useRef(doPtSell);
+  doPtSellRef.current = doPtSell;
+
+  const doPt = () => {
+    if (ptSide === "buy") doPtBuy();
+    else void doPtSell();
+  };
+
+  const ptSellOver = (() => {
+    if (!isConnected || ptSide !== "sell" || !pt) return false;
+    try { return parseUnits(ptAmt || "0", 18) > pt.balance; } catch { return false; }
+  })();
+
+  useEffect(() => {
+    if (txError) { ptStage.current = ""; setPtBusy(null); }
+  }, [txError]);
+
+  useEffect(() => {
+    if (!txSuccess) return;
+    const st = ptStage.current;
+    if (st === "approve") {
+      ptStage.current = "";
+      say("approved ✓ — confirming sell…");
+      void doPtSellRef.current();
+      return;
+    }
+    if (st === "buy" || st === "sell") {
+      ptStage.current = "";
+      setPtBusy(null);
+      say(st === "buy" ? "$VURAFY purchase confirmed ✓" : "$VURAFY sold ✓");
+      void loadPt();
+      return;
+    }
+    say("purchase confirmed onchain ✓");
+    setBuyOpen(false);
+    setQuote(null);
+  }, [txSuccess, say, loadPt]);
 
   /* ---------- launch ---------- */
   useEffect(() => {
@@ -714,7 +849,34 @@ export function VurafyApp() {
 
   const autoSymbol = form.title.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8) || "TRACK";
 
-  const pinFile = async (f: File): Promise<string> => {
+  const CHUNK = 4 * 1024 * 1024;
+
+  const pinFile = async (f: File, onProgress?: (pct: number) => void): Promise<string> => {
+    if (f.size > 4.4 * 1024 * 1024) {
+      // bigger than the Vercel body limit — send in chunks, assemble and pin server-side
+      const uploadId = crypto.randomUUID();
+      const total = Math.ceil(f.size / CHUNK);
+      for (let i = 0; i < total; i++) {
+        const fd = new FormData();
+        fd.append("chunk", f.slice(i * CHUNK, Math.min((i + 1) * CHUNK, f.size)), `part-${i}`);
+        fd.append("uploadId", uploadId);
+        fd.append("index", String(i));
+        const r = await fetch("/api/upload-chunk", { method: "POST", body: fd });
+        const j = (await r.json()) as { ok?: boolean; error?: string };
+        if (!r.ok || !j.ok) throw new Error(j.error || "chunk upload failed");
+        onProgress?.(Math.round(((i + 1) / total) * 90));
+      }
+      onProgress?.(95);
+      const r2 = await fetch("/api/pin-chunks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ uploadId, filename: f.name, mime: f.type }),
+      });
+      const j2 = (await r2.json()) as { url?: string; error?: string };
+      if (!r2.ok || !j2.url) throw new Error(j2.error || "pin failed");
+      onProgress?.(100);
+      return j2.url;
+    }
     const fd = new FormData();
     fd.append("file", f);
     const r = await fetch("/api/upload", { method: "POST", body: fd });
@@ -724,7 +886,7 @@ export function VurafyApp() {
   };
 
   const pickMedia = (kind: "cover" | "audio", f: File) => {
-    const max = kind === "cover" ? 4 * 1024 * 1024 : 4.4 * 1024 * 1024;
+    const max = kind === "cover" ? 4 * 1024 * 1024 : 50 * 1024 * 1024;
     if (f.size > max) { say(`${kind}: max ${Math.round(max / 1024 / 1024)}MB`); return; }
     const url = URL.createObjectURL(f);
     const set = kind === "cover" ? setCoverFile : setAudioFile;
@@ -739,7 +901,7 @@ export function VurafyApp() {
     if (!coverFile || !audioFile) { say("cover and audio files are required"); return; }
     setUploading(true);
     try {
-      const [coverUrl, audioUrl] = await Promise.all([pinFile(coverFile.file), pinFile(audioFile.file)]);
+      const [coverUrl, audioUrl] = await Promise.all([pinFile(coverFile.file), pinFile(audioFile.file, setUpPct)]);
       const pairToken = zeroAddress;
       const salt = toHex(crypto.getRandomValues(new Uint8Array(32)));
       const [expectedEconomics, fee] = await Promise.all([
@@ -774,6 +936,7 @@ export function VurafyApp() {
       say(`launch failed: ${String((e as Error).message || e).slice(0, 140)}`);
     } finally {
       setUploading(false);
+      setUpPct(null);
     }
   };
 
@@ -865,6 +1028,7 @@ export function VurafyApp() {
   const navItems = (
     <>
       <a href="#tracks" onClick={closeMenu}>Discover</a>
+      <a href="#token" onClick={closeMenu}>$VURAFY</a>
       <a href="#artists" onClick={closeMenu}>Artists</a>
       <a href="/vurafy/how" onClick={closeMenu}>How it works</a>
       <a href="https://x.com/vurafy" target="_blank" rel="noreferrer" onClick={closeMenu}>X ↗</a>
@@ -979,7 +1143,9 @@ export function VurafyApp() {
         .vp-grad{background:linear-gradient(92deg,#ffffff 15%,#9b9b9b 50%,#ffffff 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
         .vp-input{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
         .vp-input:focus{border-color:rgba(255,255,255,.6);box-shadow:0 0 0 3px rgba(255,255,255,.09)}
-        .vp-input::placeholder{color:#6b6b6b}`}</style>
+        .vp-input::placeholder{color:#6b6b6b}
+        .tok-logo{position:relative;width:72px;height:72px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.18);flex:0 0 auto;background:rgba(255,255,255,.05)}
+        .tok-logo img{width:100%;height:100%;object-fit:cover}`}</style>
 
       <BgWaves playing={playing} />
 
@@ -1103,6 +1269,133 @@ export function VurafyApp() {
           <div className="stat"><span className="note">graduated</span><b>{graduatedCount}</b></div>
           <div className="stat"><span className="note">launch fee</span><b>{cfg ? `${formatEther(cfg.fee)} ETH` : "0.0005 ETH"}</b></div>
         </div>
+
+        {/* $VURAFY token trade */}
+        <section id="token">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <h2 className="disp t">$VURAFY</h2>
+            <a
+              className="note"
+              href={`${EXPLORER}/address/${PROJECT_TOKEN}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "var(--mute)" }}
+            >
+              {PROJECT_TOKEN.slice(0, 6)}…{PROJECT_TOKEN.slice(-4)} ↗
+            </a>
+          </div>
+          <div className="two">
+            <div className="glow">
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <div className="tok-logo">
+                  {pt?.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={ipfsHttp(pt.logo)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  ) : (
+                    <CoverArt seed="vurafy-project-token" symbol={(pt?.symbol ?? "VUR").slice(0, 3)} />
+                  )}
+                </div>
+                <div>
+                  <div className="disp" style={{ fontSize: 22 }}>{pt?.name ?? "VURAFY"}</div>
+                  <div className="note">{pt?.symbol ?? "VURAFY"} · project token</div>
+                </div>
+              </div>
+              <p
+                className="note"
+                style={{ marginTop: 12, lineHeight: 1.6, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+              >
+                {pt?.description}
+              </p>
+              <div className="row" style={{ marginTop: 12 }}>
+                <span>Price</span>
+                <span>{pt ? `${(pt.priceEth * 1e9).toFixed(2)} gwei` : "…"}</span>
+              </div>
+              <div className="row">
+                <span>Raised</span>
+                <span>{pt ? `${fmtRaised(pt.raised)} / ${formatEther(pt.threshold)} ETH` : "…"}</span>
+              </div>
+              <div className="bar" style={{ marginTop: 8 }}>
+                <i style={{ width: `${Math.min(100, (pt?.progress ?? 0) * 100)}%` }} />
+              </div>
+              <div className="row" style={{ marginTop: 12 }}>
+                <span>Fees</span>
+                <span>{pt ? `${pt.feeBps / 100}% trade + ${pt.creatorTaxBps / 100}% creator tax` : "…"}</span>
+              </div>
+              <div className="row">
+                <span>Your balance</span>
+                <span>{isConnected && pt ? `${fmtTokens(pt.balance)} ${pt.symbol}` : "—"}</span>
+              </div>
+            </div>
+            <div className="panel">
+              <div className="tabs">
+                <button className="tab" aria-pressed={ptSide === "buy"} onClick={() => { setPtSide("buy"); setPtAmt("0.01"); setPtQuote(null); }}>Buy</button>
+                <button className="tab" aria-pressed={ptSide === "sell"} onClick={() => { setPtSide("sell"); setPtAmt("0"); setPtQuote(null); }}>Sell</button>
+              </div>
+              {pt?.graduated ? (
+                <button className="btn" style={{ width: "100%" }} onClick={() => window.open(`${PONS_APP}/${PROJECT_TOKEN}`, "_blank")}>
+                  Graduated — trade on pons ↗
+                </button>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      className="vp-input"
+                      inputMode="decimal"
+                      value={ptAmt}
+                      onChange={(e) => setPtAmt(e.target.value.replace(/[^0-9.]/g, "").replace(/^0+(?=\d)/, ""))}
+                      placeholder={ptSide === "buy" ? "0.01" : "1000"}
+                      style={{ flex: 1, padding: "12px 14px", fontSize: 16, width: "100%" }}
+                      aria-label={ptSide === "buy" ? "ETH amount" : "VURAFY amount"}
+                    />
+                    <span className="note" style={{ minWidth: 54, textAlign: "right" }}>{ptSide === "buy" ? "ETH" : pt?.symbol ?? "VURAFY"}</span>
+                  </div>
+                  <div className="note" style={{ marginTop: 8, minHeight: 18 }}>
+                    {ptQuoting
+                      ? "quoting…"
+                      : ptQuote
+                        ? ptSide === "buy"
+                          ? `≈ ${fmtTokens(ptQuote.out)} ${pt?.symbol ?? "VURAFY"}`
+                          : `≈ ${fmtEth(Number(formatUnits(ptQuote.out, 18)))} ETH`
+                        : " "}
+                  </div>
+                  <button
+                    className="btn"
+                    style={{ width: "100%", marginTop: 10 }}
+                    disabled={!!ptBusy || !ptQuote || ptSellOver}
+                    onClick={doPt}
+                  >
+                    {!isConnected
+                      ? "Connect wallet"
+                      : wrongChain
+                        ? chainSwitching ? "Switching…" : "Switch to Robinhood Chain"
+                        : ptBusy === "approve"
+                          ? "Approving…"
+                          : ptBusy === "sell"
+                            ? "Selling…"
+                            : ptBusy === "buy"
+                              ? "Buying…"
+                              : ptSellOver
+                                ? "Insufficient balance"
+                                : !ptQuote
+                                  ? "Enter an amount"
+                                  : ptSide === "buy"
+                                    ? "Buy $VURAFY"
+                                    : "Sell $VURAFY"}
+                  </button>
+                  <div className="note" style={{ marginTop: 8 }}>
+                    {ptSide === "sell"
+                      ? pt
+                        ? `balance: ${fmtTokens(pt.balance)} ${pt.symbol} · slippage 10%`
+                        : " "
+                      : pt
+                        ? `slippage 10% · fee ${pt.feeBps / 100}%`
+                        : " "}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* Tracks */}
         <section id="tracks">
@@ -1339,7 +1632,7 @@ export function VurafyApp() {
               )}
             </div>
             <div className="mb-3">
-              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Audio file (.mp3/.wav, max 4MB)</div>
+              <div className="uppercase text-neutral-400 mb-1" style={{ ...MONO, fontSize: 11 }}>Audio file (.mp3/.wav, max 50MB)</div>
               <label className="filepick">
                 <span className="filepick-btn">{audioFile ? "Change" : "Choose audio"}</span>
                 <span className="filepick-name">{audioFile ? audioFile.file.name : "no file chosen"}</span>
@@ -1391,7 +1684,7 @@ export function VurafyApp() {
             <div className="flex gap-3 mt-3">
               <button className="flex-1 py-3 uppercase vp-btn-s" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} onClick={() => setLaunchOpen(false)}>Cancel</button>
               <button className="flex-1 py-3 uppercase vp-btn-p disabled:opacity-50" style={{ ...MONO, fontSize: 12, cursor: "pointer" }} disabled={!isConnected || launch.isPending || launchWait.isLoading || uploading || !cfg} onClick={doLaunch}>
-                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : uploading ? "Uploading media to IPFS…" : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch on Chain (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
+                {!isConnected ? "Connect Wallet" : wrongChain ? (chainSwitching ? "Switching…" : "Switch to Robinhood Chain") : uploading ? (upPct != null ? `Uploading media to IPFS… ${upPct}%` : "Uploading media to IPFS…") : launch.isPending || launchWait.isLoading ? "Launching…" : `Launch on Chain (${cfg ? formatEther(cfg.fee) : "…"} ETH)`}
               </button>
             </div>
             <div className="uppercase mt-3 text-center" style={{ ...MONO, fontSize: 10, color: "#6f6f6f" }}>
