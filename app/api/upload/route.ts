@@ -1,4 +1,5 @@
 import { put } from "@vercel/blob";
+import { pinToPinata, AUDIO_EXT, IMAGE_EXT } from "@/lib/pinata";
 
 export const runtime = "nodejs";
 
@@ -7,24 +8,6 @@ const MAX_BYTES = 4.4 * 1024 * 1024;
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 type HostResult = { url: string; host: string; ipfsHash?: string };
-
-async function toPinata(file: File): Promise<HostResult> {
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("pinata: no JWT");
-  const fd = new FormData();
-  fd.append("file", new Blob([await file.arrayBuffer()], { type: file.type }), file.name || "file");
-  const r = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${jwt}` },
-    body: fd,
-  });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`pinata ${r.status}: ${text.slice(0, 120)}`);
-  const j = JSON.parse(text) as { IpfsHash?: string };
-  if (!j.IpfsHash) throw new Error("pinata: no IpfsHash");
-  const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL || "https://gateway.pinata.cloud/ipfs/";
-  return { url: `${gateway.replace(/\/?$/, "/")}${j.IpfsHash}`, host: "pinata", ipfsHash: j.IpfsHash };
-}
 
 async function toVercelBlob(file: File): Promise<HostResult> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -55,16 +38,13 @@ async function toUguu(file: File): Promise<HostResult> {
   throw new Error(`uguu: ${JSON.stringify(j).slice(0, 80) || r.status}`);
 }
 
-const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac)$/i;
-const IMAGE_EXT = /\.(png|jpe?g|webp|gif|avif)$/i;
-
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) return Response.json({ error: "no file" }, { status: 400 });
     if (file.size > MAX_BYTES)
-      return Response.json({ error: "file too large — max 4MB (Vercel limit)" }, { status: 400 });
+      return Response.json({ error: "file too large — max 4.4MB (Vercel limit)" }, { status: 400 });
     const isAudio = file.type.startsWith("audio/") || AUDIO_EXT.test(file.name);
     const isImage = file.type.startsWith("image/") || IMAGE_EXT.test(file.name);
     if (!isAudio && !isImage)
@@ -72,7 +52,7 @@ export async function POST(req: Request) {
 
     const attempts: string[] = [];
     try {
-      return Response.json(await toPinata(file));
+      return Response.json(await pinToPinata(new Blob([await file.arrayBuffer()], { type: file.type }), file.name || "file"));
     } catch (e) {
       attempts.push(String((e as Error).message));
     }
