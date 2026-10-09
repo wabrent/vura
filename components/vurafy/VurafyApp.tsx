@@ -7,10 +7,11 @@ import { robinhood } from "@/lib/web3/config";
 import {
   FACTORY, EXPLORER, PONS_APP, PROJECT_TOKEN, factoryAbi, curveAbi, tokenAbi, ipfsHttp,
   discoverLaunches, loadTrack, quoteBuy, quoteSell, loadProjectToken, walletBalances, buildDescription, VURAFY_SOCIALS,
-  type Track, type LaunchLog, type Quote, type ProjectToken,
+  loadCurveTrades, type Track, type LaunchLog, type Quote, type ProjectToken, type TradePoint,
 } from "./pons";
 import { buildDemoTracks } from "./demoCatalog";
 import { fetchAudiusTracks } from "./audius";
+import PriceChart from "./PriceChart";
 
 const MONO = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" };
 const CATALOG_TARGET = 50; // Audius trending feed size (on-chain launches take priority)
@@ -305,6 +306,8 @@ export function VurafyApp() {
   const [ptQuoting, setPtQuoting] = useState(false);
   const [ptBusy, setPtBusy] = useState<"approve" | "buy" | "sell" | null>(null);
   const ptStage = useRef<"" | "approve" | "buy" | "sell">("");
+  const [ptTrades, setPtTrades] = useState<TradePoint[]>([]);
+  const [ptTradesTick, setPtTradesTick] = useState(0);
 
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending, error: connectError } = useConnect();
@@ -717,6 +720,21 @@ export function VurafyApp() {
     return () => window.clearInterval(iv);
   }, [loadPt]);
 
+  const ptCurve = pt?.curve;
+  useEffect(() => {
+    if (!ptCurve) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const pts = await loadCurveTrades(ptCurve, PROJECT_TOKEN);
+        if (!cancelled) setPtTrades([...pts]);
+      } catch { /* noop */ }
+    };
+    void refresh();
+    const iv = window.setInterval(() => { void refresh(); }, 20000);
+    return () => { cancelled = true; window.clearInterval(iv); };
+  }, [ptCurve, ptTradesTick]);
+
   useEffect(() => {
     if (!pt) return;
     let cancelled = false;
@@ -819,6 +837,7 @@ export function VurafyApp() {
       setPtBusy(null);
       say(st === "buy" ? "$VURAFY purchase confirmed ✓" : "$VURAFY sold ✓");
       void loadPt();
+      setPtTradesTick((t) => t + 1);
       return;
     }
     say("purchase confirmed onchain ✓");
@@ -1283,6 +1302,9 @@ export function VurafyApp() {
             >
               {PROJECT_TOKEN.slice(0, 6)}…{PROJECT_TOKEN.slice(-4)} ↗
             </a>
+          </div>
+          <div style={{ margin: "16px 0 18px" }}>
+            <PriceChart trades={ptTrades} priceEth={pt?.priceEth ?? 0} totalSupply={pt?.totalSupply ?? 0n} />
           </div>
           <div className="two">
             <div className="glow">

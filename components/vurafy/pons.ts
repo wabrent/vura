@@ -62,6 +62,14 @@ export const TOKEN_LAUNCHED = parseAbiItem(
   "event TokenLaunched(address indexed token, address indexed curve, address indexed deployer, address pairToken, uint256 launchConfigId, uint256 graduationThreshold)"
 );
 
+export const CURVE_BUY = parseAbiItem(
+  "event CurveBuy(address indexed buyer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax)"
+);
+
+export const CURVE_SELL = parseAbiItem(
+  "event CurveSell(address indexed seller, address indexed recipient, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 tax)"
+);
+
 /* ---------- description format for vurafy tracks ----------
    VURAFY | {artist} | audio: {url}
 ----------------------------------------------------------- */
@@ -287,6 +295,107 @@ export async function loadProjectToken(owner?: Address): Promise<ProjectToken | 
   } catch {
     return null;
   }
+}
+
+/* ---------- trade history (CurveBuy/CurveSell → price points) ---------- */
+export type TradePoint = { t: number; price: number; side: "buy" | "sell"; block: number };
+
+const launchBlockCache = new Map<string, bigint>();
+
+export async function findLaunchBlock(token: Address): Promise<bigint> {
+  const key = token.toLowerCase();
+  const hit = launchBlockCache.get(key);
+  if (hit !== undefined) return hit;
+  const latest = await client.getBlockNumber();
+  const CHUNK = 1_000_000n;
+  let to = latest;
+  let start = -1n;
+  for (let i = 0; i < 20 && start < 0n; i++) {
+    const from = to - CHUNK < 0n ? 0n : to - CHUNK;
+    try {
+      const logs = await client.getLogs({ address: FACTORY, event: TOKEN_LAUNCHED, args: { token }, fromBlock: from, toBlock: to });
+      if (logs.length > 0) start = logs[0].blockNumber ?? from;
+    } catch {
+      break;
+    }
+    if (from === 0n) break;
+    to = from - 1n;
+  }
+  if (start < 0n) start = latest > 20_000_000n ? latest - 20_000_000n : 0n;
+  launchBlockCache.set(key, start);
+  return start;
+}
+
+type TradesCache = { curve: Address; points: TradePoint[]; lastBlock: bigint };
+let tradesCache: TradesCache | null = null;
+const blockTimeCache = new Map<number, number>();
+
+async function blockTimestamps(blocks: number[]): Promise<void> {
+  const missing = [...new Set(blocks)].filter((b) => !blockTimeCache.has(b));
+  await Promise.all(
+    missing.map(async (b) => {
+      try {
+        const blk = await client.getBlock({ blockNumber: BigInt(b) });
+        blockTimeCache.set(b, Number(blk.timestamp) * 1000);
+      } catch {
+        blockTimeCache.set(b, Date.now());
+      }
+    })
+  );
+}
+
+export async function loadCurveTrades(curve: Address, token: Address): Promise<TradePoint[]> {
+  if (!tradesCache || tradesCache.curve.toLowerCase() !== curve.toLowerCase()) {
+    const start = await findLaunchBlock(token);
+    tradesCache = { curve, points: [], lastBlock: start };
+  }
+  const latest = await client.getBlockNumber();
+  if (latest < tradesCache.lastBlock) return tradesCache.points;
+  const cache = tradesCache;
+  const CHUNK = 2_000_000n;
+  const collected: TradePoint[] = [];
+  let next = cache.lastBlock;
+  while (next <= latest) {
+    const to = next + CHUNK - 1n > latest ? latest : next + CHUNK - 1n;
+    let buys: readonly { args: Record<string, unknown>; blockNumber: bigint | null }[] = [];
+    let sells: readonly { args: Record<string, unknown>; blockNumber: bigint | null }[] = [];
+    try {
+      [buys, sells] = (await Promise.all([
+        client.getLogs({ address: curve, event: CURVE_BUY, fromBlock: next, toBlock: to }),
+        client.getLogs({ address: curve, event: CURVE_SELL, fromBlock: next, toBlock: to }),
+      ])) as [typeof buys, typeof sells];
+    } catch {
+      break;
+    }
+    for (const lg of buys) {
+      const a = lg.args as { quoteIn?: bigint; tokensOut?: bigint; fee?: bigint; tax?: bigint };
+      if (!lg.blockNumber || a.quoteIn === undefined || !a.tokensOut) continue;
+      const net = a.quoteIn - (a.fee ?? 0n) - (a.tax ?? 0n);
+      collected.push({ t: 0, price: Number(net) / Number(a.tokensOut), side: "buy", block: Number(lg.blockNumber) });
+    }
+    for (const lg of sells) {
+      const a = lg.args as { tokensIn?: bigint; quoteOut?: bigint; fee?: bigint; tax?: bigint };
+      if (!lg.blockNumber || !a.tokensIn || a.quoteOut === undefined) continue;
+      const gross = a.quoteOut + (a.fee ?? 0n) + (a.tax ?? 0n);
+      collected.push({ t: 0, price: Number(gross) / Number(a.tokensIn), side: "sell", block: Number(lg.blockNumber) });
+    }
+    next = to + 1n;
+  }
+  if (collected.length > 0) {
+    await blockTimestamps(collected.map((p) => p.block));
+    for (const p of collected) p.t = blockTimeCache.get(p.block) ?? Date.now();
+    const seen = new Set(cache.points.map((p) => `${p.block}:${p.side}:${p.price}`));
+    for (const p of collected) {
+      const k = `${p.block}:${p.side}:${p.price}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        cache.points.push(p);
+      }
+    }
+    cache.points.sort((a, b) => a.block - b.block || a.t - b.t);
+  }
+  if (next > cache.lastBlock) cache.lastBlock = next;
+  return cache.points;
 }
 
 const CHUNK = 1_000_000n;
