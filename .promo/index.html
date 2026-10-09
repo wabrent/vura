@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#050505;overflow:hidden}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+const W = 1920, H = 1080, FPS = 30, DURATION = 20.5;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+
+/* ---------- easing ---------- */
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+const easeInOutCubic = (x) => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const easeOutExpo = (x) => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const easeOutBack = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+/* beat pulse at 120bpm (0.5s grid) */
+const pulse = (t) => Math.exp(-((t % 0.5) / 0.11));
+
+/* hard-cut scenes, every 2.5s = 5 beats */
+const CUTS = [0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, DURATION];
+const FLASHES = [2.5, 5, 7.5, 8.333, 9.166, 10, 11.0, 12.5, 15, 17.5, 19.6];
+
+function seg(t, i) {
+  const a = CUTS[i], b = CUTS[i + 1];
+  if (t < a || t >= b) return null;
+  return { lt: t - a, dur: b - a };
+}
+
+/* ---------- device screens (preloaded) ---------- */
+const IMG = {};
+const __imgLoad = Promise.all(
+  [["desktop", "/shots/desktop.png"], ["mobile", "/shots/mobile.png"]].map(
+    ([k, src]) =>
+      new Promise((res) => {
+        const im = new Image();
+        im.onload = () => { IMG[k] = im; res(); };
+        im.onerror = () => res();
+        im.src = src;
+      })
+  )
+);
+
+function drawScreen(img, x, y, w, h, r, zoom = 1, panY = 0, anchorY = 0.5) {
+  if (!img) return;
+  const s = Math.max(w / img.width, h / img.height) * zoom;
+  const dw = img.width * s, dh = img.height * s;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.clip();
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) * anchorY + panY, dw, dh);
+  ctx.restore();
+}
+
+/* ---------- fonts ---------- */
+const __ready = (async () => {
+  await document.fonts.load('800 170px Archivo');
+  await document.fonts.load('600 130px Archivo');
+  await document.fonts.load('500 30px "JetBrains Mono"');
+  await document.fonts.load('400 30px "JetBrains Mono"');
+  await document.fonts.ready;
+  await __imgLoad;
+  window.__ready = true;
+})();
+
+/* ---------- shared draws ---------- */
+function drawWaves(t, alpha, speedMul = 1) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const layers = [
+    { amp: 46, freq: 0.0016, speed: 0.34, y: 0.30, a: 0.10 },
+    { amp: 62, freq: 0.0011, speed: -0.26, y: 0.52, a: 0.075 },
+    { amp: 38, freq: 0.0023, speed: 0.45, y: 0.68, a: 0.11 },
+    { amp: 80, freq: 0.0008, speed: -0.18, y: 0.86, a: 0.06 },
+  ];
+  for (const L of layers) {
+    ctx.beginPath();
+    for (let x = -20; x <= W + 20; x += 16) {
+      const y = H * L.y
+        + Math.sin(x * L.freq + t * L.speed * 2.2 * speedMul) * L.amp
+        + Math.sin(x * L.freq * 2.7 + t * L.speed * 3.1 * speedMul) * L.amp * 0.35;
+      x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = `rgba(255,255,255,${L.a})`;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function vignette(strength = 0.55) {
+  const g = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.95);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, `rgba(0,0,0,${strength})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function gradText(text, x, y, size, weight = 800, align = "left", alpha = 1, scale = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.font = `${weight} ${size}px Archivo`;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  const g = ctx.createLinearGradient(0, -size, 0, size * 0.18);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(1, "#8b8b8b");
+  ctx.fillStyle = g;
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function mono(text, x, y, size, color = "#9a9a9a", align = "left", alpha = 1, ls = 3, weight = 400) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  try { ctx.letterSpacing = ls + "px"; } catch (e) {}
+  ctx.font = `${weight} ${size}px "JetBrains Mono"`;
+  ctx.textAlign = align;
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+/* vinyl record */
+function vinyl(cx, cy, r, rot, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(cx, cy);
+  // disc
+  const g = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r);
+  g.addColorStop(0, "#141414");
+  g.addColorStop(1, "#070707");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  // grooves
+  for (let i = 0; i < 16; i++) {
+    const rr = r * (0.34 + 0.041 * i);
+    ctx.beginPath();
+    ctx.arc(0, 0, rr, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255,${0.05 + (i % 3 === 0 ? 0.05 : 0)})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  // rotating sheen
+  ctx.rotate(rot);
+  const sh = ctx.createLinearGradient(0, -r, 0, r);
+  sh.addColorStop(0, "rgba(255,255,255,0)");
+  sh.addColorStop(0.5, "rgba(255,255,255,0.07)");
+  sh.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sh;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.rotate(-rot);
+  // label
+  ctx.fillStyle = "#1b1b1b";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.27, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.stroke();
+  ctx.rotate(rot * 1.0);
+  mono("V U R A F Y", 0, 6, Math.max(10, r * 0.075), "#c9c9c9", "center", 1, 2, 500);
+  ctx.rotate(-rot * 1.0);
+  // spindle
+  ctx.fillStyle = "#050505";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.035, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/* fast per-letter reveal, from left origin */
+function kineticL(text, x0, y, size, tLocal, startDelay = 0, per = 0.035, alpha = 1) {
+  ctx.save();
+  ctx.font = `800 ${size}px Archivo`;
+  ctx.textAlign = "left";
+  const g = ctx.createLinearGradient(0, y - size, 0, y + size * 0.18);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(1, "#8b8b8b");
+  let x = x0;
+  [...text].forEach((ch, i) => {
+    const p = clamp01((tLocal - startDelay - i * per) / 0.45);
+    const e = easeOutExpo(p);
+    ctx.globalAlpha = p * alpha;
+    ctx.fillStyle = g;
+    ctx.fillText(ch, x - (1 - e) * 70, y + (1 - e) * 30);
+    x += ctx.measureText(ch).width;
+  });
+  ctx.restore();
+}
+
+/* ---------- S1 intro: kinetic headline + spinning vinyl ---------- */
+function sceneIntro(t) {
+  const s = seg(t, 0);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.4);
+  // wordmark tracking-in
+  const tp = easeOutExpo(clamp01(lt / 0.9));
+  mono("V U R A F Y", 120, 150, 34, "#8f8f8f", "left", tp, 14 + 46 * (1 - tp), 500);
+  // vinyl slides in from right, spinning
+  const vp = easeOutExpo(clamp01(lt / 0.7));
+  const vx = W + 340 + (1500 - (W + 340)) * vp;
+  vinyl(vx, 560, 265, lt * 2.1, vp);
+  // headline
+  kineticL("OWN THE", 120, 430, 150, lt, 0.2, 0.035);
+  kineticL("SOUND.", 120, 600, 150, lt, 0.45, 0.035);
+  // subtitle
+  const sp = easeOutCubic(clamp01((lt - 1.0) / 0.5));
+  ctx.fillStyle = `rgba(255,255,255,${0.35 * sp})`;
+  ctx.fillRect(122, 668, 620 * sp, 2);
+  mono("EVERY TRACK IS A TOKEN  ·  ROBINHOOD CHAIN", 120, 740, 28, "#9a9a9a", "left", sp, 4);
+}
+
+/* ---------- S2 equalizer / now playing ---------- */
+function sceneWave(t) {
+  const s = seg(t, 1);
+  if (!s) return;
+  const lt = s.lt;
+  const kick = pulse(lt + 0.001);
+  // now playing row
+  const dot = (lt % 0.7) < 0.35 ? 1 : 0.25;
+  ctx.fillStyle = `rgba(255,90,90,${dot})`;
+  ctx.beginPath();
+  ctx.arc(96, 96, 9, 0, Math.PI * 2);
+  ctx.fill();
+  mono("NOW PLAYING — VURAFY RADIO", 122, 106, 26, "#c9c9c9", "left", 1, 5, 500);
+  mono("LIVE FEED · 50+ TRACKS", W - 96, 106, 24, "#6f6f6f", "right", 1, 4);
+  // marquee headline
+  const line = "VURAFY RADIO ✦ OWN THE SOUND ✦ ";
+  ctx.save();
+  ctx.font = `600 118px Archivo`;
+  const lw = ctx.measureText(line).width;
+  let mx = W - ((lt * 620) % lw);
+  for (let k = 0; k < 3; k++) {
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.textAlign = "left";
+    ctx.fillText(line, mx - lw * k, 350);
+  }
+  ctx.restore();
+  // EQ bars
+  const N = 76, gap = 8;
+  const bw = (W - 160 - gap * (N - 1)) / N;
+  const maxH = 430, midY = 660;
+  for (let i = 0; i < N; i++) {
+    const n1 = Math.sin(i * 0.62 + lt * 5.1);
+    const n2 = Math.sin(i * 1.41 - lt * 3.7);
+    const n3 = Math.sin(i * 0.21 + lt * 9.3);
+    const wob = (n1 + n2 + n3 + 3) / 6;
+    const beat = kick * (0.35 + 0.65 * Math.abs(Math.sin(i * 1.7 + 2)));
+    const h = maxH * (0.10 + 0.72 * wob + 0.5 * beat * wob);
+    const x = 80 + i * (bw + gap);
+    ctx.fillStyle = `rgba(255,255,255,${0.55 + 0.4 * wob})`;
+    ctx.beginPath();
+    ctx.roundRect(x, midY - h / 2, bw, h, bw / 2);
+    ctx.fill();
+  }
+  // progress bar
+  const p = clamp01(lt / s.dur);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(80, H - 120, W - 160, 4);
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillRect(80, H - 120, (W - 160) * p, 4);
+  mono("SPACE — PLAY/PAUSE   ·   ← → — SWITCH TRACK", 80, H - 66, 24, "#6f6f6f", "left", 1, 3);
+  mono(`00:${String(Math.floor(p * 20)).padStart(2, "0")} / 00:20`, W - 80, H - 66, 24, "#6f6f6f", "right", 1, 3);
+}
+
+/* ---------- S3 bonding curve draws itself ---------- */
+function sceneCurve(t) {
+  const s = seg(t, 2);
+  if (!s) return;
+  const lt = s.lt;
+  const p = easeInOutCubic(clamp01((lt - 0.25) / 1.5));
+  // title
+  const tp = easeOutExpo(clamp01(lt / 0.5));
+  gradText("TRADE THE CURVE.", 110, 190, 88, 800, "left", tp);
+  mono("BONDING CURVE · GRADUATION AT 4.2 ETH", 112, 250, 26, "#9a9a9a", "left", easeOutCubic(clamp01((lt - 0.35) / 0.5)), 4);
+  // grid
+  const gp = clamp01(lt / 0.5);
+  const yl = ["4.2", "2.5", "1.0", "0.1"];
+  ctx.save();
+  for (let i = 0; i < 4; i++) {
+    const gy = 340 + i * 170;
+    ctx.globalAlpha = gp * (1 - i * 0.15);
+    ctx.setLineDash([6, 10]);
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(140, gy);
+    ctx.lineTo(1800, gy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    mono(yl[i], 1830, gy + 8, 22, "#6f6f6f", "left", 1, 2);
+  }
+  ctx.restore();
+  // curve geometry
+  const X0 = 150, X1 = 1780, Y0 = 920, Y1 = 330;
+  const fy = (x) => (Math.exp(3.3 * x) - 1) / (Math.exp(3.3) - 1);
+  const px = (x) => X0 + x * (X1 - X0);
+  const py = (x) => Y0 - fy(x) * (Y0 - Y1);
+  // fill under drawn part
+  ctx.save();
+  ctx.globalAlpha = 0.5 * gp;
+  const fillG = ctx.createLinearGradient(0, Y1, 0, Y0);
+  fillG.addColorStop(0, "rgba(255,255,255,0.14)");
+  fillG.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = fillG;
+  ctx.beginPath();
+  ctx.moveTo(px(0), Y0);
+  const STEPS = 90;
+  for (let i = 0; i <= STEPS * p; i++) {
+    const x = i / STEPS;
+    ctx.lineTo(px(x), py(x));
+  }
+  ctx.lineTo(px(p), Y0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  // curve stroke (drawn portion)
+  if (p > 0) {
+    ctx.save();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(255,255,255,0.5)";
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    for (let i = 0; i <= STEPS; i++) {
+      const x = (i / STEPS) * p;
+      i === 0 ? ctx.moveTo(px(x), py(x)) : ctx.lineTo(px(x), py(x));
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  // head dot + price
+  if (p > 0.02) {
+    const dx = px(p), dy = py(p);
+    ctx.save();
+    ctx.shadowColor = "rgba(255,255,255,0.9)";
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(dx, dy, 12 + 3 * pulse(lt), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    mono(`${(p * 4.2).toFixed(2)} ETH`, dx - 20, dy - 40, 34, "#ffffff", "right", 1, 3, 500);
+  }
+  // graduation pill
+  if (p >= 0.999) {
+    const ap = easeOutBack(clamp01((lt - 1.85) / 0.4));
+    if (ap > 0) {
+      ctx.save();
+      ctx.globalAlpha = clamp01((lt - 1.85) / 0.2);
+      ctx.translate(px(1) - 240, py(1) + 90);
+      ctx.scale(Math.max(0.01, ap), Math.max(0.01, ap));
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.beginPath();
+      ctx.roundRect(-170, -30, 340, 60, 30);
+      ctx.stroke();
+      mono("GRADUATED → V4", 0, 10, 26, "#ffffff", "center", 1, 4, 500);
+      ctx.restore();
+    }
+  }
+}
+
+/* ---------- S4 punch words with glitch ---------- */
+function scenePunch(t) {
+  const s = seg(t, 3);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.8);
+  const words = ["LAUNCH.", "TRADE.", "EARN."];
+  const subs = ["COVER + AUDIO → IPFS", "BUY & SELL 24/7", "TAX ON EVERY TRADE"];
+  const step = s.dur / 3;
+  const wi = Math.min(2, Math.floor(lt / step));
+  const wl = lt - wi * step;
+  const p = easeOutExpo(clamp01(wl / 0.22));
+  const scale = 1.3 - 0.3 * p;
+  const glitch = (1 - p) * 14;
+  const y = 580;
+  if (glitch > 0.5) {
+    gradText(words[wi], W / 2 + glitch, y, 190, 800, "center", p * 0.4, scale);
+    gradText(words[wi], W / 2 - glitch, y, 190, 800, "center", p * 0.4, scale);
+  }
+  gradText(words[wi], W / 2, y, 190, 800, "center", p, scale);
+  mono(subs[wi], W / 2, y + 110, 32, "#9a9a9a", "center", easeOutCubic(clamp01((wl - 0.15) / 0.35)), 8, 500);
+}
+
+/* ---------- S5 cards -> IPFS -> spinning coin ---------- */
+function sceneMint(t) {
+  const s = seg(t, 4);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.4);
+  // phase 1: two cards fly in
+  const pA = easeOutExpo(clamp01(lt / 0.6));
+  const pB = easeOutExpo(clamp01((lt - 0.1) / 0.6));
+  const merge = clamp01((lt - 0.75) / 0.35); // cards shrink into center
+  const cardScale = 1 - easeInOutCubic(merge);
+  if (pA > 0 && cardScale > 0.02) {
+    // cover card
+    const cx = -320 + (760 + 320) * pA;
+    const cx2 = cx + (960 - cx) * easeInOutCubic(merge);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, pA * 2);
+    ctx.translate(cx2, 500);
+    ctx.scale(cardScale, cardScale);
+    ctx.rotate((1 - pA) * -0.3 + 0.06 * Math.sin(lt * 3));
+    const cg = ctx.createLinearGradient(-110, -110, 110, 110);
+    cg.addColorStop(0, "#f2f2f2");
+    cg.addColorStop(0.55, "#9c9c9c");
+    cg.addColorStop(1, "#3c3c3c");
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.roundRect(-110, -110, 220, 220, 26);
+    ctx.fill();
+    ctx.fillStyle = "#111";
+    ctx.font = "800 110px Archivo";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("♪", 0, 6);
+    ctx.restore();
+  }
+  if (pB > 0 && cardScale > 0.02) {
+    // audio card
+    const cx = W + 340 + (1160 - (W + 340)) * pB;
+    const cx2 = cx + (960 - cx) * easeInOutCubic(merge);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, pB * 2);
+    ctx.translate(cx2, 500);
+    ctx.scale(cardScale, cardScale);
+    ctx.rotate((1 - pB) * 0.3 - 0.05 * Math.sin(lt * 3));
+    ctx.fillStyle = "#101010";
+    ctx.beginPath();
+    ctx.roundRect(-170, -85, 340, 170, 24);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    for (let i = 0; i < 22; i++) {
+      const h = 20 + 90 * Math.abs(Math.sin(i * 0.9 + lt * 7));
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.roundRect(-150 + i * 14, -h / 2, 7, h, 3);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // phase 2: coin spins out
+  if (lt >= 0.95) {
+    const cp = clamp01((lt - 0.95) / 0.5);
+    const pop = easeOutBack(cp);
+    const rot = (lt - 0.95) * 4.5;
+    const face = Math.cos(rot);
+    const R = 175 * Math.max(0.01, pop);
+    const cy = 500 - 60 * easeOutCubic(clamp01((lt - 0.95) / 1.2));
+    ctx.save();
+    ctx.globalAlpha = clamp01((lt - 0.95) / 0.2);
+    ctx.translate(960, cy);
+    // rim (thickness when edge-on)
+    ctx.fillStyle = "#8a8a8a";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(6, R * Math.abs(face)), R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // face
+    const fg = ctx.createLinearGradient(-R, -R, R, R);
+    fg.addColorStop(0, "#f5f5f5");
+    fg.addColorStop(0.5, "#cfcfcf");
+    fg.addColorStop(1, "#7d7d7d");
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(6, R * Math.abs(face)), R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    // note on face (only when face visible)
+    if (Math.abs(face) > 0.35) {
+      ctx.save();
+      ctx.scale(Math.abs(face), 1);
+      ctx.fillStyle = "#141414";
+      ctx.font = `800 ${R * 0.9}px Archivo`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.globalAlpha = ctx.globalAlpha * clamp01((Math.abs(face) - 0.35) / 0.3);
+      ctx.fillText("♪", 0, R * 0.06);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  // labels
+  mono("COVER + AUDIO → IPFS", 960, 790, 32, "#e8e8e8", "center", easeOutCubic(clamp01((lt - 1.1) / 0.4)), 6, 500);
+  mono("TOKEN LIVE ON THE CURVE", 960, 850, 28, "#9a9a9a", "center", easeOutCubic(clamp01((lt - 1.55) / 0.4)), 6);
+}
+
+/* ---------- S6 stats counters ---------- */
+function sceneStats(t) {
+  const s = seg(t, 5);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.4);
+  const rows = [
+    { d: 0.0, val: 0.0005, fmt: (v) => `${v.toFixed(4)} ETH`, label: "LAUNCH FEE" },
+    { d: 0.55, val: 10, fmt: (v) => `${v.toFixed(0)}%`, label: "CREATOR TAX ON EVERY TRADE" },
+    { d: 1.1, val: 4.2, fmt: (v) => `${v.toFixed(1)} ETH`, label: "GRADUATION THRESHOLD" },
+  ];
+  rows.forEach((r, i) => {
+    const p = easeOutExpo(clamp01((lt - r.d) / 0.6));
+    if (p <= 0) return;
+    const y = 320 + i * 230;
+    const x = 150 - (1 - p) * 240;
+    const cp = easeOutCubic(clamp01((lt - r.d - 0.1) / 0.9));
+    gradText(r.fmt(r.val * cp), x, y, 128, 800, "left", p);
+    ctx.save();
+    ctx.font = `800 128px Archivo`;
+    const nw = ctx.measureText(r.fmt(r.val)).width;
+    ctx.restore();
+    ctx.fillStyle = `rgba(255,255,255,${0.3 * p})`;
+    ctx.fillRect(x + 4, y + 34, nw * p, 2);
+    mono(r.label, x + 6, y + 78, 27, "#9a9a9a", "left", p, 5, 500);
+    // right accent
+    mono(`0${i + 1}`, W - 150, y, 44, `rgba(255,255,255,${0.18 * p})`, "right", 1, 4, 500);
+  });
+}
+
+/* ---------- S7 devices: laptop + phone with live UI ---------- */
+function laptopBody(LW, LH) {
+  // base
+  const bg = ctx.createLinearGradient(0, LH, 0, LH + 26);
+  bg.addColorStop(0, "#9a9a9a");
+  bg.addColorStop(1, "#5f5f5f");
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.moveTo(-26, LH + 2);
+  ctx.lineTo(LW + 26, LH + 2);
+  ctx.lineTo(LW + 62, LH + 26);
+  ctx.lineTo(-62, LH + 26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#4a4a4a";
+  ctx.beginPath();
+  ctx.roundRect(-62, LH + 21, LW + 124, 8, 4);
+  ctx.fill();
+  ctx.fillStyle = "#2e2e2e";
+  ctx.beginPath();
+  ctx.roundRect(LW / 2 - 70, LH + 21, 140, 7, 4);
+  ctx.fill();
+  // screen shell
+  ctx.fillStyle = "#0b0b0b";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, LW, LH, 16);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function phoneBody(PW, PH, lt) {
+  ctx.fillStyle = "#0a0a0a";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, PW, PH, 46);
+  ctx.fill();
+  // screen (slow scroll down over the scene)
+  drawScreen(IMG.mobile, 9, 9, PW - 18, PH - 18, 38, 1.15, 48 - lt * 38);
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, PW, PH, 46);
+  ctx.stroke();
+  // dynamic island
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.roundRect(PW / 2 - 46, 24, 92, 27, 14);
+  ctx.fill();
+  // side buttons
+  ctx.fillStyle = "#3c3c3c";
+  ctx.beginPath(); ctx.roundRect(PW - 3, 150, 4, 64, 2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(PW - 3, 232, 4, 44, 2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-1, 190, 4, 44, 2); ctx.fill();
+  // glass sheen
+  const sg = ctx.createLinearGradient(0, 0, PW, PH);
+  sg.addColorStop(0, "rgba(255,255,255,0.10)");
+  sg.addColorStop(0.35, "rgba(255,255,255,0)");
+  ctx.fillStyle = sg;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, PW, PH, 46);
+  ctx.fill();
+}
+
+function sceneDevices(t) {
+  const s = seg(t, 6);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.4);
+  // headline
+  gradText("EVERYWHERE.", 170, 185, 86, 800, "left", easeOutExpo(clamp01(lt / 0.45)));
+  mono("DESKTOP + MOBILE — ONE APP", 173, 242, 26, "#9a9a9a", "left", easeOutCubic(clamp01((lt - 0.25) / 0.4)), 5, 500);
+  // backdrop glow
+  const glow = ctx.createRadialGradient(760, 660, 100, 760, 660, 860);
+  glow.addColorStop(0, "rgba(255,255,255,0.07)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  // laptop slides in from left with slight tilt + float
+  const lp = easeOutExpo(clamp01(lt / 0.7));
+  const LW = 1120, LH = 700;
+  ctx.save();
+  ctx.globalAlpha = lp;
+  ctx.translate(170 - (1 - lp) * 1750 + LW / 2, 305 + Math.sin(lt * 1.6) * 6 + LH / 2);
+  ctx.rotate(-0.03 + Math.sin(lt * 1.2) * 0.004);
+  ctx.translate(-LW / 2, -LH / 2);
+  laptopBody(LW, LH);
+  drawScreen(IMG.desktop, 12, 12, LW - 24, LH - 24, 8, 1.0 + 0.035 * (lt / 2.5), -lt * 2, 0);
+  ctx.fillStyle = "#1e1e1e";
+  ctx.beginPath();
+  ctx.arc(LW / 2, 7, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // phone pops in front, tilted, slowly scrolling its screen
+  const pp = easeOutBack(clamp01((lt - 0.5) / 0.55));
+  if (pp > 0.01) {
+    const PW = 320, PH = 660;
+    ctx.save();
+    ctx.globalAlpha = clamp01((lt - 0.5) / 0.25);
+    ctx.translate(1225 + PW / 2, 335 + PH / 2 + (1 - pp) * 130);
+    ctx.rotate(0.05);
+    ctx.scale(Math.max(0.01, pp), Math.max(0.01, pp));
+    ctx.translate(-PW / 2, -PH / 2);
+    phoneBody(PW, PH, lt);
+    ctx.restore();
+  }
+  // right info column
+  const ip = easeOutCubic(clamp01((lt - 0.9) / 0.5));
+  mono("WEB APP", 1810, 430, 26, "#9a9a9a", "right", ip, 5, 500);
+  mono("MOBILE FIRST", 1810, 482, 26, "#9a9a9a", "right", ip, 5, 500);
+  mono("vura.ink", 1810, 534, 28, "#ffffff", "right", ip, 5, 500);
+}
+
+/* ---------- S8 outro ---------- */
+function sceneOutro(t) {
+  const s = seg(t, 7);
+  if (!s) return;
+  const lt = s.lt;
+  drawWaves(lt, 1, 1.6);
+  vinyl(1530, 560, 250, lt * 1.6, 0.45 * easeOutCubic(clamp01(lt / 0.5)));
+  const wp = easeOutExpo(clamp01(lt / 0.55));
+  gradText("VURAFY", 960, 500, 200, 800, "center", wp, 1.32 - 0.32 * wp);
+  const pp = easeOutBack(clamp01((lt - 0.45) / 0.5));
+  if (pp > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp01((lt - 0.45) / 0.25);
+    const pw = 420, ph = 88;
+    ctx.translate(960, 585 + ph / 2);
+    ctx.scale(Math.max(0.01, pp), Math.max(0.01, pp));
+    ctx.lineWidth = 2 / Math.max(0.4, pp);
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath();
+    ctx.roundRect(-pw / 2, -ph / 2, pw, ph, 44);
+    ctx.stroke();
+    mono("vura.ink", 0, 13, 36, "#ffffff", "center", clamp01((lt - 0.6) / 0.25), 4, 500);
+    ctx.restore();
+  }
+  mono("LAUNCH A TRACK TODAY", 960, 780, 28, "#6f6f6f", "center", easeOutCubic(clamp01((lt - 0.85) / 0.5)), 8);
+}
+
+/* ---------- master timeline ---------- */
+function renderAt(t) {
+  ctx.fillStyle = "#050505";
+  ctx.fillRect(0, 0, W, H);
+  sceneIntro(t);
+  sceneWave(t);
+  sceneCurve(t);
+  scenePunch(t);
+  sceneMint(t);
+  sceneStats(t);
+  sceneDevices(t);
+  sceneOutro(t);
+  // white flashes on cuts
+  for (const f of FLASHES) {
+    const dt = t - f;
+    if (dt >= 0 && dt < 2.6 / FPS) {
+      ctx.fillStyle = `rgba(255,255,255,${0.22 * (1 - dt / (2.6 / FPS))})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+  // final fade to black
+  const tail = clamp01((t - (DURATION - 0.35)) / 0.35);
+  if (tail > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${tail})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+window.render = (t) => { renderAt(t); return cv.toDataURL("image/jpeg", 0.95); };
+window.__ready = false;
+</script>
+</body>
+</html>
